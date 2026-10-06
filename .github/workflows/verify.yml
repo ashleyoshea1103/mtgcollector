@@ -1,7 +1,11 @@
 # Runs scripts/verify.sh (compile, unit tests, behaviour checks) on every pull
-# request into develop or main, on every push to them (so merged results are
-# checked too) and in merge queues. The job is named `verify`: the branch
-# ruleset requires that check, from GitHub Actions, before anything merges.
+# request into develop or main and on every push to them (so merged results are
+# checked too). The job is named `verify`: the branch ruleset requires that
+# check, from GitHub Actions, before anything merges.
+#
+# Never add an `if:` that skips the job (e.g. to ignore title edits): a skipped
+# job satisfies a required check, and with cancel-in-progress a skipped run
+# would replace a real one.
 name: verify
 
 on:
@@ -11,7 +15,6 @@ on:
     types: [opened, synchronize, reopened, edited]
   push:
     branches: [develop, main]
-  merge_group:
   workflow_dispatch:
 
 concurrency:

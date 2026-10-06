@@ -1,0 +1,26 @@
+# Keeps the SHA-pinned GitHub Actions and npm dependencies up to date. Updates
+# arrive as pull requests into develop and must pass `verify` like any other.
+# The cooldown lets new releases settle for a few days before they're proposed,
+# which avoids picking up a compromised release in its first hours.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: npm
+    directory: /frontend
+    target-branch: develop
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
+      # One pull request for all minor and patch updates, rather than one per package.
+      minor-and-patch:
+        update-types: [minor, patch]

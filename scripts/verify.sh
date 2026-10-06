@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Every check a change must pass before it can be pushed or merged:
-#   1. compile          – lint (warnings fail), lockfile sources, type check, production build
+#   0. setup            – lockfile sources (before installing), clean install, test file names
+#   1. compile          – lint (warnings fail), type check, production build, no dev-only code shipped
 #   2. unit tests       – pure logic
 #   3. behaviour checks – components rendered and driven as a user would
 #
@@ -38,6 +39,9 @@ stage 'setup'
 # The frontend always exists; a change that removes or moves it must not pass by checking nothing.
 [[ -f frontend/package.json ]] || fail 'frontend/package.json is missing'
 
+# Before anything is installed from it.
+run 'frontend: lockfile sources' node scripts/check-lockfile.mjs frontend/package-lock.json
+
 if [[ -n "${CI:-}" || -n "${VERIFY_CLEAN_INSTALL:-}" ]]; then
   # --ignore-scripts here as well as in .npmrc, which a change could delete.
   run 'frontend: npm ci' npm ci --prefix frontend --ignore-scripts --no-audit --no-fund
@@ -45,8 +49,13 @@ elif [[ ! -d frontend/node_modules ]]; then
   fail 'frontend/node_modules is missing; run `npm install` in frontend/'
 fi
 
-if [[ -z "${CI:-}" ]] && ! grep -qs 'installed by scripts/install-hooks.sh' "$(git rev-parse --git-common-dir)/hooks/pre-push"; then
-  printf '%swarning: the pre-push hook is not installed; run ./scripts/install-hooks.sh%s\n' "$yellow" "$reset"
+if [[ -z "${CI:-}" ]]; then
+  installed_hook="$(git rev-parse --git-common-dir)/hooks/pre-push"
+  if ! grep -qs 'installed by scripts/install-hooks.sh' "$installed_hook"; then
+    printf '%swarning: the pre-push hook is not installed; run ./scripts/install-hooks.sh%s\n' "$yellow" "$reset"
+  elif ! cmp -s .githooks/pre-push <(grep -v 'installed by scripts/install-hooks.sh' "$installed_hook"); then
+    printf '%swarning: .githooks/pre-push differs from the installed hook; review it, then run ./scripts/install-hooks.sh%s\n' "$yellow" "$reset"
+  fi
 fi
 
 # Every test file must be one Vitest runs: src/**/*.test.ts (unit) or src/**/*.test.tsx (behaviour).
@@ -57,7 +66,6 @@ $stray_tests"
 # --- 1. compile -------------------------------------------------------------
 stage '1/3 compile'
 run 'frontend: lint' npm run --prefix frontend --silent lint
-run 'frontend: lockfile sources' npm run --prefix frontend --silent lint:lockfile
 run 'frontend: type check + build' npm run --prefix frontend --silent build
 printf -- '--- %s\n' 'frontend: production bundle has no dev-only code'
 # Dev-only modules embed DEV_ONLY_MARKER (frontend/src/devOnly.ts); finding it in dist means one shipped.
