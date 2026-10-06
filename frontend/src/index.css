@@ -1,0 +1,167 @@
+/*
+ * Base styles only: enough to make the components readable. The visual design
+ * is still to be decided, so components expose BEM-style class names
+ * (block__element--modifier) for the real stylesheet to target later.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 1rem;
+  font-family: system-ui, sans-serif;
+  line-height: 1.4;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Card images keep the printed card's 63 × 88 mm proportions. */
+.card-image {
+  display: block;
+  aspect-ratio: 63 / 88;
+  width: 100%;
+  border-radius: 4.75% / 3.5%;
+}
+.card-image--small {
+  max-width: 146px;
+}
+.card-image--normal {
+  max-width: 244px;
+}
+.card-image--large {
+  max-width: 336px;
+}
+.card-image--missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  border: 1px dashed currentColor;
+  text-align: center;
+}
+
+.card-tile__media {
+  position: relative;
+}
+.card-tile__overlay {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+}
+.card-tile__body p,
+.card-tile__name {
+  margin: 0.25rem 0;
+}
+
+.entry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+}
+.group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.custom-group-card__previews {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+  min-height: 4rem;
+}
+
+.entry-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.entry-table th,
+.entry-table td {
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}
+
+.group-bucket__header {
+  cursor: pointer;
+}
+.group-bucket__header > * {
+  display: inline;
+  margin-right: 1rem;
+}
+
+.card-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.card-detail__images {
+  display: flex;
+  gap: 0.5rem;
+}
+.card-detail__oracle {
+  white-space: pre-line;
+}
+
+.add-form {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 24rem;
+}
+.add-form__field {
+  display: grid;
+}
+
+.printing-list {
+  display: grid;
+  gap: 0.25rem;
+  max-width: 32rem;
+}
+.printing-option {
+  display: flex;
+  gap: 0.75rem;
+  text-align: left;
+}
+.printing-option__set {
+  flex: 1;
+}
+
+.mana-symbol {
+  text-decoration: none;
+}
+.mana-symbol::before {
+  content: '{';
+}
+.mana-symbol::after {
+  content: '}';
+}
+
+/* Gallery page */
+.gallery__section {
+  margin-block: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid;
+}
+.gallery__toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.gallery__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.gallery__row .card-image {
+  width: auto;
+}
+.gallery__note {
+  font-style: italic;
+}
