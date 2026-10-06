@@ -15,8 +15,10 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: verify-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # A new push to a pull request replaces its older run. Pushes to develop/main each keep
+  # their own run, so every merged commit gets a result.
+  group: verify-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

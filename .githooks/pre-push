@@ -16,6 +16,7 @@ cleanup() {
   rm -rf "$scratch"
 }
 trap cleanup EXIT
+trap 'exit 130' INT TERM # leave through the EXIT trap, so worktrees are removed on Ctrl-C too
 
 # git passes one line per ref: <local ref> <local sha> <remote ref> <remote sha>
 commits=()
@@ -31,9 +32,15 @@ for commit in ${commits[@]+"${commits[@]}"}; do
   git -C "$root" worktree add --detach --quiet "$wt" "$commit"
   worktrees+=("$wt")
   echo "pre-push: verifying ${commit:0:7} in a clean checkout"
-  # Install here rather than relying on the pushed commit's verify.sh to do it.
+  if [[ ! -f $wt/scripts/verify.sh ]]; then
+    echo "pre-push: ${commit:0:7} predates the verify gate (no scripts/verify.sh), so it can't be verified; push blocked." >&2
+    exit 1
+  fi
+  # Install here rather than relying on the pushed commit's verify.sh to do it. Never run
+  # dependency install scripts, whatever that commit's .npmrc says: an older commit's
+  # `prepare` script would otherwise rewrite this repository's git config.
   if [[ -f $wt/frontend/package-lock.json ]]; then
-    npm ci --prefix "$wt/frontend" --no-audit --no-fund --loglevel=error || {
+    npm ci --prefix "$wt/frontend" --ignore-scripts --no-audit --no-fund --loglevel=error || {
       echo "pre-push: npm ci failed for ${commit:0:7}; push blocked." >&2
       exit 1
     }

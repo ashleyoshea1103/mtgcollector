@@ -39,7 +39,8 @@ stage 'setup'
 [[ -f frontend/package.json ]] || fail 'frontend/package.json is missing'
 
 if [[ -n "${CI:-}" || -n "${VERIFY_CLEAN_INSTALL:-}" ]]; then
-  run 'frontend: npm ci' npm ci --prefix frontend --no-audit --no-fund
+  # --ignore-scripts here as well as in .npmrc, which a change could delete.
+  run 'frontend: npm ci' npm ci --prefix frontend --ignore-scripts --no-audit --no-fund
 elif [[ ! -d frontend/node_modules ]]; then
   fail 'frontend/node_modules is missing; run `npm install` in frontend/'
 fi
@@ -59,8 +60,9 @@ run 'frontend: lint' npm run --prefix frontend --silent lint
 run 'frontend: lockfile sources' npm run --prefix frontend --silent lint:lockfile
 run 'frontend: type check + build' npm run --prefix frontend --silent build
 printf -- '--- %s\n' 'frontend: production bundle has no dev-only code'
-if grep -rlF '/dev/components' frontend/dist; then
-  fail 'the production bundle contains the dev-only component gallery'
+# Dev-only modules embed DEV_ONLY_MARKER (frontend/src/devOnly.ts); finding it in dist means one shipped.
+if grep -rlF 'mtgcollector:dev-only' frontend/dist; then
+  fail 'the production bundle contains dev-only code (gallery or fixtures)'
 fi
 
 # --- 2. unit tests ----------------------------------------------------------

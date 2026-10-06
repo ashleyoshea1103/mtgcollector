@@ -1,6 +1,7 @@
 // Sample data for the component gallery and tests. cards.json holds real Scryfall
 // cards (see scripts/fetch-fixtures.mjs) and is frozen: tests must derive expected
 // values from these objects rather than hardcode prices.
+import { DEV_ONLY_MARKER } from '../devOnly';
 import { lineValue, priceFor, roundToCents } from '../lib/price';
 import type { Card, CardSummary, CollectionEntry, CollectionStats, CustomGroup, GroupSummary, ValueTotal } from '../types';
 import rawCards from './cards.json';
@@ -13,7 +14,7 @@ export const cards = rawCards as unknown as Record<FixtureCard, Card>;
 /** A card Scryfall has no prices for. */
 export const unpricedCard: Card = {
   ...cards.llanowarElves,
-  id: 'unpriced-llanowar-elves',
+  id: `${DEV_ONLY_MARKER}:unpriced-llanowar-elves`,
   prices: { eur: null, eur_foil: null, usd: null, usd_foil: null, usd_etched: null },
 };
 
