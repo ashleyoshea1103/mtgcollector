@@ -5,9 +5,11 @@ export function Home() {
   return (
     <main>
       <h1>mtgcollector</h1>
-      <p>
-        <Link to="/dev/components">Component gallery</Link>
-      </p>
+      {import.meta.env.DEV && (
+        <p>
+          <Link to="/dev/components">Component gallery</Link>
+        </p>
+      )}
     </main>
   );
 }

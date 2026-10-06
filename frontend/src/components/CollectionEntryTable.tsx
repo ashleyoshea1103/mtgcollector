@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { CONDITIONS, FINISHES, LANGUAGES } from '../lib/labels';
+import { CONDITIONS, FINISHES, labelFor, LANGUAGES } from '../lib/labels';
 import type { CollectionEntry } from '../types';
 import { ManaCost } from './ManaCost';
 import { Price } from './Price';
@@ -27,12 +27,12 @@ export function CollectionEntryRow({ entry, actions }: RowProps) {
         <SetSymbol card={card} /> #{card.collector_number}
       </td>
       <td className="entry-row__condition">
-        <abbr title={CONDITIONS[entry.condition]}>{entry.condition}</abbr>
+        <abbr title={labelFor(CONDITIONS, entry.condition)}>{entry.condition}</abbr>
       </td>
-      <td className="entry-row__finish">{FINISHES[entry.finish]}</td>
-      <td className="entry-row__language">{LANGUAGES[entry.language] ?? entry.language}</td>
+      <td className="entry-row__finish">{labelFor(FINISHES, entry.finish)}</td>
+      <td className="entry-row__language">{labelFor(LANGUAGES, entry.language)}</td>
       <td className="entry-row__price">
-        <Price prices={card.prices} finish={entry.finish} />
+        <Price value={entry.unit_price_eur} />
       </td>
       <td className="entry-row__value">
         <Price value={entry.value_eur} />

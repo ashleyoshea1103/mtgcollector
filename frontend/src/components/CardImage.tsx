@@ -1,7 +1,8 @@
-import type { Card, ImageSize } from '../types';
+import type { Card, CardSummary, ImageSize } from '../types';
 
 interface Props {
-  card: Card;
+  /** A summary only has the front image; pass the full Card to show other faces. */
+  card: CardSummary | Card;
   size?: ImageSize;
   /** Which face to show for double-faced cards. Defaults to the front. */
   face?: number;
@@ -10,7 +11,7 @@ interface Props {
 
 /** A Scryfall card image, or a placeholder with the card name when there is none. */
 export function CardImage({ card, size = 'normal', face = 0, className = '' }: Props) {
-  const faceData = card.faces?.[face];
+  const faceData = 'faces' in card ? card.faces?.[face] : undefined;
   const src = (faceData?.images ?? card.images)?.[size];
   const alt = faceData?.images ? faceData.name : card.name;
 

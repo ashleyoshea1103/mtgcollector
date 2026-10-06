@@ -1,17 +1,23 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router';
+import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-router';
 import './index.css';
-import { ComponentGallery } from './pages/ComponentGallery';
 import { Home } from './pages/Home';
 
-const router = createBrowserRouter([
-  { path: '/', element: <Home /> },
-  { path: '/dev/components', element: <ComponentGallery /> },
-]);
+const routes: RouteObject[] = [{ path: '/', element: <Home /> }];
+
+// Development-only pages. `import.meta.env.DEV` is false in production builds,
+// so these imports (and the fixture data they pull in) are dropped from the bundle.
+if (import.meta.env.DEV) {
+  routes.push({
+    path: '/dev/components',
+    lazy: () => import('./pages/ComponentGallery').then((m) => ({ Component: m.ComponentGallery })),
+    hydrateFallbackElement: <p>Loading…</p>,
+  });
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <RouterProvider router={createBrowserRouter(routes)} />
   </StrictMode>,
 );

@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { CONDITIONS, FINISHES, LANGUAGES } from '../lib/labels';
-import type { Card, Condition, CustomGroup, Finish, NewEntry } from '../types';
+import { CONDITIONS, FINISHES, labelFor, LANGUAGES } from '../lib/labels';
+import { defaultFinish } from '../lib/price';
+import { MAX_QUANTITY, parseQuantity } from '../lib/quantity';
+import type { CardSummary, Condition, CustomGroup, Finish, NewEntry } from '../types';
 import { Price } from './Price';
 
 interface Props {
-  card: Card;
+  card: CardSummary;
   groups?: CustomGroup[];
   onSubmit: (entry: NewEntry) => void;
   submitting?: boolean;
@@ -12,12 +14,24 @@ interface Props {
 
 /** Collects quantity, finish, condition, language and an optional group for one printing. */
 export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = false }: Props) {
+  // Quantity, finish and language belong to the printing being added: they start from
+  // its defaults and are forgotten when the form is given another card. Condition and
+  // group stay as they are, so sorting a pile into one binder keeps those settings.
+  const [choice, setChoice] = useState<{ cardId: string; quantity?: string; finish?: Finish; language?: string }>({
+    cardId: card.id,
+  });
+  const chosen = choice.cardId === card.id ? choice : { cardId: card.id };
   // Kept as typed so the field can be cleared and retyped; parsed and clamped on submit.
-  const [quantity, setQuantity] = useState('1');
-  const [finish, setFinish] = useState<Finish>(card.finishes[0] ?? 'nonfoil');
+  const quantity = chosen.quantity ?? '1';
+  const finish = chosen.finish && card.finishes.includes(chosen.finish) ? chosen.finish : defaultFinish(card);
+  const language = chosen.language ?? (Object.hasOwn(LANGUAGES, card.lang) ? card.lang : 'en');
+  const setQuantity = (q: string) => setChoice({ ...chosen, quantity: q });
+  const setFinish = (f: Finish) => setChoice({ ...chosen, finish: f });
+  const setLanguage = (l: string) => setChoice({ ...chosen, language: l });
   const [condition, setCondition] = useState<Condition>('NM');
-  const [language, setLanguage] = useState('en');
-  const [groupId, setGroupId] = useState<number | null>(null);
+  const [chosenGroupId, setGroupId] = useState<number | null>(null);
+  // Likewise the chosen group may have been deleted since it was picked.
+  const groupId = groups.some((g) => g.id === chosenGroupId) ? chosenGroupId : null;
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -36,7 +50,7 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
         <input
           type="number"
           min={1}
-          max={999}
+          max={MAX_QUANTITY}
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
         />
@@ -47,7 +61,7 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
         <select value={finish} onChange={(e) => setFinish(e.target.value as Finish)}>
           {card.finishes.map((f) => (
             <option key={f} value={f}>
-              {FINISHES[f]}
+              {labelFor(FINISHES, f)}
             </option>
           ))}
         </select>
@@ -99,8 +113,3 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
   );
 }
 
-/** A whole number from 1 to 999; anything empty or invalid counts as 1. */
-function parseQuantity(input: string): number {
-  const n = Math.floor(Number(input));
-  return Number.isFinite(n) && n >= 1 ? Math.min(n, 999) : 1;
-}

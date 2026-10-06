@@ -1,15 +1,36 @@
-import type { Finish, Prices } from '../types';
+import type { CardSummary, Finish, Prices } from '../types';
 
 export type Currency = 'eur' | 'usd';
 
 /**
- * The unit price for a finish. Foil and etched use the foil price, falling
- * back to the non-foil price when no foil price is listed.
+ * The unit price of one copy in a finish, for cards that aren't owned yet
+ * (search results, printing picker). Owned entries carry the server's
+ * `unit_price_eur` instead. The server applies the same rule:
+ * - non-foil: the regular price
+ * - foil: the foil price, else the regular price
+ * - etched: the etched price (USD only; Scryfall has no EUR etched price), else foil, else regular
  */
 export function priceFor(prices: Prices, finish: Finish = 'nonfoil', currency: Currency = 'eur'): number | null {
   const regular = prices[currency];
   if (finish === 'nonfoil') return regular;
-  return prices[`${currency}_foil`] ?? regular;
+  const foil = prices[`${currency}_foil`] ?? regular;
+  if (finish === 'foil') return foil;
+  return (currency === 'usd' ? prices.usd_etched : null) ?? foil;
+}
+
+/** The finish to price a printing at when none is chosen: non-foil if it exists, else its first finish (e.g. foil-only promos). */
+export function defaultFinish(card: Pick<CardSummary, 'finishes'>): Finish {
+  return card.finishes.includes('nonfoil') ? 'nonfoil' : (card.finishes[0] ?? 'nonfoil');
+}
+
+/** Rounds a EUR/USD amount to cents, half up (1.005 → 1.01), as Postgres numeric does. */
+export function roundToCents(amount: number): number {
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+}
+
+/** quantity × unit price, in cents; null when there's no unit price. */
+export function lineValue(unitPrice: number | null, quantity: number): number | null {
+  return unitPrice == null ? null : roundToCents(unitPrice * quantity);
 }
 
 const formatters: Record<Currency, Intl.NumberFormat> = {

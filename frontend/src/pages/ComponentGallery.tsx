@@ -13,10 +13,10 @@ import { Price } from '../components/Price';
 import { PrintingOption } from '../components/PrintingOption';
 import { RarityBadge } from '../components/RarityBadge';
 import { SetSymbol } from '../components/SetSymbol';
-import { cards, colorBuckets, customGroups, entries, stats } from '../fixtures';
+import { cards, colorGroups, customGroups, entries, stats, unpricedCard } from '../fixtures';
 import type { Card, NewEntry } from '../types';
 
-const allCards = Object.values(cards);
+const allCards = [...Object.values(cards), unpricedCard];
 const allEntries = Object.values(entries);
 const imageless: Card = { ...cards.lightningBolt, id: 'imageless', images: null };
 
@@ -62,7 +62,7 @@ export function ComponentGallery() {
         </ul>
       </Section>
 
-      <Section name="Price" note="Foil falls back to the non-foil price when there's no foil price; missing prices show a dash.">
+      <Section name="Price" note="Foil falls back to the non-foil price when there's no foil price; etched USD uses the etched price; missing prices show a dash.">
         <ul>
           <li>
             Ragavan non-foil: <Price prices={cards.ragavan.prices} />
@@ -74,12 +74,15 @@ export function ComponentGallery() {
             Ragavan foil USD: <Price prices={cards.ragavan.prices} finish="foil" currency="usd" />
           </li>
           <li>
-            Farseek (no price): <Price prices={cards.noPrice.prices} />
+            Fire // Ice etched USD: <Price prices={cards.fireIce.prices} finish="etched" currency="usd" />
+          </li>
+          <li>
+            Unpriced Llanowar Elves: <Price prices={unpricedCard.prices} />
           </li>
         </ul>
       </Section>
 
-      <Section name="CardTile" note="Search result shape, with an action slot.">
+      <Section name="CardTile" note="Search result shape, with an action slot. Foil-only Propaganda is priced at its foil price.">
         <div className="entry-grid">
           {allCards.map((c) => (
             <CardTile key={c.id} card={c} actions={<button type="button">Add</button>} />
@@ -95,7 +98,7 @@ export function ComponentGallery() {
         </div>
       </Section>
 
-      <Section name="CollectionEntryTile" note="4× Bolt, foil Ragavan, German EX Delver, etched LP Fire // Ice, unpriced Farseek.">
+      <Section name="CollectionEntryTile" note="4× Bolt, foil Ragavan, German EX Delver, etched LP Fire // Ice, foil-only Propaganda, 3× unpriced Llanowar Elves.">
         <div className="entry-grid">
           {allEntries.map((e) => (
             <CollectionEntryTile key={e.id} entry={e} />
@@ -107,7 +110,7 @@ export function ComponentGallery() {
         <CollectionEntryTable entries={allEntries} renderActions={() => <button type="button">Remove</button>} />
       </Section>
 
-      <Section name="GroupBucketSection" note="The collection grouped by color.">
+      <Section name="GroupBucketSection" note="The collection grouped by color. Green has only unpriced cards; Trade binder below is partly unpriced. The last group starts closed.">
         <fieldset className="gallery__controls">
           <legend>View</legend>
           {(['grid', 'list'] as const).map((v) => (
@@ -116,8 +119,8 @@ export function ComponentGallery() {
             </label>
           ))}
         </fieldset>
-        {colorBuckets.map((b) => (
-          <GroupBucketSection key={b.key} bucket={b} view={view} />
+        {colorGroups.map(({ group, entries }, i) => (
+          <GroupBucketSection key={group.key} group={group} entries={entries} view={view} defaultOpen={i < colorGroups.length - 1} />
         ))}
       </Section>
 

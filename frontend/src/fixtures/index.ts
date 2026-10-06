@@ -1,95 +1,101 @@
-// Sample data for the component gallery. cards.json holds real Scryfall cards
-// (regenerate with `node scripts/fetch-fixtures.mjs`); everything else is built from them.
-import { priceFor } from '../lib/price';
-import type { Card, CollectionEntry, CollectionStats, Condition, CustomGroup, Finish, GroupBucket } from '../types';
+// Sample data for the component gallery and tests. cards.json holds real Scryfall
+// cards (see scripts/fetch-fixtures.mjs) and is frozen: tests must derive expected
+// values from these objects rather than hardcode prices.
+import { lineValue, priceFor, roundToCents } from '../lib/price';
+import type { Card, CardSummary, CollectionEntry, CollectionStats, CustomGroup, GroupSummary, ValueTotal } from '../types';
 import rawCards from './cards.json';
 
-type FixtureCard = 'lightningBolt' | 'ragavan' | 'delver' | 'fireIce' | 'noPrice';
+type FixtureCard = 'lightningBolt' | 'ragavan' | 'delver' | 'fireIce' | 'propaganda' | 'llanowarElves';
 
+/** Real cards. fixtures.test.ts checks every one has the full Card shape. */
 export const cards = rawCards as unknown as Record<FixtureCard, Card>;
 
-let nextId = 1;
-function entry(card: Card, quantity: number, finish: Finish = 'nonfoil', condition: Condition = 'NM', language = 'en'): CollectionEntry {
-  const unit = priceFor(card.prices, finish);
+/** A card Scryfall has no prices for. */
+export const unpricedCard: Card = {
+  ...cards.llanowarElves,
+  id: 'unpriced-llanowar-elves',
+  prices: { eur: null, eur_foil: null, usd: null, usd_foil: null, usd_etched: null },
+};
+
+/** A collection entry priced the way the server prices it. */
+export function makeEntry(
+  id: number,
+  card: CardSummary,
+  copy: Partial<Pick<CollectionEntry, 'quantity' | 'finish' | 'condition' | 'language' | 'added_at' | 'unit_price_eur'>> = {},
+): CollectionEntry {
+  const { quantity = 1, finish = 'nonfoil', condition = 'NM', language = 'en', added_at = '2026-10-01T12:00:00Z' } = copy;
+  // The server's price, which the client must show as-is. Tests can override it to
+  // prove a component shows the server's number rather than working out its own.
+  const unit = copy.unit_price_eur !== undefined ? copy.unit_price_eur : priceFor(card.prices, finish);
   return {
-    id: nextId++,
+    id,
     card,
     quantity,
     finish,
     condition,
     language,
-    added_at: '2026-10-01T12:00:00Z',
-    value_eur: unit == null ? null : Math.round(unit * quantity * 100) / 100,
+    added_at,
+    unit_price_eur: unit,
+    value_eur: lineValue(unit, quantity),
   };
+}
+
+/** Totals over some entries, the way the server sums them. */
+export function totalOf(entries: CollectionEntry[]): ValueTotal {
+  return {
+    card_count: entries.reduce((n, e) => n + e.quantity, 0),
+    value_eur: roundToCents(entries.reduce((sum, e) => sum + (e.value_eur ?? 0), 0)),
+    unpriced_count: entries.filter((e) => e.value_eur == null).reduce((n, e) => n + e.quantity, 0),
+  };
+}
+
+export function makeGroup(key: string, label: string, entries: CollectionEntry[]): { group: GroupSummary; entries: CollectionEntry[] } {
+  return { group: { key, label, entry_count: entries.length, ...totalOf(entries) }, entries };
 }
 
 export const entries = {
-  bolts: entry(cards.lightningBolt, 4),
-  foilRagavan: entry(cards.ragavan, 1, 'foil', 'NM'),
-  germanDelver: entry(cards.delver, 2, 'nonfoil', 'EX', 'de'),
-  etchedFireIce: entry(cards.fireIce, 1, 'etched', 'LP'),
-  farseek: entry(cards.noPrice, 1),
+  bolts: makeEntry(1, cards.lightningBolt, { quantity: 4 }),
+  foilRagavan: makeEntry(2, cards.ragavan, { finish: 'foil' }),
+  germanDelver: makeEntry(3, cards.delver, { quantity: 2, condition: 'EX', language: 'de' }),
+  etchedFireIce: makeEntry(4, cards.fireIce, { finish: 'etched', condition: 'LP' }),
+  propaganda: makeEntry(5, cards.propaganda, { finish: 'foil' }),
+  unpricedElves: makeEntry(6, unpricedCard, { quantity: 3 }),
 };
+
+/** An entry whose server price differs from anything the client could work out from the card's prices. */
+export const serverPricedBolts = makeEntry(7, cards.lightningBolt, { quantity: 2, unit_price_eur: 7.77 });
 
 const allEntries = Object.values(entries);
 
-function bucket(key: string, label: string, members: CollectionEntry[]): GroupBucket {
+/** The collection grouped by color: the group headers plus each group's first page of entries. */
+export const colorGroups = [
+  makeGroup('U', 'Blue', [entries.germanDelver, entries.propaganda]),
+  makeGroup('R', 'Red', [entries.bolts, entries.foilRagavan]),
+  makeGroup('G', 'Green', [entries.unpricedElves]),
+  makeGroup('M', 'Multicolor', [entries.etchedFireIce]),
+];
+
+function customGroup(id: number, name: string, kind: CustomGroup['kind'], description: string, members: CollectionEntry[]): CustomGroup {
   return {
-    key,
-    label,
-    card_count: members.reduce((n, e) => n + e.quantity, 0),
-    value_eur: Math.round(members.reduce((sum, e) => sum + (e.value_eur ?? 0), 0) * 100) / 100,
-    entries: members,
+    id,
+    name,
+    kind,
+    description,
+    preview_images: members.flatMap((e) => (e.card.images ? [e.card.images.small] : [])),
+    ...totalOf(members),
   };
 }
 
-/** The collection grouped by color, as `GET /api/collection?group_by=color` will return it. */
-export const colorBuckets: GroupBucket[] = [
-  bucket('U', 'Blue', [entries.germanDelver]),
-  bucket('R', 'Red', [entries.bolts, entries.foilRagavan]),
-  bucket('G', 'Green', [entries.farseek]),
-  bucket('M', 'Multicolor', [entries.etchedFireIce]),
-];
-
-const img = (c: Card) => c.images!.small;
-
 export const customGroups: CustomGroup[] = [
-  {
-    id: 1,
-    name: 'Trade binder',
-    kind: 'binder',
-    description: 'Everything up for trade at the LGS.',
-    card_count: 5,
-    value_eur: bucket('', '', [entries.bolts, entries.etchedFireIce]).value_eur,
-    preview_images: [img(cards.lightningBolt), img(cards.fireIce)],
-  },
-  {
-    id: 2,
-    name: 'Izzet Tempo',
-    kind: 'deck',
-    description: '',
-    card_count: 8,
-    value_eur: bucket('', '', [entries.bolts, entries.foilRagavan, entries.germanDelver, entries.etchedFireIce]).value_eur,
-    preview_images: [img(cards.ragavan), img(cards.delver), img(cards.lightningBolt), img(cards.fireIce)],
-  },
-  {
-    id: 3,
-    name: 'Bulk box',
-    kind: 'box',
-    description: 'Unsorted.',
-    card_count: 0,
-    value_eur: 0,
-    preview_images: [],
-  },
+  customGroup(1, 'Trade binder', 'binder', 'Everything up for trade at the LGS.', [entries.bolts, entries.etchedFireIce, entries.unpricedElves]),
+  customGroup(2, 'Izzet Tempo', 'deck', '', [entries.foilRagavan, entries.germanDelver, entries.bolts, entries.etchedFireIce, entries.propaganda]),
+  customGroup(3, 'Bulk box', 'box', 'Unsorted.', []),
 ];
 
 export const stats: CollectionStats = {
-  total_cards: allEntries.reduce((n, e) => n + e.quantity, 0),
-  unique_cards: allEntries.length,
-  value_eur: bucket('', '', allEntries).value_eur,
-  value_usd:
-    Math.round(allEntries.reduce((sum, e) => sum + (priceFor(e.card.prices, e.finish, 'usd') ?? 0) * e.quantity, 0) * 100) / 100,
-  by_color: Object.fromEntries(colorBuckets.map((b) => [b.key, b.card_count])),
+  ...totalOf(allEntries),
+  unique_cards: new Set(allEntries.map((e) => e.card.id)).size,
+  by_color: Object.fromEntries(colorGroups.map(({ group }) => [group.key, group.card_count])),
   by_rarity: allEntries.reduce<CollectionStats['by_rarity']>((acc, e) => {
     acc[e.card.rarity] = (acc[e.card.rarity] ?? 0) + e.quantity;
     return acc;

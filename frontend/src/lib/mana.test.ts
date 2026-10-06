@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseManaCost } from './mana';
+import { describeManaCost, parseManaCost } from './mana';
 
 describe('parseManaCost', () => {
   it('splits a cost into symbols', () => {
@@ -19,5 +19,25 @@ describe('parseManaCost', () => {
 
   it('returns nothing for cards without a mana cost', () => {
     expect(parseManaCost('')).toEqual([]);
+  });
+});
+
+describe('describeManaCost', () => {
+  it('reads generic and colored mana', () => {
+    expect(describeManaCost('{2}{R}{R}')).toBe('2 generic, red, red');
+  });
+
+  it('reads hybrid, Phyrexian and other symbols', () => {
+    expect(describeManaCost('{X}{W/U}{B/P}{G/U/P}{2/W}{C}')).toBe(
+      'X, white or blue, Phyrexian black, Phyrexian green or blue, 2 generic or white, colorless',
+    );
+  });
+
+  it('reads both halves of a split card', () => {
+    expect(describeManaCost('{1}{R} // {1}{U}')).toBe('1 generic, red, then 1 generic, blue');
+  });
+
+  it('passes unknown symbols through', () => {
+    expect(describeManaCost('{½}{∞}')).toBe('½, ∞');
   });
 });

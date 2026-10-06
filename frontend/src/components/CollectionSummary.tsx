@@ -1,6 +1,6 @@
-import { COLORS, RARITIES } from '../lib/labels';
-import type { CollectionStats, Rarity } from '../types';
-import { Price } from './Price';
+import { COLORS, labelFor, RARITIES } from '../lib/labels';
+import type { CollectionStats } from '../types';
+import { TotalValue } from './TotalValue';
 
 interface Props {
   stats: CollectionStats;
@@ -13,7 +13,7 @@ export function CollectionSummary({ stats }: Props) {
       <dl className="collection-summary__totals">
         <div>
           <dt>Cards</dt>
-          <dd>{stats.total_cards}</dd>
+          <dd>{stats.card_count}</dd>
         </div>
         <div>
           <dt>Unique</dt>
@@ -22,13 +22,7 @@ export function CollectionSummary({ stats }: Props) {
         <div>
           <dt>Value (Cardmarket)</dt>
           <dd>
-            <Price value={stats.value_eur} />
-          </dd>
-        </div>
-        <div>
-          <dt>Value (USD)</dt>
-          <dd>
-            <Price value={stats.value_usd} currency="usd" />
+            <TotalValue total={stats} />
           </dd>
         </div>
       </dl>
@@ -36,12 +30,12 @@ export function CollectionSummary({ stats }: Props) {
       <Breakdown
         title="By color"
         modifier="color"
-        rows={Object.entries(stats.by_color).map(([key, count]) => [key, COLORS[key] ?? key, count])}
+        rows={Object.entries(stats.by_color).map(([key, count]) => [key, labelFor(COLORS, key), count])}
       />
       <Breakdown
         title="By rarity"
         modifier="rarity"
-        rows={Object.entries(stats.by_rarity).map(([key, count]) => [key, RARITIES[key as Rarity], count ?? 0])}
+        rows={Object.entries(stats.by_rarity).map(([key, count]) => [key, labelFor(RARITIES, key), count ?? 0])}
       />
     </section>
   );
