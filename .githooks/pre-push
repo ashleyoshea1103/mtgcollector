@@ -31,7 +31,14 @@ for commit in ${commits[@]+"${commits[@]}"}; do
   git -C "$root" worktree add --detach --quiet "$wt" "$commit"
   worktrees+=("$wt")
   echo "pre-push: verifying ${commit:0:7} in a clean checkout"
-  VERIFY_CLEAN_INSTALL=1 "$wt/scripts/verify.sh" || {
+  # Install here rather than relying on the pushed commit's verify.sh to do it.
+  if [[ -f $wt/frontend/package-lock.json ]]; then
+    npm ci --prefix "$wt/frontend" --no-audit --no-fund --loglevel=error || {
+      echo "pre-push: npm ci failed for ${commit:0:7}; push blocked." >&2
+      exit 1
+    }
+  fi
+  "$wt/scripts/verify.sh" || {
     echo "pre-push: verify failed for ${commit:0:7}; push blocked." >&2
     exit 1
   }
