@@ -47,7 +47,9 @@ jobs:
 
       - name: Verify
         run: |
-          node -e "console.log('Test locale:', Intl.DateTimeFormat().resolvedOptions().locale, JSON.stringify(new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR' }).format(1.55)))"
+          locale=$(node -p 'Intl.DateTimeFormat().resolvedOptions().locale')
+          echo "Test locale: $locale, 1.55 EUR formats as $(node -p "JSON.stringify(new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR' }).format(1.55))")"
+          [[ $locale == de* ]] || { echo "::error::Node is using '$locale', not the German locale the tests should run under"; exit 1; }
           ./scripts/verify.sh
         env:
           CI: 'true'

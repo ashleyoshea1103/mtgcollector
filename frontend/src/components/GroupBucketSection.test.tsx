@@ -55,7 +55,7 @@ describe('GroupBucketSection', () => {
 
   it('collapses and expands, rendering entries only while open', async () => {
     const user = userEvent.setup();
-    const onOpenChange = vi.fn();
+    const onOpenChange = vi.fn<(open: boolean) => void>();
     const { container } = render(<GroupBucketSection {...red} onOpenChange={onOpenChange} />);
     expect(toggle('Red')).toHaveAttribute('aria-expanded', 'true');
     expect(container.firstElementChild).toHaveClass('group-bucket--open');
@@ -88,7 +88,7 @@ describe('GroupBucketSection', () => {
 
   it('follows a controlled open state and only reports clicks', async () => {
     const user = userEvent.setup();
-    const onOpenChange = vi.fn();
+    const onOpenChange = vi.fn<(open: boolean) => void>();
     const { rerender } = render(<GroupBucketSection {...red} open={false} onOpenChange={onOpenChange} />);
     await user.click(toggle('Red'));
     expect(onOpenChange).toHaveBeenCalledWith(true);
@@ -110,7 +110,7 @@ describe('GroupBucketSection', () => {
   });
 
   it('asks for the first page when it starts open, once, even if the callback changes', () => {
-    const onLoad = vi.fn();
+    const onLoad = vi.fn<() => void>();
     const { rerender } = render(<GroupBucketSection group={red.group} onLoad={onLoad} />);
     rerender(<GroupBucketSection group={red.group} onLoad={() => onLoad()} />);
     expect(onLoad).toHaveBeenCalledOnce();
@@ -118,7 +118,7 @@ describe('GroupBucketSection', () => {
 
   it('asks for the first page when opened, not while collapsed or once loaded', async () => {
     const user = userEvent.setup();
-    const onLoad = vi.fn();
+    const onLoad = vi.fn<() => void>();
     const { rerender } = render(<GroupBucketSection group={red.group} defaultOpen={false} onLoad={onLoad} />);
     expect(onLoad).not.toHaveBeenCalled();
     await user.click(toggle('Red'));
@@ -132,7 +132,7 @@ describe('GroupBucketSection', () => {
 
   it('offers a retry when the first page failed to load', async () => {
     const user = userEvent.setup();
-    const onLoad = vi.fn();
+    const onLoad = vi.fn<() => void>();
     render(<GroupBucketSection group={red.group} onLoad={onLoad} loadFailed />);
     expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load these cards.");
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
@@ -142,7 +142,7 @@ describe('GroupBucketSection', () => {
 
   it('offers to load more only when there is more, and not twice at once', async () => {
     const user = userEvent.setup();
-    const onLoadMore = vi.fn();
+    const onLoadMore = vi.fn<() => void>();
     const { rerender } = render(<GroupBucketSection {...red} />);
     expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument();
     rerender(<GroupBucketSection {...red} onLoadMore={onLoadMore} />);

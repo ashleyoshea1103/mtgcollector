@@ -22,6 +22,20 @@ if (!lock.packages) {
   process.exit(1);
 }
 
+/** The lockfile key of the package whose node_modules this key sits in ("" for the project). */
+function parentOf(key) {
+  const i = key.lastIndexOf('/node_modules/');
+  return i === -1 ? '' : key.slice(0, i);
+}
+
+/** Whether that package declares `installedAs` as an alias for `name`, e.g. "npm:name@^1". */
+function declaresAlias(parentKey, installedAs, name) {
+  const parent = lock.packages[parentKey] ?? {};
+  return ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'].some((field) =>
+    (parent[field]?.[installedAs] ?? '').startsWith(`npm:${name}@`),
+  );
+}
+
 const problems = [];
 for (const [key, pkg] of Object.entries(lock.packages)) {
   if (key === '') continue; // the project itself
@@ -31,7 +45,14 @@ for (const [key, pkg] of Object.entries(lock.packages)) {
     continue;
   }
   // The name it's installed under: the part after the last node_modules/, e.g. "@scope/name".
-  const name = pkg.name ?? key.slice(key.lastIndexOf('node_modules/') + 'node_modules/'.length);
+  const installedAs = key.slice(key.lastIndexOf('node_modules/') + 'node_modules/'.length);
+  const name = pkg.name ?? installedAs;
+  // A package installed under another name is only legitimate as an npm alias
+  // ("installedAs": "npm:name@…") declared by the package that depends on it.
+  if (name !== installedAs && !declaresAlias(parentOf(key), installedAs, name)) {
+    problems.push(`${where}: installed as "${installedAs}" but is "${name}", with no matching npm: alias`);
+    continue;
+  }
   const resolved = pkg.resolved ?? '';
   if (!resolved.startsWith(REGISTRY)) {
     problems.push(`${where}: resolved from ${resolved || '(nowhere)'}, not ${REGISTRY}`);

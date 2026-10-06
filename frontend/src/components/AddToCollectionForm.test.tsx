@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { cards, customGroups } from '../fixtures';
 import { LANGUAGES } from '../lib/labels';
 import { eur } from '../test/helpers';
+import type { NewEntry } from '../types';
 import { AddToCollectionForm } from './AddToCollectionForm';
 
 const { lightningBolt, fireIce, ragavan, propaganda } = cards;
@@ -12,7 +13,7 @@ const submit = () => userEvent.click(screen.getByRole('button', { name: 'Add to 
 
 describe('AddToCollectionForm', () => {
   it('submits one near-mint English copy by default', async () => {
-    const onSubmit = vi.fn();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
     render(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} />);
     await submit();
     expect(onSubmit).toHaveBeenCalledWith({
@@ -27,7 +28,7 @@ describe('AddToCollectionForm', () => {
 
   it('submits what the user picked', async () => {
     const user = userEvent.setup();
-    const onSubmit = vi.fn();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
     render(<AddToCollectionForm card={fireIce} groups={customGroups} onSubmit={onSubmit} />);
 
     const quantity = screen.getByRole('spinbutton', { name: 'Quantity' });
@@ -72,7 +73,7 @@ describe('AddToCollectionForm', () => {
   });
 
   it('defaults a foil-only printing to foil', async () => {
-    const onSubmit = vi.fn();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
     render(<AddToCollectionForm card={propaganda} onSubmit={onSubmit} />);
     expect(select('Finish')).toHaveValue('foil');
     expect(screen.getByText(/Adding/)).toHaveTextContent(eur(propaganda.prices.eur_foil));
@@ -82,7 +83,7 @@ describe('AddToCollectionForm', () => {
 
   it('falls back to a valid finish when the card changes to one without the chosen finish', async () => {
     const user = userEvent.setup();
-    const onSubmit = vi.fn();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
     const { rerender } = render(<AddToCollectionForm card={fireIce} onSubmit={onSubmit} />);
     await user.selectOptions(select('Finish'), 'etched');
 
@@ -94,7 +95,7 @@ describe('AddToCollectionForm', () => {
   });
 
   it("defaults the language to the printing's language", async () => {
-    const onSubmit = vi.fn();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
     render(<AddToCollectionForm card={{ ...lightningBolt, lang: 'ja' }} onSubmit={onSubmit} />);
     expect(select('Language')).toHaveValue('ja');
     await submit();
@@ -103,7 +104,7 @@ describe('AddToCollectionForm', () => {
 
   it('forgets the quantity, finish and language chosen for a previous card, but keeps condition and group', async () => {
     const user = userEvent.setup();
-    const onSubmit = vi.fn();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
     const { rerender } = render(<AddToCollectionForm card={lightningBolt} groups={customGroups} onSubmit={onSubmit} />);
     const quantity = () => screen.getByRole('spinbutton', { name: 'Quantity' });
     await user.clear(quantity());
@@ -128,7 +129,7 @@ describe('AddToCollectionForm', () => {
 
   it('drops a chosen group that no longer exists, and "None" clears the group', async () => {
     const user = userEvent.setup();
-    const onSubmit = vi.fn();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
     const { rerender } = render(<AddToCollectionForm card={lightningBolt} groups={customGroups} onSubmit={onSubmit} />);
     await user.selectOptions(select('Add to group'), 'Trade binder');
     await user.selectOptions(select('Add to group'), 'None');
@@ -151,7 +152,7 @@ describe('AddToCollectionForm', () => {
 
   it('submits an emptied quantity as one', async () => {
     const user = userEvent.setup();
-    const onSubmit = vi.fn();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
     render(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} />);
     await user.clear(screen.getByRole('spinbutton', { name: 'Quantity' }));
     await submit();
@@ -160,7 +161,7 @@ describe('AddToCollectionForm', () => {
 
   it.each(['2.5', '0', '1000'])('lets the browser block an invalid quantity of %s', async (typed) => {
     const user = userEvent.setup();
-    const onSubmit = vi.fn();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
     render(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} />);
     const quantity = screen.getByRole('spinbutton', { name: 'Quantity' });
     await user.clear(quantity);

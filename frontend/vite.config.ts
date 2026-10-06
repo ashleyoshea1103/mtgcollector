@@ -1,9 +1,30 @@
 import react from '@vitejs/plugin-react';
+import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
+
+/** Modules that exist only for development: the component gallery and its fixture data. */
+const DEV_ONLY_MODULES = /[\\/]src[\\/](fixtures[\\/]|pages[\\/]ComponentGallery\.tsx|devOnly\.ts)/;
+
+/** Fails a production build that bundles any dev-only module, however it got imported. */
+function forbidDevOnlyModules(): Plugin {
+  return {
+    name: 'forbid-dev-only-modules',
+    apply: 'build',
+    generateBundle(_, bundle) {
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type !== 'chunk') continue;
+        const devOnly = chunk.moduleIds.filter((id) => DEV_ONLY_MODULES.test(id));
+        if (devOnly.length > 0) {
+          this.error(`dev-only modules in the production bundle (${chunk.fileName}):\n  ${devOnly.join('\n  ')}`);
+        }
+      }
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), forbidDevOnlyModules()],
   test: {
     // A stray .only would silently skip every other test; fail instead, locally as well as in CI.
     allowOnly: false,

@@ -29,7 +29,9 @@ if [[ -e $target ]] && ! grep -qs 'installed by scripts/install-hooks.sh' "$targ
 fi
 
 mkdir -p "$hooks_dir"
-# The tracked hook with the marker line added after its shebang.
+# The tracked hook with the marker line added after its shebang, plus the lockfile check it runs
+# before installing anything (a trusted copy, so the code being pushed can't weaken it).
 { head -n 1 .githooks/pre-push; echo "$marker"; tail -n +2 .githooks/pre-push; } >"$target"
 chmod +x "$target"
+cp scripts/check-lockfile.mjs "$hooks_dir/check-lockfile.mjs"
 echo "Installed the pre-push check at $target."

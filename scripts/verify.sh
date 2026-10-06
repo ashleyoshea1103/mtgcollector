@@ -50,16 +50,25 @@ elif [[ ! -d frontend/node_modules ]]; then
 fi
 
 if [[ -z "${CI:-}" ]]; then
-  installed_hook="$(git rev-parse --git-common-dir)/hooks/pre-push"
-  if ! grep -qs 'installed by scripts/install-hooks.sh' "$installed_hook"; then
+  # --git-path follows core.hooksPath, so this is the hook git will actually run.
+  installed_hook=$(git rev-parse --git-path hooks/pre-push)
+  if [[ -n $(git config --get core.hooksPath || true) ]]; then
+    printf '%swarning: core.hooksPath is set (%s), so git ignores the installed pre-push hook; unset it and run ./scripts/install-hooks.sh%s\n' \
+      "$yellow" "$(git config --show-origin --get core.hooksPath)" "$reset"
+  elif ! grep -qs 'installed by scripts/install-hooks.sh' "$installed_hook"; then
     printf '%swarning: the pre-push hook is not installed; run ./scripts/install-hooks.sh%s\n' "$yellow" "$reset"
-  elif ! cmp -s .githooks/pre-push <(grep -v 'installed by scripts/install-hooks.sh' "$installed_hook"); then
-    printf '%swarning: .githooks/pre-push differs from the installed hook; review it, then run ./scripts/install-hooks.sh%s\n' "$yellow" "$reset"
+  elif ! cmp -s .githooks/pre-push <(grep -v 'installed by scripts/install-hooks.sh' "$installed_hook") ||
+    ! cmp -s scripts/check-lockfile.mjs "$(dirname "$installed_hook")/check-lockfile.mjs"; then
+    printf '%swarning: .githooks/pre-push or scripts/check-lockfile.mjs differs from the installed copy; review the change, then run ./scripts/install-hooks.sh%s\n' "$yellow" "$reset"
   fi
 fi
 
-# Every test file must be one Vitest runs: src/**/*.test.ts (unit) or src/**/*.test.tsx (behaviour).
-stray_tests=$(git ls-files -- frontend | grep -E '\.(test|spec)\.[cm]?[jt]sx?$' | grep -vE '^frontend/src/.*\.test\.tsx?$' || true)
+# Every test file anywhere in the repo must be one Vitest runs: frontend/src/**/*.test.ts (unit)
+# or *.test.tsx (behaviour). Catches __tests__/ folders and test/spec/tests/specs names in any
+# case or separator. quotePath=false keeps non-ASCII names as-is so the patterns can match them.
+stray_tests=$(git -c core.quotePath=false ls-files |
+  grep -iE '(^|/)__tests__/|[._-](test|spec)s?\.[cm]?[jt]sx?$' |
+  grep -vE '^frontend/src/.*\.test\.tsx?$' || true)
 [[ -z "$stray_tests" ]] || fail "test files that would never run (rename to src/**/*.test.ts or *.test.tsx):
 $stray_tests"
 
