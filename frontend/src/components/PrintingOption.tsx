@@ -1,0 +1,29 @@
+import type { Card } from '../types';
+import { Price } from './Price';
+import { SetSymbol } from './SetSymbol';
+
+interface Props {
+  card: Card;
+  selected?: boolean;
+  onSelect?: (card: Card) => void;
+}
+
+/** One printing in a "which printing do you have?" list. */
+export function PrintingOption({ card, selected = false, onSelect }: Props) {
+  return (
+    <button
+      type="button"
+      className={`printing-option${selected ? ' printing-option--selected' : ''}`}
+      aria-pressed={selected}
+      onClick={() => onSelect?.(card)}
+    >
+      <SetSymbol card={card} />
+      <span className="printing-option__set">{card.set_name}</span>
+      <span className="printing-option__number">#{card.collector_number}</span>
+      <time className="printing-option__date" dateTime={card.released_at}>
+        {card.released_at.slice(0, 4)}
+      </time>
+      <Price prices={card.prices} />
+    </button>
+  );
+}
