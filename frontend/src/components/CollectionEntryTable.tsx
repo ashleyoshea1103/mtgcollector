@@ -32,7 +32,7 @@ export function CollectionEntryRow({ entry, actions }: RowProps) {
       <td className="entry-row__finish">{FINISHES[entry.finish]}</td>
       <td className="entry-row__language">{LANGUAGES[entry.language] ?? entry.language}</td>
       <td className="entry-row__price">
-        <Price prices={card.prices} finish={entry.finish} />
+        <Price value={entry.unit_price_eur} />
       </td>
       <td className="entry-row__value">
         <Price value={entry.value_eur} />

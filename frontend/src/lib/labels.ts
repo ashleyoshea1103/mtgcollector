@@ -42,7 +42,7 @@ export const COLORS: Record<string, string> = {
   M: 'Multicolor',
 };
 
-/** Scryfall language codes. */
+/** Every language code Scryfall uses (https://scryfall.com/docs/api/languages). */
 export const LANGUAGES: Record<string, string> = {
   en: 'English',
   de: 'German',
@@ -55,4 +55,11 @@ export const LANGUAGES: Record<string, string> = {
   ru: 'Russian',
   zhs: 'Simplified Chinese',
   zht: 'Traditional Chinese',
+  he: 'Hebrew',
+  la: 'Latin',
+  grc: 'Ancient Greek',
+  ar: 'Arabic',
+  sa: 'Sanskrit',
+  ph: 'Phyrexian',
+  qya: 'Quenya',
 };

@@ -1,11 +1,12 @@
-import type { Card } from '../types';
+import { defaultFinish } from '../lib/price';
+import type { CardSummary } from '../types';
 import { Price } from './Price';
 import { SetSymbol } from './SetSymbol';
 
 interface Props {
-  card: Card;
+  card: CardSummary;
   selected?: boolean;
-  onSelect?: (card: Card) => void;
+  onSelect?: (card: CardSummary) => void;
 }
 
 /** One printing in a "which printing do you have?" list. */
@@ -23,7 +24,7 @@ export function PrintingOption({ card, selected = false, onSelect }: Props) {
       <time className="printing-option__date" dateTime={card.released_at}>
         {card.released_at.slice(0, 4)}
       </time>
-      <Price prices={card.prices} />
+      <Price prices={card.prices} finish={defaultFinish(card)} />
     </button>
   );
 }

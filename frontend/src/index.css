@@ -89,11 +89,12 @@ img {
 }
 
 .group-bucket__header {
-  cursor: pointer;
+  margin: 0;
+  font-size: 1.25rem;
 }
-.group-bucket__header > * {
-  display: inline;
-  margin-right: 1rem;
+.group-bucket__toggle {
+  font: inherit;
+  cursor: pointer;
 }
 
 .card-detail {

@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { CONDITIONS, FINISHES, LANGUAGES } from '../lib/labels';
-import type { Card, Condition, CustomGroup, Finish, NewEntry } from '../types';
+import { defaultFinish } from '../lib/price';
+import { MAX_QUANTITY, parseQuantity } from '../lib/quantity';
+import type { CardSummary, Condition, CustomGroup, Finish, NewEntry } from '../types';
 import { Price } from './Price';
 
 interface Props {
-  card: Card;
+  card: CardSummary;
   groups?: CustomGroup[];
   onSubmit: (entry: NewEntry) => void;
   submitting?: boolean;
@@ -14,10 +16,15 @@ interface Props {
 export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = false }: Props) {
   // Kept as typed so the field can be cleared and retyped; parsed and clamped on submit.
   const [quantity, setQuantity] = useState('1');
-  const [finish, setFinish] = useState<Finish>(card.finishes[0] ?? 'nonfoil');
+  // Until the user picks one, and whenever the card changes to a printing without the
+  // picked finish, use the printing's default finish.
+  const [chosenFinish, setFinish] = useState<Finish | null>(null);
+  const finish = chosenFinish && card.finishes.includes(chosenFinish) ? chosenFinish : defaultFinish(card);
   const [condition, setCondition] = useState<Condition>('NM');
   const [language, setLanguage] = useState('en');
-  const [groupId, setGroupId] = useState<number | null>(null);
+  const [chosenGroupId, setGroupId] = useState<number | null>(null);
+  // Likewise the chosen group may have been deleted since it was picked.
+  const groupId = groups.some((g) => g.id === chosenGroupId) ? chosenGroupId : null;
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -36,7 +43,7 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
         <input
           type="number"
           min={1}
-          max={999}
+          max={MAX_QUANTITY}
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
         />
@@ -99,8 +106,3 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
   );
 }
 
-/** A whole number from 1 to 999; anything empty or invalid counts as 1. */
-function parseQuantity(input: string): number {
-  const n = Math.floor(Number(input));
-  return Number.isFinite(n) && n >= 1 ? Math.min(n, 999) : 1;
-}

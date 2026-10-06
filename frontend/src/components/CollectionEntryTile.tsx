@@ -15,6 +15,7 @@ export function CollectionEntryTile({ entry, actions }: Props) {
     <CardTile
       card={entry.card}
       finish={entry.finish}
+      unitPrice={entry.unit_price_eur}
       className="entry-tile"
       overlay={<span className="entry-tile__quantity">{entry.quantity}×</span>}
       actions={actions}

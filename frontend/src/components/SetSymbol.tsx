@@ -1,7 +1,7 @@
-import type { Card } from '../types';
+import type { CardSummary } from '../types';
 
 interface Props {
-  card: Pick<Card, 'set_code' | 'set_name' | 'rarity'>;
+  card: Pick<CardSummary, 'set_code' | 'set_name' | 'rarity'>;
 }
 
 /** The set code, with the rarity as a modifier class (set symbols are colored by rarity). */

@@ -1,6 +1,7 @@
 import { COLORS, RARITIES } from '../lib/labels';
 import type { CollectionStats, Rarity } from '../types';
 import { Price } from './Price';
+import { TotalValue } from './TotalValue';
 
 interface Props {
   stats: CollectionStats;
@@ -13,7 +14,7 @@ export function CollectionSummary({ stats }: Props) {
       <dl className="collection-summary__totals">
         <div>
           <dt>Cards</dt>
-          <dd>{stats.total_cards}</dd>
+          <dd>{stats.card_count}</dd>
         </div>
         <div>
           <dt>Unique</dt>
@@ -22,7 +23,7 @@ export function CollectionSummary({ stats }: Props) {
         <div>
           <dt>Value (Cardmarket)</dt>
           <dd>
-            <Price value={stats.value_eur} />
+            <TotalValue total={stats} />
           </dd>
         </div>
         <div>

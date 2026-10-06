@@ -39,8 +39,8 @@ export function CardDetail({ card, entries = [] }: Props) {
           </p>
         </header>
 
-        {faces.map((face) => (
-          <section key={face.name} className="card-detail__face">
+        {faces.map((face, i) => (
+          <section key={i} className="card-detail__face">
             <h3 className="card-detail__face-name">
               {face.name} <ManaCost cost={face.mana_cost} />
             </h3>
@@ -60,24 +60,17 @@ export function CardDetail({ card, entries = [] }: Props) {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <th scope="row">Non-foil</th>
-                <td>
-                  <Price value={card.prices.eur} />
-                </td>
-                <td>
-                  <Price value={card.prices.usd} currency="usd" />
-                </td>
-              </tr>
-              <tr>
-                <th scope="row">Foil</th>
-                <td>
-                  <Price value={card.prices.eur_foil} />
-                </td>
-                <td>
-                  <Price value={card.prices.usd_foil} currency="usd" />
-                </td>
-              </tr>
+              {card.finishes.map((finish) => (
+                <tr key={finish}>
+                  <th scope="row">{FINISHES[finish]}</th>
+                  <td>
+                    <Price prices={card.prices} finish={finish} />
+                  </td>
+                  <td>
+                    <Price prices={card.prices} finish={finish} currency="usd" />
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
           {card.cardmarket_url && (
