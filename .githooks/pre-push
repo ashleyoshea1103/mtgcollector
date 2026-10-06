@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Blocks a push unless scripts/verify.sh passes on exactly the commit being pushed.
+# Enabled with: git config core.hooksPath .githooks
+set -euo pipefail
+
+head=$(git rev-parse HEAD)
+pushing=false
+
+# git passes one line per ref: <local ref> <local sha> <remote ref> <remote sha>
+while read -r local_ref local_sha _remote_ref _remote_sha; do
+  [[ $local_sha =~ ^0+$ ]] && continue # deleting a remote branch: nothing to check
+  pushing=true
+  if [[ $(git rev-parse "$local_sha^{commit}") != "$head" ]]; then
+    echo "pre-push: $local_ref is not the checked-out commit." >&2
+    echo "pre-push: check it out and push from there, so verify runs on what you're pushing." >&2
+    exit 1
+  fi
+done
+
+$pushing || exit 0
+
+if ! git diff --quiet HEAD --; then
+  echo 'pre-push: you have uncommitted changes.' >&2
+  echo 'pre-push: commit or stash them, so verify runs on exactly what is being pushed.' >&2
+  exit 1
+fi
+
+echo "pre-push: running scripts/verify.sh on $(git rev-parse --short HEAD)"
+exec "$(git rev-parse --show-toplevel)/scripts/verify.sh"
