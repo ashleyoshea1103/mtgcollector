@@ -1,29 +1,38 @@
 #!/usr/bin/env bash
-# Blocks a push unless scripts/verify.sh passes on exactly the commit being pushed.
-# Enabled with: git config core.hooksPath .githooks
+# Blocks a push unless scripts/verify.sh passes on each commit being pushed.
+#
+# Each commit is checked out into a temporary worktree and verified there with a
+# clean `npm ci`, so the result can't depend on uncommitted, untracked or
+# locally-hidden files, or on edits made while the checks run.
+#
+# Installed into .git/hooks by scripts/install-hooks.sh (not via core.hooksPath).
 set -euo pipefail
 
-head=$(git rev-parse HEAD)
-pushing=false
+root=$(git rev-parse --show-toplevel)
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/verify-push.XXXXXX")
+worktrees=()
+cleanup() {
+  for wt in ${worktrees[@]+"${worktrees[@]}"}; do git -C "$root" worktree remove --force "$wt" >/dev/null 2>&1 || true; done
+  rm -rf "$scratch"
+}
+trap cleanup EXIT
 
 # git passes one line per ref: <local ref> <local sha> <remote ref> <remote sha>
+commits=()
 while read -r local_ref local_sha _remote_ref _remote_sha; do
   [[ $local_sha =~ ^0+$ ]] && continue # deleting a remote branch: nothing to check
-  pushing=true
-  if [[ $(git rev-parse "$local_sha^{commit}") != "$head" ]]; then
-    echo "pre-push: $local_ref is not the checked-out commit." >&2
-    echo "pre-push: check it out and push from there, so verify runs on what you're pushing." >&2
-    exit 1
-  fi
+  commit=$(git rev-parse "$local_sha^{commit}" 2>/dev/null) || continue # e.g. a tag on a tree or blob
+  [[ " ${commits[*]-} " == *" $commit "* ]] || commits+=("$commit")
+  echo "pre-push: will verify $local_ref at ${commit:0:7}"
 done
 
-$pushing || exit 0
-
-if ! git diff --quiet HEAD --; then
-  echo 'pre-push: you have uncommitted changes.' >&2
-  echo 'pre-push: commit or stash them, so verify runs on exactly what is being pushed.' >&2
-  exit 1
-fi
-
-echo "pre-push: running scripts/verify.sh on $(git rev-parse --short HEAD)"
-exec "$(git rev-parse --show-toplevel)/scripts/verify.sh"
+for commit in ${commits[@]+"${commits[@]}"}; do
+  wt="$scratch/${commit:0:12}"
+  git -C "$root" worktree add --detach --quiet "$wt" "$commit"
+  worktrees+=("$wt")
+  echo "pre-push: verifying ${commit:0:7} in a clean checkout"
+  VERIFY_CLEAN_INSTALL=1 "$wt/scripts/verify.sh" || {
+    echo "pre-push: verify failed for ${commit:0:7}; push blocked." >&2
+    exit 1
+  }
+done

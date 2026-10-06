@@ -5,6 +5,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   plugins: [react()],
   test: {
+    // A stray .only would silently skip every other test; fail instead, locally as well as in CI.
+    allowOnly: false,
     // The two test projects map to the unit and behaviour stages of scripts/verify.sh.
     projects: [
       {
