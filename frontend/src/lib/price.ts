@@ -23,6 +23,16 @@ export function defaultFinish(card: Pick<CardSummary, 'finishes'>): Finish {
   return card.finishes.includes('nonfoil') ? 'nonfoil' : (card.finishes[0] ?? 'nonfoil');
 }
 
+/** Rounds a EUR/USD amount to cents, half up (1.005 → 1.01), as Postgres numeric does. */
+export function roundToCents(amount: number): number {
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+}
+
+/** quantity × unit price, in cents; null when there's no unit price. */
+export function lineValue(unitPrice: number | null, quantity: number): number | null {
+  return unitPrice == null ? null : roundToCents(unitPrice * quantity);
+}
+
 const formatters: Record<Currency, Intl.NumberFormat> = {
   eur: new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR' }),
   usd: new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }),

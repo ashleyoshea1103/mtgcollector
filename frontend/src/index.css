@@ -95,6 +95,16 @@ img {
 .group-bucket__toggle {
   font: inherit;
   cursor: pointer;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+}
+.group-bucket__toggle::before {
+  content: '▸ ';
+}
+.group-bucket__toggle[aria-expanded='true']::before {
+  content: '▾ ';
 }
 
 .card-detail {

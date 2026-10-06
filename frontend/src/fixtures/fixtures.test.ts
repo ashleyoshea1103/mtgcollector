@@ -25,6 +25,13 @@ describe('fixture cards', () => {
     });
     expect(['common', 'uncommon', 'rare', 'mythic', 'special', 'bonus']).toContain(card.rarity);
     expect(card.finishes.length).toBeGreaterThan(0);
+    for (const finish of card.finishes) expect(['nonfoil', 'foil', 'etched']).toContain(finish);
+    expect(card.oracle_text === null || typeof card.oracle_text === 'string').toBe(true);
+    if (card.images) expect(Object.keys(card.images).sort()).toEqual(['art_crop', 'large', 'normal', 'small']);
+    for (const face of card.faces ?? []) {
+      expect(face).toMatchObject({ name: string, mana_cost: string, type_line: string });
+      if (face.images) expect(Object.keys(face.images).sort()).toEqual(['art_crop', 'large', 'normal', 'small']);
+    }
     expect(Object.keys(card.prices).sort()).toEqual(['eur', 'eur_foil', 'usd', 'usd_etched', 'usd_foil']);
     expect(Object.values(card.prices).every(priceOrNull)).toBe(true);
   });
@@ -36,6 +43,18 @@ describe('fixture cards', () => {
     ];
     for (const url of urls) expect(url).toMatch(/^https:\/\/cards\.scryfall\.io\//);
     if (card.cardmarket_url) expect(card.cardmarket_url).toMatch(/^https:\/\/www\.cardmarket\.com\//);
+  });
+});
+
+describe('fixture entries', () => {
+  // Checked against the raw Scryfall fields, not priceFor, so a broken
+  // "server model" in makeEntry can't hide behind the function it uses.
+  it('price each copy at the price for its finish', () => {
+    expect(entries.bolts.unit_price_eur).toBe(cards.lightningBolt.prices.eur);
+    expect(entries.foilRagavan.unit_price_eur).toBe(cards.ragavan.prices.eur_foil);
+    expect(entries.etchedFireIce.unit_price_eur).toBe(cards.fireIce.prices.eur_foil);
+    expect(entries.propaganda.unit_price_eur).toBe(cards.propaganda.prices.eur_foil);
+    expect(entries.unpricedElves.unit_price_eur).toBeNull();
   });
 });
 

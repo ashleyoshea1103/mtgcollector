@@ -56,23 +56,34 @@ describe('GroupBucketSection', () => {
   it('collapses and expands, rendering entries only while open', async () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
-    render(<GroupBucketSection {...red} onOpenChange={onOpenChange} />);
+    const { container } = render(<GroupBucketSection {...red} onOpenChange={onOpenChange} />);
     expect(toggle('Red')).toHaveAttribute('aria-expanded', 'true');
+    expect(container.firstElementChild).toHaveClass('group-bucket--open');
+    expect(onOpenChange).not.toHaveBeenCalled();
 
     await user.click(toggle('Red'));
     expect(toggle('Red')).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    expect(onOpenChange).toHaveBeenCalledOnce();
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    expect(container.firstElementChild).not.toHaveClass('group-bucket--open');
 
     await user.click(toggle('Red'));
     expect(screen.getAllByRole('article')).toHaveLength(red.entries.length);
+    expect(onOpenChange).toHaveBeenCalledTimes(2);
     expect(onOpenChange).toHaveBeenLastCalledWith(true);
   });
 
-  it('can start collapsed', () => {
-    render(<GroupBucketSection {...red} defaultOpen={false} />);
+  it('can start collapsed, rendering nothing below the header', () => {
+    render(<GroupBucketSection {...red} view="list" defaultOpen={false} onLoadMore={() => {}} />);
     expect(toggle('Red')).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument();
+  });
+
+  it('shows an empty group as empty, not as loading', () => {
+    render(<GroupBucketSection group={makeGroup('E', 'Empty', []).group} entries={[]} />);
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
   });
 
   it('follows a controlled open state and only reports clicks', async () => {
@@ -86,12 +97,40 @@ describe('GroupBucketSection', () => {
     expect(screen.getAllByRole('article')).toHaveLength(red.entries.length);
   });
 
-  it('shows a loading state while the first page is on its way', () => {
-    render(<GroupBucketSection group={red.group} />);
-    expect(screen.getByText('Loading…')).toBeInTheDocument();
+  it('stays where it was when the parent stops controlling it', () => {
+    const { rerender } = render(<GroupBucketSection {...red} open={false} />);
+    rerender(<GroupBucketSection {...red} />);
+    expect(toggle('Red')).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('offers to load more only when there is more', async () => {
+  it('shows a loading state, and no "Show more", while the first page is on its way', () => {
+    render(<GroupBucketSection group={red.group} onLoadMore={() => {}} />);
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument();
+  });
+
+  it('asks for the first page when it starts open, once, even if the callback changes', () => {
+    const onLoad = vi.fn();
+    const { rerender } = render(<GroupBucketSection group={red.group} onLoad={onLoad} />);
+    rerender(<GroupBucketSection group={red.group} onLoad={() => onLoad()} />);
+    expect(onLoad).toHaveBeenCalledOnce();
+  });
+
+  it('asks for the first page when opened, not while collapsed or once loaded', async () => {
+    const user = userEvent.setup();
+    const onLoad = vi.fn();
+    const { rerender } = render(<GroupBucketSection group={red.group} defaultOpen={false} onLoad={onLoad} />);
+    expect(onLoad).not.toHaveBeenCalled();
+    await user.click(toggle('Red'));
+    expect(onLoad).toHaveBeenCalledOnce();
+
+    rerender(<GroupBucketSection {...red} onLoad={onLoad} />);
+    await user.click(toggle('Red'));
+    await user.click(toggle('Red'));
+    expect(onLoad).toHaveBeenCalledOnce();
+  });
+
+  it('offers to load more only when there is more, and not twice at once', async () => {
     const user = userEvent.setup();
     const onLoadMore = vi.fn();
     const { rerender } = render(<GroupBucketSection {...red} />);
@@ -99,5 +138,8 @@ describe('GroupBucketSection', () => {
     rerender(<GroupBucketSection {...red} onLoadMore={onLoadMore} />);
     await user.click(screen.getByRole('button', { name: 'Show more' }));
     expect(onLoadMore).toHaveBeenCalledOnce();
+
+    rerender(<GroupBucketSection {...red} onLoadMore={onLoadMore} loadingMore />);
+    expect(screen.getByRole('button', { name: 'Loading…' })).toBeDisabled();
   });
 });

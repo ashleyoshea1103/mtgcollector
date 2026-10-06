@@ -55,10 +55,16 @@ describe('TotalValue', () => {
   it('says how many cards were left out of a partly priced total', () => {
     const { container } = render(<TotalValue total={{ card_count: 5, value_eur: 12.5, unpriced_count: 2 }} />);
     expect(container).toHaveTextContent(`${eur(12.5)} (+2 unpriced)`);
+    expect(container.firstElementChild).toHaveClass('total-value--partial');
   });
 
   it('shows a dash, not a zero total, when no card has a price', () => {
     const { container } = render(<TotalValue total={{ card_count: 3, value_eur: 0, unpriced_count: 3 }} />);
+    expect(container).toHaveTextContent(/^—$/);
+  });
+
+  it('shows a dash for inconsistent totals that claim unpriced cards but no cards', () => {
+    const { container } = render(<TotalValue total={{ card_count: 0, value_eur: 0, unpriced_count: 2 }} />);
     expect(container).toHaveTextContent(/^—$/);
   });
 

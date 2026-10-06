@@ -1,4 +1,4 @@
-import { RARITIES } from '../lib/labels';
+import { labelFor, RARITIES } from '../lib/labels';
 import type { Rarity } from '../types';
 
 interface Props {
@@ -7,8 +7,8 @@ interface Props {
 
 export function RarityBadge({ rarity }: Props) {
   return (
-    <abbr className={`rarity-badge rarity-badge--${rarity}`} title={RARITIES[rarity]}>
-      {rarity[0].toUpperCase()}
+    <abbr className={`rarity-badge rarity-badge--${rarity}`} title={labelFor(RARITIES, rarity)}>
+      {rarity.charAt(0).toUpperCase()}
     </abbr>
   );
 }

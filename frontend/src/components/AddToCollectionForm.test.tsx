@@ -88,8 +88,29 @@ describe('AddToCollectionForm', () => {
 
     rerender(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} />);
     expect(select('Finish')).toHaveValue('nonfoil');
+    expect(screen.getByText(/Adding/)).toHaveTextContent(eur(lightningBolt.prices.eur));
     await submit();
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ card_id: lightningBolt.id, finish: 'nonfoil' }));
+  });
+
+  it("defaults the language to the printing's language", async () => {
+    const onSubmit = vi.fn();
+    render(<AddToCollectionForm card={{ ...lightningBolt, lang: 'ja' }} onSubmit={onSubmit} />);
+    expect(select('Language')).toHaveValue('ja');
+    await submit();
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ language: 'ja' }));
+  });
+
+  it('forgets the finish and language chosen for a previous card', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    const { rerender } = render(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} />);
+    await user.selectOptions(select('Finish'), 'foil');
+    await user.selectOptions(select('Language'), 'de');
+
+    rerender(<AddToCollectionForm card={ragavan} onSubmit={onSubmit} />);
+    expect(select('Finish')).toHaveValue('nonfoil');
+    expect(select('Language')).toHaveValue('en');
   });
 
   it('drops a chosen group that no longer exists, and "None" clears the group', async () => {

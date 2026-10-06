@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { countOf } from '../lib/format';
-import { GROUP_KINDS } from '../lib/labels';
+import { GROUP_KINDS, labelFor } from '../lib/labels';
 import type { CustomGroup } from '../types';
 import { TotalValue } from './TotalValue';
 
@@ -24,7 +24,7 @@ export function CustomGroupCard({ group, actions }: Props) {
       </div>
       <h3 className="custom-group-card__name">{group.name}</h3>
       <p className="custom-group-card__meta">
-        <span className="custom-group-card__kind">{GROUP_KINDS[group.kind]}</span>
+        <span className="custom-group-card__kind">{labelFor(GROUP_KINDS, group.kind)}</span>
         <span className="custom-group-card__count">
           {countOf(group.card_count, 'card')}
         </span>

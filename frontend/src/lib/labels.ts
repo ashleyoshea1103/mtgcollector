@@ -63,3 +63,12 @@ export const LANGUAGES: Record<string, string> = {
   ph: 'Phyrexian',
   qya: 'Quenya',
 };
+
+/**
+ * The label for a code that came from the server, or the code itself when it's
+ * unknown. Only own keys count, so odd values like "__proto__" can't return an
+ * object and crash rendering.
+ */
+export function labelFor(labels: Record<string, string>, code: string): string {
+  return Object.hasOwn(labels, code) ? labels[code] : code;
+}

@@ -21,8 +21,9 @@ export interface CardFace {
 }
 
 /**
- * Scryfall's prices. EUR comes from Cardmarket. Scryfall has no EUR etched
- * price, so etched cards are valued at the EUR foil price.
+ * Scryfall's prices. EUR comes from Cardmarket. Scryfall has no EUR etched price:
+ * etched copies use the EUR foil price when the printing has one, and etched-only
+ * printings usually have no EUR price at all (so they count as unpriced).
  */
 export interface Prices {
   eur: number | null;
@@ -109,6 +110,24 @@ export interface EntryPage {
   next_cursor: string | null;
 }
 
+/**
+ * A collection entry as a member of a custom group. A binder can hold only some
+ * of an entry's copies, so the member has its own quantity and value.
+ */
+export interface GroupMember {
+  entry: CollectionEntry;
+  /** Copies of the entry in this group: 1 to entry.quantity. */
+  quantity: number;
+  /** quantity × entry.unit_price_eur; null when there's no price. */
+  value_eur: number | null;
+}
+
+/** One page of a custom group's members. */
+export interface GroupMemberPage {
+  members: GroupMember[];
+  next_cursor: string | null;
+}
+
 export type CustomGroupKind = 'binder' | 'deck' | 'box' | 'other';
 
 /** A user-created group of cards: a binder, deck, box, etc. */
@@ -120,9 +139,10 @@ export interface CustomGroup extends ValueTotal {
   preview_images: string[];
 }
 
+/** Totals for the whole collection. Values are EUR only: Cardmarket is the reference market. */
 export interface CollectionStats extends ValueTotal {
+  /** Distinct printings owned (entries for the same printing in other finishes/conditions count once). */
   unique_cards: number;
-  value_usd: number;
   by_color: Record<string, number>;
   by_rarity: Partial<Record<Rarity, number>>;
 }

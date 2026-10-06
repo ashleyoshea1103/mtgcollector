@@ -1,4 +1,4 @@
-import { CONDITIONS, FINISHES, LANGUAGES } from '../lib/labels';
+import { CONDITIONS, FINISHES, labelFor, LANGUAGES } from '../lib/labels';
 import type { Card, CardFace, CollectionEntry } from '../types';
 import { CardImage } from './CardImage';
 import { ManaCost } from './ManaCost';
@@ -62,7 +62,7 @@ export function CardDetail({ card, entries = [] }: Props) {
             <tbody>
               {card.finishes.map((finish) => (
                 <tr key={finish}>
-                  <th scope="row">{FINISHES[finish]}</th>
+                  <th scope="row">{labelFor(FINISHES, finish)}</th>
                   <td>
                     <Price prices={card.prices} finish={finish} />
                   </td>
@@ -86,7 +86,7 @@ export function CardDetail({ card, entries = [] }: Props) {
             <ul>
               {entries.map((e) => (
                 <li key={e.id}>
-                  {e.quantity}× {FINISHES[e.finish]}, {CONDITIONS[e.condition]}, {LANGUAGES[e.language] ?? e.language}{' '}
+                  {e.quantity}× {labelFor(FINISHES, e.finish)}, {labelFor(CONDITIONS, e.condition)}, {labelFor(LANGUAGES, e.language)}{' '}
                   <Price value={e.value_eur} />
                 </li>
               ))}

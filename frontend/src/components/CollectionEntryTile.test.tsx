@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { cards, entries } from '../fixtures';
+import { cards, entries, serverPricedBolts } from '../fixtures';
 import { eur } from '../test/helpers';
 import { CardTile } from './CardTile';
 import { CollectionEntryTile } from './CollectionEntryTile';
@@ -24,6 +24,12 @@ describe('CardTile', () => {
     expect(screen.queryByTitle('No price available')).not.toBeInTheDocument();
   });
 
+  it('shows a dash for a null given price rather than working one out', () => {
+    render(<CardTile card={lightningBolt} unitPrice={null} />);
+    expect(screen.getByTitle('No price available')).toBeInTheDocument();
+    expect(screen.queryByText(eur(lightningBolt.prices.eur))).not.toBeInTheDocument();
+  });
+
   it('shows a given unit price instead of working one out', () => {
     render(<CardTile card={lightningBolt} unitPrice={9.99} />);
     expect(screen.getByText(eur(9.99))).toBeInTheDocument();
@@ -40,6 +46,14 @@ describe('CollectionEntryTile', () => {
     expect(within(tile).getByTitle('Near Mint')).toHaveTextContent(/^NM$/);
     expect(within(tile).getByText(eur(bolts.unit_price_eur))).toBeInTheDocument();
     expect(within(tile).getByText(/^Value/)).toHaveTextContent(eur(bolts.value_eur));
+  });
+
+  it("shows the server's unit price and value, not one worked out from the card", () => {
+    render(<CollectionEntryTile entry={serverPricedBolts} />);
+    const tile = screen.getByRole('article');
+    expect(within(tile).getByText(eur(serverPricedBolts.unit_price_eur))).toBeInTheDocument();
+    expect(within(tile).getByText(/^Value/)).toHaveTextContent(eur(serverPricedBolts.value_eur));
+    expect(tile).not.toHaveTextContent(eur(lightningBolt.prices.eur));
   });
 
   it('labels foils and etched foils, but not non-foils', () => {

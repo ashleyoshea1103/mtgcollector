@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { cards, entries } from '../fixtures';
+import { cards, entries, serverPricedBolts } from '../fixtures';
 import { cellsByColumn, eur, usd } from '../test/helpers';
 import { CardDetail } from './CardDetail';
 
@@ -64,6 +64,11 @@ describe('CardDetail', () => {
     expect(priceRow('Etched foil').USD).toHaveTextContent(usd(prices.usd_etched));
   });
 
+  it('keeps the etched row when there is no USD etched price', () => {
+    render(<CardDetail card={{ ...fireIce, prices: { ...fireIce.prices, usd_etched: null } }} />);
+    expect(priceRow('Etched foil').USD).toHaveTextContent(usd(fireIce.prices.usd_foil));
+  });
+
   it('only prices the foil finish of a foil-only printing', () => {
     render(<CardDetail card={propaganda} />);
     expect(within(screen.getByRole('table')).getAllByRole('rowheader').map((th) => th.textContent)).toEqual(['Foil']);
@@ -90,6 +95,11 @@ describe('CardDetail', () => {
     const item = screen.getByRole('listitem');
     expect(item).toHaveTextContent(`${germanDelver.quantity}× Non-foil, Excellent, German`);
     expect(item).toHaveTextContent(eur(germanDelver.value_eur));
+  });
+
+  it("shows the server's value for owned copies", () => {
+    render(<CardDetail card={lightningBolt} entries={[serverPricedBolts]} />);
+    expect(screen.getByRole('listitem')).toHaveTextContent(eur(serverPricedBolts.value_eur));
   });
 
   it('omits the owned section when the user has no copies', () => {

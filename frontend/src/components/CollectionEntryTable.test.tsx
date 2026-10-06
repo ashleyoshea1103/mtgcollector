@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { entries } from '../fixtures';
+import { entries, serverPricedBolts } from '../fixtures';
 import { CONDITIONS, FINISHES, LANGUAGES } from '../lib/labels';
 import { cellsByColumn, eur } from '../test/helpers';
 import { CollectionEntryTable } from './CollectionEntryTable';
@@ -28,12 +28,27 @@ describe('CollectionEntryTable', () => {
     expect(cells.Value).toHaveTextContent(eur(entry.value_eur));
   });
 
+  it("shows the server's unit price, not one worked out from the card", () => {
+    render(<CollectionEntryTable entries={[serverPricedBolts]} />);
+    const cells = cellsByColumn(rowFor(serverPricedBolts.card.name));
+    expect(cells.Price).toHaveTextContent(eur(serverPricedBolts.unit_price_eur));
+    expect(cells.Value).toHaveTextContent(eur(serverPricedBolts.value_eur));
+  });
+
   it('shows the unit price and the line value separately', () => {
     render(<CollectionEntryTable entries={[entries.bolts]} />);
     const cells = cellsByColumn(rowFor(entries.bolts.card.name));
     expect(entries.bolts.quantity).toBeGreaterThan(1);
     expect(cells.Price).toHaveTextContent(eur(entries.bolts.unit_price_eur));
     expect(cells.Value).toHaveTextContent(eur(entries.bolts.value_eur));
+  });
+
+  it('shows unknown or hostile codes from the server as-is instead of crashing', () => {
+    const odd = { ...entries.bolts, language: '__proto__', condition: 'constructor' as never };
+    render(<CollectionEntryTable entries={[odd]} />);
+    const cells = cellsByColumn(rowFor(odd.card.name));
+    expect(cells.Language).toHaveTextContent('__proto__');
+    expect(within(cells.Condition).getByTitle('constructor')).toBeInTheDocument();
   });
 
   it('has no actions column unless actions are provided', () => {

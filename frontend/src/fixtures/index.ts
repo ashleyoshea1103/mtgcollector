@@ -1,7 +1,7 @@
 // Sample data for the component gallery and tests. cards.json holds real Scryfall
 // cards (see scripts/fetch-fixtures.mjs) and is frozen: tests must derive expected
 // values from these objects rather than hardcode prices.
-import { priceFor } from '../lib/price';
+import { lineValue, priceFor, roundToCents } from '../lib/price';
 import type { Card, CardSummary, CollectionEntry, CollectionStats, CustomGroup, GroupSummary, ValueTotal } from '../types';
 import rawCards from './cards.json';
 
@@ -17,16 +17,16 @@ export const unpricedCard: Card = {
   prices: { eur: null, eur_foil: null, usd: null, usd_foil: null, usd_etched: null },
 };
 
-const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-
 /** A collection entry priced the way the server prices it. */
 export function makeEntry(
   id: number,
   card: CardSummary,
-  copy: Partial<Pick<CollectionEntry, 'quantity' | 'finish' | 'condition' | 'language' | 'added_at'>> = {},
+  copy: Partial<Pick<CollectionEntry, 'quantity' | 'finish' | 'condition' | 'language' | 'added_at' | 'unit_price_eur'>> = {},
 ): CollectionEntry {
   const { quantity = 1, finish = 'nonfoil', condition = 'NM', language = 'en', added_at = '2026-10-01T12:00:00Z' } = copy;
-  const unit = priceFor(card.prices, finish);
+  // The server's price, which the client must show as-is. Tests can override it to
+  // prove a component shows the server's number rather than working out its own.
+  const unit = copy.unit_price_eur !== undefined ? copy.unit_price_eur : priceFor(card.prices, finish);
   return {
     id,
     card,
@@ -36,7 +36,7 @@ export function makeEntry(
     language,
     added_at,
     unit_price_eur: unit,
-    value_eur: unit == null ? null : round2(unit * quantity),
+    value_eur: lineValue(unit, quantity),
   };
 }
 
@@ -44,7 +44,7 @@ export function makeEntry(
 export function totalOf(entries: CollectionEntry[]): ValueTotal {
   return {
     card_count: entries.reduce((n, e) => n + e.quantity, 0),
-    value_eur: round2(entries.reduce((sum, e) => sum + (e.value_eur ?? 0), 0)),
+    value_eur: roundToCents(entries.reduce((sum, e) => sum + (e.value_eur ?? 0), 0)),
     unpriced_count: entries.filter((e) => e.value_eur == null).reduce((n, e) => n + e.quantity, 0),
   };
 }
@@ -61,6 +61,9 @@ export const entries = {
   propaganda: makeEntry(5, cards.propaganda, { finish: 'foil' }),
   unpricedElves: makeEntry(6, unpricedCard, { quantity: 3 }),
 };
+
+/** An entry whose server price differs from anything the client could work out from the card's prices. */
+export const serverPricedBolts = makeEntry(7, cards.lightningBolt, { quantity: 2, unit_price_eur: 7.77 });
 
 const allEntries = Object.values(entries);
 
@@ -91,8 +94,7 @@ export const customGroups: CustomGroup[] = [
 
 export const stats: CollectionStats = {
   ...totalOf(allEntries),
-  unique_cards: allEntries.length,
-  value_usd: round2(allEntries.reduce((sum, e) => sum + (priceFor(e.card.prices, e.finish, 'usd') ?? 0) * e.quantity, 0)),
+  unique_cards: new Set(allEntries.map((e) => e.card.id)).size,
   by_color: Object.fromEntries(colorGroups.map(({ group }) => [group.key, group.card_count])),
   by_rarity: allEntries.reduce<CollectionStats['by_rarity']>((acc, e) => {
     acc[e.card.rarity] = (acc[e.card.rarity] ?? 0) + e.quantity;

@@ -16,12 +16,15 @@ interface Props {
 export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = false }: Props) {
   // Kept as typed so the field can be cleared and retyped; parsed and clamped on submit.
   const [quantity, setQuantity] = useState('1');
-  // Until the user picks one, and whenever the card changes to a printing without the
-  // picked finish, use the printing's default finish.
-  const [chosenFinish, setFinish] = useState<Finish | null>(null);
-  const finish = chosenFinish && card.finishes.includes(chosenFinish) ? chosenFinish : defaultFinish(card);
+  // Finish and language belong to the printing: they default from it, and a choice
+  // made for one card is forgotten when the form is given another.
+  const [choice, setChoice] = useState<{ cardId: string; finish?: Finish; language?: string }>({ cardId: card.id });
+  const chosen = choice.cardId === card.id ? choice : { cardId: card.id };
+  const finish = chosen.finish && card.finishes.includes(chosen.finish) ? chosen.finish : defaultFinish(card);
+  const language = chosen.language ?? (Object.hasOwn(LANGUAGES, card.lang) ? card.lang : 'en');
+  const setFinish = (f: Finish) => setChoice({ ...chosen, finish: f });
+  const setLanguage = (l: string) => setChoice({ ...chosen, language: l });
   const [condition, setCondition] = useState<Condition>('NM');
-  const [language, setLanguage] = useState('en');
   const [chosenGroupId, setGroupId] = useState<number | null>(null);
   // Likewise the chosen group may have been deleted since it was picked.
   const groupId = groups.some((g) => g.id === chosenGroupId) ? chosenGroupId : null;

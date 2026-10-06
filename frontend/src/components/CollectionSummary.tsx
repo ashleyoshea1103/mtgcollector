@@ -1,6 +1,5 @@
-import { COLORS, RARITIES } from '../lib/labels';
-import type { CollectionStats, Rarity } from '../types';
-import { Price } from './Price';
+import { COLORS, labelFor, RARITIES } from '../lib/labels';
+import type { CollectionStats } from '../types';
 import { TotalValue } from './TotalValue';
 
 interface Props {
@@ -26,23 +25,17 @@ export function CollectionSummary({ stats }: Props) {
             <TotalValue total={stats} />
           </dd>
         </div>
-        <div>
-          <dt>Value (USD)</dt>
-          <dd>
-            <Price value={stats.value_usd} currency="usd" />
-          </dd>
-        </div>
       </dl>
 
       <Breakdown
         title="By color"
         modifier="color"
-        rows={Object.entries(stats.by_color).map(([key, count]) => [key, COLORS[key] ?? key, count])}
+        rows={Object.entries(stats.by_color).map(([key, count]) => [key, labelFor(COLORS, key), count])}
       />
       <Breakdown
         title="By rarity"
         modifier="rarity"
-        rows={Object.entries(stats.by_rarity).map(([key, count]) => [key, RARITIES[key as Rarity], count ?? 0])}
+        rows={Object.entries(stats.by_rarity).map(([key, count]) => [key, labelFor(RARITIES, key), count ?? 0])}
       />
     </section>
   );

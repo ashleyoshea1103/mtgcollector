@@ -12,6 +12,7 @@ if (import.meta.env.DEV) {
   routes.push({
     path: '/dev/components',
     lazy: () => import('./pages/ComponentGallery').then((m) => ({ Component: m.ComponentGallery })),
+    hydrateFallbackElement: <p>Loading…</p>,
   });
 }
 

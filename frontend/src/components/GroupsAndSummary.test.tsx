@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, customGroups, stats, unpricedCard } from '../fixtures';
 import { COLORS, RARITIES } from '../lib/labels';
-import { eur, usd } from '../test/helpers';
+import { eur } from '../test/helpers';
 import type { CustomGroup } from '../types';
 import { CollectionSummary } from './CollectionSummary';
 import { CustomGroupCard } from './CustomGroupCard';
@@ -68,7 +68,7 @@ describe('CollectionSummary', () => {
     expect(total('Unique')).toHaveTextContent(new RegExp(`^${stats.unique_cards}$`));
     expect(total('Value (Cardmarket)')).toHaveTextContent(eur(stats.value_eur));
     expect(total('Value (Cardmarket)')).toHaveTextContent(`+${stats.unpriced_count} unpriced`);
-    expect(total('Value (USD)')).toHaveTextContent(usd(stats.value_usd));
+    expect(screen.queryByText('Value (USD)')).not.toBeInTheDocument();
   });
 
   it.each([
@@ -128,7 +128,7 @@ describe('ManaCost', () => {
       ['1', '{1}', 'mana-symbol mana-symbol--1'],
       ['U', '{U}', 'mana-symbol mana-symbol--u'],
     ]);
-    expect(container.querySelector('.mana-cost__separator')).toHaveTextContent('//');
+    expect(container.querySelector('.mana-cost__separator')!.textContent).toBe(' // ');
   });
 
   it('renders nothing for an empty cost', () => {
