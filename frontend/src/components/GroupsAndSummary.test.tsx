@@ -114,9 +114,9 @@ describe('PrintingOption', () => {
 });
 
 describe('ManaCost', () => {
-  it('is announced as one image named by the full cost', () => {
+  it('is announced as one image, with the cost in words', () => {
     render(<ManaCost cost="{2}{R}" />);
-    expect(screen.getByRole('img', { name: '{2}{R}' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '2 generic, red' })).toBeInTheDocument();
   });
 
   it('renders one symbol per pip, with a slash-free class, and separates split-card halves', () => {

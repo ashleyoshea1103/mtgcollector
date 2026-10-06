@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, entries, serverPricedBolts } from '../fixtures';
+import { describeManaCost } from '../lib/mana';
 import { cellsByColumn, eur, usd } from '../test/helpers';
 import { CardDetail } from './CardDetail';
 
@@ -21,7 +22,7 @@ describe('CardDetail', () => {
     expect(screen.getByRole('img', { name: 'Delver of Secrets' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Insectile Aberration' })).toBeInTheDocument();
     const front = screen.getByRole('heading', { level: 3, name: /^Delver of Secrets/ });
-    expect(within(front).getByRole('img', { name: delver.faces![0].mana_cost })).toBeInTheDocument();
+    expect(within(front).getByRole('img', { name: describeManaCost(delver.faces![0].mana_cost) })).toBeInTheDocument();
     expect(screen.getByText('Flying')).toBeInTheDocument();
   });
 
@@ -30,7 +31,7 @@ describe('CardDetail', () => {
     expect(screen.getAllByRole('img', { name: fireIce.name })).toHaveLength(1);
     for (const face of fireIce.faces!) {
       const heading = screen.getByRole('heading', { level: 3, name: new RegExp(`^${face.name}`) });
-      expect(within(heading).getByRole('img', { name: face.mana_cost })).toBeInTheDocument();
+      expect(within(heading).getByRole('img', { name: describeManaCost(face.mana_cost) })).toBeInTheDocument();
     }
   });
 

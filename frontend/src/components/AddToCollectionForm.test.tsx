@@ -101,16 +101,29 @@ describe('AddToCollectionForm', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ language: 'ja' }));
   });
 
-  it('forgets the finish and language chosen for a previous card', async () => {
+  it('forgets the quantity, finish and language chosen for a previous card, but keeps condition and group', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    const { rerender } = render(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} />);
+    const { rerender } = render(<AddToCollectionForm card={lightningBolt} groups={customGroups} onSubmit={onSubmit} />);
+    const quantity = () => screen.getByRole('spinbutton', { name: 'Quantity' });
+    await user.clear(quantity());
+    await user.type(quantity(), '4');
     await user.selectOptions(select('Finish'), 'foil');
     await user.selectOptions(select('Language'), 'de');
+    await user.selectOptions(select('Condition'), 'LP');
+    await user.selectOptions(select('Add to group'), 'Trade binder');
 
-    rerender(<AddToCollectionForm card={ragavan} onSubmit={onSubmit} />);
+    rerender(<AddToCollectionForm card={ragavan} groups={customGroups} onSubmit={onSubmit} />);
+    expect(quantity()).toHaveValue(1);
     expect(select('Finish')).toHaveValue('nonfoil');
     expect(select('Language')).toHaveValue('en');
+    expect(select('Condition')).toHaveValue('LP');
+    expect(select('Add to group')).toHaveValue(String(customGroups.find((g) => g.name === 'Trade binder')!.id));
+  });
+
+  it('shows a finish it has no label for by its code', () => {
+    render(<AddToCollectionForm card={{ ...lightningBolt, finishes: ['nonfoil', 'glossy' as never] }} onSubmit={() => {}} />);
+    expect(within(select('Finish')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Non-foil', 'glossy']);
   });
 
   it('drops a chosen group that no longer exists, and "None" clears the group', async () => {

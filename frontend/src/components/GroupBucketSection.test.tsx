@@ -130,6 +130,16 @@ describe('GroupBucketSection', () => {
     expect(onLoad).toHaveBeenCalledOnce();
   });
 
+  it('offers a retry when the first page failed to load', async () => {
+    const user = userEvent.setup();
+    const onLoad = vi.fn();
+    render(<GroupBucketSection group={red.group} onLoad={onLoad} loadFailed />);
+    expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load these cards.");
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onLoad).toHaveBeenCalledTimes(2); // once on mount, once for the retry
+  });
+
   it('offers to load more only when there is more, and not twice at once', async () => {
     const user = userEvent.setup();
     const onLoadMore = vi.fn();

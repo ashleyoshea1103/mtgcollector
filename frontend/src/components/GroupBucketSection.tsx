@@ -23,6 +23,8 @@ interface Props {
   onLoadMore?: () => void;
   /** True while a further page is being fetched; disables "Show more". */
   loadingMore?: boolean;
+  /** True when fetching the first page failed; shows a message with a retry that calls onLoad. */
+  loadFailed?: boolean;
   renderActions?: (entry: CollectionEntry) => ReactNode;
 }
 
@@ -40,6 +42,7 @@ export function GroupBucketSection({
   onLoad,
   onLoadMore,
   loadingMore = false,
+  loadFailed = false,
   renderActions,
 }: Props) {
   const [ownOpen, setOwnOpen] = useState(open ?? defaultOpen);
@@ -49,7 +52,7 @@ export function GroupBucketSection({
   const isOpen = open ?? ownOpen;
 
   const toggle = () => {
-    setOwnOpen(!isOpen);
+    if (open === undefined) setOwnOpen(!isOpen);
     onOpenChange?.(!isOpen);
   };
 
@@ -75,7 +78,14 @@ export function GroupBucketSection({
 
       {isOpen && (
         <div className="group-bucket__body">
-          {entries === undefined ? (
+          {entries === undefined && loadFailed ? (
+            <p className="group-bucket__error" role="alert">
+              Couldn't load these cards.{' '}
+              <button type="button" onClick={() => onLoad?.()}>
+                Try again
+              </button>
+            </p>
+          ) : entries === undefined ? (
             <p className="group-bucket__loading">Loading…</p>
           ) : (
             <>
