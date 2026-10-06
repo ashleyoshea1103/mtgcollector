@@ -12,7 +12,8 @@ interface Props {
 
 /** Collects quantity, finish, condition, language and an optional group for one printing. */
 export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = false }: Props) {
-  const [quantity, setQuantity] = useState(1);
+  // Kept as typed so the field can be cleared and retyped; parsed and clamped on submit.
+  const [quantity, setQuantity] = useState('1');
   const [finish, setFinish] = useState<Finish>(card.finishes[0] ?? 'nonfoil');
   const [condition, setCondition] = useState<Condition>('NM');
   const [language, setLanguage] = useState('en');
@@ -20,7 +21,7 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    onSubmit({ card_id: card.id, quantity, finish, condition, language, group_id: groupId });
+    onSubmit({ card_id: card.id, quantity: parseQuantity(quantity), finish, condition, language, group_id: groupId });
   }
 
   return (
@@ -37,7 +38,7 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
           min={1}
           max={999}
           value={quantity}
-          onChange={(e) => setQuantity(Math.max(1, e.target.valueAsNumber || 1))}
+          onChange={(e) => setQuantity(e.target.value)}
         />
       </label>
 
@@ -96,4 +97,10 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
       </button>
     </form>
   );
+}
+
+/** A whole number from 1 to 999; anything empty or invalid counts as 1. */
+function parseQuantity(input: string): number {
+  const n = Math.floor(Number(input));
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, 999) : 1;
 }
