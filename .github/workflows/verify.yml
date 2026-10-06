@@ -1,16 +1,27 @@
 # Runs scripts/verify.sh (compile, unit tests, behaviour checks) on every pull
-# request into develop or main. The job is named `verify`; make that check
-# required in the branch rules so nothing merges without it passing.
+# request into develop or main and on every push to them (so merged results are
+# checked too). The job is named `verify`: the branch ruleset requires that
+# check, from GitHub Actions, before anything merges.
+#
+# Never add an `if:` that skips the job (e.g. to ignore title edits): a skipped
+# job satisfies a required check, and with cancel-in-progress a skipped run
+# would replace a real one.
 name: verify
 
 on:
   pull_request:
     branches: [develop, main]
+    # `edited` re-runs the check when a pull request is retargeted to another base branch.
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [develop, main]
   workflow_dispatch:
 
 concurrency:
-  group: verify-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # A new push to a pull request replaces its older run. Pushes to develop/main each keep
+  # their own run, so every merged commit gets a result.
+  group: verify-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -21,17 +32,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      # Actions are pinned to commit SHAs (tags can be moved); the comment says which release.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Don't leave the token in .git/config where dependency or test code could read it.
+          persist-credentials: false
 
       - name: Set up Node
-        if: hashFiles('frontend/package-lock.json') != ''
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: frontend/.nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Verify
-        run: ./scripts/verify.sh
+        run: |
+          locale=$(node -p 'Intl.DateTimeFormat().resolvedOptions().locale')
+          echo "Test locale: $locale, 1.55 EUR formats as $(node -p "JSON.stringify(new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR' }).format(1.55))")"
+          [[ $locale == de* ]] || { echo "::error::Node is using '$locale', not the German locale the tests should run under"; exit 1; }
+          ./scripts/verify.sh
         env:
           CI: 'true'
+          # Run under a locale whose prices look different from en-GB/en-US ("1,55 €",
+          # with a non-breaking space), so locale assumptions in tests fail here.
+          LC_ALL: de_DE.UTF-8

@@ -1,29 +1,76 @@
 #!/usr/bin/env bash
-# Blocks a push unless scripts/verify.sh passes on exactly the commit being pushed.
-# Enabled with: git config core.hooksPath .githooks
+# Blocks a push unless scripts/verify.sh passes on the tip commit of each ref being pushed.
+#
+# Each tip is checked out into a temporary worktree and verified there after a lockfile
+# check and a clean `npm ci`, so the result can't depend on uncommitted, untracked or
+# locally-hidden files, or on edits made while the checks run.
+#
+# Copied into .git/hooks by scripts/install-hooks.sh (not run via core.hooksPath),
+# together with check-lockfile.mjs, so the checks that run before any of the pushed
+# code don't come from the pushed code.
 set -euo pipefail
 
-head=$(git rev-parse HEAD)
-pushing=false
+root=$(git rev-parse --show-toplevel)
+git_dir=$(cd "$(git rev-parse --git-common-dir)" && pwd)
+hooks_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/verify-push.XXXXXX")
+current_wt=''
+cleanup() {
+  [[ -n $current_wt ]] && git -C "$root" worktree remove --force "$current_wt" >/dev/null 2>&1
+  rm -rf "$scratch"
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM # leave through the EXIT trap, so the worktree is removed on Ctrl-C too
+
+blocked() {
+  echo "pre-push: $1; push blocked." >&2
+  exit 1
+}
+
+# What verified code must not change: git config and the installed hooks.
+git_state() {
+  { cat "$git_dir/config"; find "$git_dir/hooks" -type f -exec cksum {} + 2>/dev/null | sort; } | cksum
+}
 
 # git passes one line per ref: <local ref> <local sha> <remote ref> <remote sha>
-while read -r local_ref local_sha _remote_ref _remote_sha; do
-  [[ $local_sha =~ ^0+$ ]] && continue # deleting a remote branch: nothing to check
-  pushing=true
-  if [[ $(git rev-parse "$local_sha^{commit}") != "$head" ]]; then
-    echo "pre-push: $local_ref is not the checked-out commit." >&2
-    echo "pre-push: check it out and push from there, so verify runs on what you're pushing." >&2
-    exit 1
+commits=()
+while read -r local_ref local_sha _remote_ref remote_sha; do
+  [[ $local_sha =~ ^0+$ ]] && continue          # deleting a remote branch: nothing to check
+  [[ $local_sha == "$remote_sha" ]] && continue # the remote already has exactly this
+  [[ $local_ref == refs/remotes/* ]] && continue # remote-tracking refs (e.g. --mirror) aren't our work
+  commit=$(git rev-parse "$local_sha^{commit}" 2>/dev/null) || continue # e.g. a tag on a tree or blob
+  # A tag on a commit the remote already has (e.g. --tags of old releases) adds no new code.
+  if [[ $local_ref == refs/tags/* ]] && [[ -n $(git for-each-ref --count=1 --contains "$commit" refs/remotes) ]]; then
+    continue
   fi
+  [[ " ${commits[*]-} " == *" $commit "* ]] || commits+=("$commit")
+  echo "pre-push: will verify $local_ref at ${commit:0:7}"
 done
 
-$pushing || exit 0
+for commit in ${commits[@]+"${commits[@]}"}; do
+  wt="$scratch/${commit:0:12}"
+  git -C "$root" worktree add --detach --quiet "$wt" "$commit"
+  current_wt=$wt
+  echo "pre-push: verifying ${commit:0:7} in a clean checkout"
+  [[ -f $wt/scripts/verify.sh ]] || blocked "${commit:0:7} predates the verify gate (no scripts/verify.sh), so it can't be verified"
 
-if ! git diff --quiet HEAD --; then
-  echo 'pre-push: you have uncommitted changes.' >&2
-  echo 'pre-push: commit or stash them, so verify runs on exactly what is being pushed.' >&2
-  exit 1
-fi
+  if [[ -f $wt/frontend/package-lock.json ]]; then
+    # The installed copy of the lockfile check, not the pushed one, which the pushed code controls.
+    [[ -f $hooks_dir/check-lockfile.mjs ]] || blocked "$hooks_dir/check-lockfile.mjs is missing; run ./scripts/install-hooks.sh"
+    node "$hooks_dir/check-lockfile.mjs" "$wt/frontend/package-lock.json" || blocked "lockfile check failed for ${commit:0:7}"
+    # Never run dependency install scripts, whatever the commit's .npmrc says: an older commit's
+    # `prepare` script would otherwise rewrite this repository's git config.
+    npm ci --prefix "$wt/frontend" --ignore-scripts --no-audit --no-fund --loglevel=error ||
+      blocked "npm ci failed for ${commit:0:7}"
+  fi
 
-echo "pre-push: running scripts/verify.sh on $(git rev-parse --short HEAD)"
-exec "$(git rev-parse --show-toplevel)/scripts/verify.sh"
+  # Verifying runs the commit's own code (verify.sh, build config, tests). It shares this
+  # repository's .git, so make sure it didn't change git config or the installed hooks.
+  before=$(git_state)
+  "$wt/scripts/verify.sh" || blocked "verify failed for ${commit:0:7}"
+  [[ $(git_state) == "$before" ]] ||
+    blocked "verifying ${commit:0:7} changed .git/config or .git/hooks; check them (git config --list --local) and reinstall the hook"
+
+  git -C "$root" worktree remove --force "$wt" # free its node_modules before the next one
+  current_wt=''
+done

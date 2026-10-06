@@ -6,12 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
+    "lint": "oxlint --deny-warnings",
     "preview": "vite preview",
     "test": "vitest",
     "test:unit": "vitest run --project unit",
-    "test:behaviour": "vitest run --project behaviour",
-    "prepare": "git -C .. config core.hooksPath .githooks || exit 0"
+    "test:behaviour": "vitest run --project behaviour"
   },
   "dependencies": {
     "react": "^19.2.8",

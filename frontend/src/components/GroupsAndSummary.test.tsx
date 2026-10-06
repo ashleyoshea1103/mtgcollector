@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { cards, customGroups, stats, unpricedCard } from '../fixtures';
 import { COLORS, RARITIES } from '../lib/labels';
 import { eur } from '../test/helpers';
-import type { CustomGroup } from '../types';
+import type { CardSummary, CustomGroup } from '../types';
 import { CollectionSummary } from './CollectionSummary';
 import { CustomGroupCard } from './CustomGroupCard';
 import { ManaCost } from './ManaCost';
@@ -100,7 +100,7 @@ describe('PrintingOption', () => {
 
   it('reports the printing when picked and shows it as pressed when selected', async () => {
     const user = userEvent.setup();
-    const onSelect = vi.fn();
+    const onSelect = vi.fn<(card: CardSummary) => void>();
     const { rerender } = render(<PrintingOption card={cards.ragavan} onSelect={onSelect} />);
     const button = screen.getByRole('button', { name: new RegExp(cards.ragavan.set_name) });
     expect(button).toHaveAttribute('aria-pressed', 'false');

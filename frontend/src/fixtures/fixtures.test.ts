@@ -27,11 +27,9 @@ describe('fixture cards', () => {
     expect(card.finishes.length).toBeGreaterThan(0);
     for (const finish of card.finishes) expect(['nonfoil', 'foil', 'etched']).toContain(finish);
     expect(card.oracle_text === null || typeof card.oracle_text === 'string').toBe(true);
-    if (card.images) expect(Object.keys(card.images).sort()).toEqual(['art_crop', 'large', 'normal', 'small']);
-    for (const face of card.faces ?? []) {
-      expect(face).toMatchObject({ name: string, mana_cost: string, type_line: string });
-      if (face.images) expect(Object.keys(face.images).sort()).toEqual(['art_crop', 'large', 'normal', 'small']);
-    }
+    const imageSets = [card.images, ...(card.faces ?? []).map((f) => f.images)].filter((i) => i !== null);
+    for (const images of imageSets) expect(Object.keys(images).sort()).toEqual(['art_crop', 'large', 'normal', 'small']);
+    for (const face of card.faces ?? []) expect(face).toMatchObject({ name: string, mana_cost: string, type_line: string });
     expect(Object.keys(card.prices).sort()).toEqual(['eur', 'eur_foil', 'usd', 'usd_etched', 'usd_foil']);
     expect(Object.values(card.prices).every(priceOrNull)).toBe(true);
   });
@@ -42,7 +40,7 @@ describe('fixture cards', () => {
       ...(card.faces ?? []).flatMap((f) => Object.values(f.images ?? {})),
     ];
     for (const url of urls) expect(url).toMatch(/^https:\/\/cards\.scryfall\.io\//);
-    if (card.cardmarket_url) expect(card.cardmarket_url).toMatch(/^https:\/\/www\.cardmarket\.com\//);
+    expect(card.cardmarket_url ?? 'https://www.cardmarket.com/').toMatch(/^https:\/\/www\.cardmarket\.com\//);
   });
 });
 

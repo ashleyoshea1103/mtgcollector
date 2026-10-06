@@ -13,6 +13,7 @@ import { Price } from '../components/Price';
 import { PrintingOption } from '../components/PrintingOption';
 import { RarityBadge } from '../components/RarityBadge';
 import { SetSymbol } from '../components/SetSymbol';
+import { DEV_ONLY_MARKER } from '../devOnly';
 import { cards, colorGroups, customGroups, entries, stats, unpricedCard } from '../fixtures';
 import type { Card, NewEntry } from '../types';
 
@@ -28,7 +29,7 @@ export function ComponentGallery() {
   const [submitted, setSubmitted] = useState<NewEntry | null>(null);
 
   return (
-    <main className="gallery">
+    <main className="gallery" data-dev-only={DEV_ONLY_MARKER}>
       <h1>Component gallery</h1>
       <p>Each component shown with real Scryfall fixture data. Styling is intentionally minimal.</p>
       <nav className="gallery__toc">
