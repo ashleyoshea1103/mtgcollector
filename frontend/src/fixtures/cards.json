@@ -1,0 +1,235 @@
+{
+  "lightningBolt": {
+    "id": "435589bb-27c6-4a6d-9d63-394d5092b9d8",
+    "oracle_id": "4457ed35-7c10-48c8-9776-456485fdf070",
+    "name": "Lightning Bolt",
+    "set_code": "m10",
+    "set_name": "Magic 2010",
+    "collector_number": "146",
+    "rarity": "common",
+    "mana_cost": "{R}",
+    "cmc": 1,
+    "type_line": "Instant",
+    "colors": [
+      "R"
+    ],
+    "color_identity": [
+      "R"
+    ],
+    "images": {
+      "small": "https://cards.scryfall.io/small/front/4/3/435589bb-27c6-4a6d-9d63-394d5092b9d8.jpg?1783942371",
+      "normal": "https://cards.scryfall.io/normal/front/4/3/435589bb-27c6-4a6d-9d63-394d5092b9d8.jpg?1783942371",
+      "large": "https://cards.scryfall.io/large/front/4/3/435589bb-27c6-4a6d-9d63-394d5092b9d8.jpg?1783942371",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/4/3/435589bb-27c6-4a6d-9d63-394d5092b9d8.jpg?1783942371"
+    },
+    "faces": null,
+    "oracle_text": "Lightning Bolt deals 3 damage to any target.",
+    "prices": {
+      "eur": 1.55,
+      "eur_foil": 5.56,
+      "usd": 1.87,
+      "usd_foil": 8.03
+    },
+    "cardmarket_url": "https://www.cardmarket.com/en/Magic/Products?idProduct=21192&referrer=scryfall&utm_campaign=card_prices&utm_medium=text&utm_source=scryfall",
+    "finishes": [
+      "nonfoil",
+      "foil"
+    ],
+    "released_at": "2009-07-17"
+  },
+  "ragavan": {
+    "id": "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
+    "oracle_id": "37108cd4-bbab-4ce3-9ed6-f60e8422e703",
+    "name": "Ragavan, Nimble Pilferer",
+    "set_code": "mh2",
+    "set_name": "Modern Horizons 2",
+    "collector_number": "138",
+    "rarity": "mythic",
+    "mana_cost": "{R}",
+    "cmc": 1,
+    "type_line": "Legendary Creature — Monkey Pirate",
+    "colors": [
+      "R"
+    ],
+    "color_identity": [
+      "R"
+    ],
+    "images": {
+      "small": "https://cards.scryfall.io/small/front/a/9/a9738cda-adb1-47fb-9f4c-ecd930228c4d.jpg?1783926839",
+      "normal": "https://cards.scryfall.io/normal/front/a/9/a9738cda-adb1-47fb-9f4c-ecd930228c4d.jpg?1783926839",
+      "large": "https://cards.scryfall.io/large/front/a/9/a9738cda-adb1-47fb-9f4c-ecd930228c4d.jpg?1783926839",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/a/9/a9738cda-adb1-47fb-9f4c-ecd930228c4d.jpg?1783926839"
+    },
+    "faces": null,
+    "oracle_text": "Whenever Ragavan deals combat damage to a player, create a Treasure token and exile the top card of that player's library. Until end of turn, you may cast that card.\nDash {1}{R} (You may cast this spell for its dash cost. If you do, it gains haste, and it's returned from the battlefield to its owner's hand at the beginning of the next end step.)",
+    "prices": {
+      "eur": 34.19,
+      "eur_foil": 53.92,
+      "usd": 40.27,
+      "usd_foil": 57.4
+    },
+    "cardmarket_url": "https://www.cardmarket.com/en/Magic/Products?idProduct=566480&referrer=scryfall&utm_campaign=card_prices&utm_medium=text&utm_source=scryfall",
+    "finishes": [
+      "nonfoil",
+      "foil"
+    ],
+    "released_at": "2021-06-18"
+  },
+  "delver": {
+    "id": "11bf83bb-c95b-4b4f-9a56-ce7a1816307a",
+    "oracle_id": "edd531b9-f615-4399-8c8c-1c5e18c4acbf",
+    "name": "Delver of Secrets // Insectile Aberration",
+    "set_code": "isd",
+    "set_name": "Innistrad",
+    "collector_number": "51",
+    "rarity": "common",
+    "mana_cost": "{U}",
+    "cmc": 1,
+    "type_line": "Creature — Human Wizard // Creature — Human Insect",
+    "colors": [
+      "U"
+    ],
+    "color_identity": [
+      "U"
+    ],
+    "images": {
+      "small": "https://cards.scryfall.io/small/front/1/1/11bf83bb-c95b-4b4f-9a56-ce7a1816307a.jpg?1783940984",
+      "normal": "https://cards.scryfall.io/normal/front/1/1/11bf83bb-c95b-4b4f-9a56-ce7a1816307a.jpg?1783940984",
+      "large": "https://cards.scryfall.io/large/front/1/1/11bf83bb-c95b-4b4f-9a56-ce7a1816307a.jpg?1783940984",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/1/1/11bf83bb-c95b-4b4f-9a56-ce7a1816307a.jpg?1783940984"
+    },
+    "faces": [
+      {
+        "name": "Delver of Secrets",
+        "mana_cost": "{U}",
+        "type_line": "Creature — Human Wizard",
+        "oracle_text": "At the beginning of your upkeep, look at the top card of your library. You may reveal that card. If an instant or sorcery card is revealed this way, transform this creature.",
+        "images": {
+          "small": "https://cards.scryfall.io/small/front/1/1/11bf83bb-c95b-4b4f-9a56-ce7a1816307a.jpg?1783940984",
+          "normal": "https://cards.scryfall.io/normal/front/1/1/11bf83bb-c95b-4b4f-9a56-ce7a1816307a.jpg?1783940984",
+          "large": "https://cards.scryfall.io/large/front/1/1/11bf83bb-c95b-4b4f-9a56-ce7a1816307a.jpg?1783940984",
+          "art_crop": "https://cards.scryfall.io/art_crop/front/1/1/11bf83bb-c95b-4b4f-9a56-ce7a1816307a.jpg?1783940984"
+        }
+      },
+      {
+        "name": "Insectile Aberration",
+        "mana_cost": "",
+        "type_line": "Creature — Human Insect",
+        "oracle_text": "Flying",
+        "images": {
+          "small": "https://cards.scryfall.io/small/back/1/1/11bf83bb-c95b-4b4f-9a56-ce7a1816307a.jpg?1783940984",
+          "normal": "https://cards.scryfall.io/normal/back/1/1/11bf83bb-c95b-4b4f-9a56-ce7a1816307a.jpg?1783940984",
+          "large": "https://cards.scryfall.io/large/back/1/1/11bf83bb-c95b-4b4f-9a56-ce7a1816307a.jpg?1783940984",
+          "art_crop": "https://cards.scryfall.io/art_crop/back/1/1/11bf83bb-c95b-4b4f-9a56-ce7a1816307a.jpg?1783940984"
+        }
+      }
+    ],
+    "oracle_text": null,
+    "prices": {
+      "eur": 0.5,
+      "eur_foil": 3.44,
+      "usd": 0.33,
+      "usd_foil": 2.13
+    },
+    "cardmarket_url": "https://www.cardmarket.com/en/Magic/Products?idProduct=250620&referrer=scryfall&utm_campaign=card_prices&utm_medium=text&utm_source=scryfall",
+    "finishes": [
+      "nonfoil",
+      "foil"
+    ],
+    "released_at": "2011-09-30"
+  },
+  "fireIce": {
+    "id": "0e09b054-4d33-4a12-bf2a-9b0009f33044",
+    "oracle_id": "ae92942b-919c-4ea9-b693-85fcef765d5a",
+    "name": "Fire // Ice",
+    "set_code": "mh2",
+    "set_name": "Modern Horizons 2",
+    "collector_number": "290",
+    "rarity": "rare",
+    "mana_cost": "{1}{R} // {1}{U}",
+    "cmc": 4,
+    "type_line": "Instant // Instant",
+    "colors": [
+      "R",
+      "U"
+    ],
+    "color_identity": [
+      "R",
+      "U"
+    ],
+    "images": {
+      "small": "https://cards.scryfall.io/small/front/0/e/0e09b054-4d33-4a12-bf2a-9b0009f33044.jpg?1783926779",
+      "normal": "https://cards.scryfall.io/normal/front/0/e/0e09b054-4d33-4a12-bf2a-9b0009f33044.jpg?1783926779",
+      "large": "https://cards.scryfall.io/large/front/0/e/0e09b054-4d33-4a12-bf2a-9b0009f33044.jpg?1783926779",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/0/e/0e09b054-4d33-4a12-bf2a-9b0009f33044.jpg?1783926779"
+    },
+    "faces": [
+      {
+        "name": "Fire",
+        "mana_cost": "{1}{R}",
+        "type_line": "Instant",
+        "oracle_text": "Fire deals 2 damage divided as you choose among one or two targets.",
+        "images": null
+      },
+      {
+        "name": "Ice",
+        "mana_cost": "{1}{U}",
+        "type_line": "Instant",
+        "oracle_text": "Tap target permanent.\nDraw a card.",
+        "images": null
+      }
+    ],
+    "oracle_text": null,
+    "prices": {
+      "eur": 0.21,
+      "eur_foil": 1.45,
+      "usd": 0.25,
+      "usd_foil": 0.66
+    },
+    "cardmarket_url": "https://www.cardmarket.com/en/Magic/Products?idProduct=566657&referrer=scryfall&utm_campaign=card_prices&utm_medium=text&utm_source=scryfall",
+    "finishes": [
+      "nonfoil",
+      "foil",
+      "etched"
+    ],
+    "released_at": "2021-06-18"
+  },
+  "noPrice": {
+    "id": "37d275d1-5ec7-4168-af2c-16b4e08aef08",
+    "oracle_id": "495e52e6-4c2b-4574-9474-eadbdcc8b4ac",
+    "name": "Farseek",
+    "set_code": "pf27",
+    "set_name": "MagicFest 2027",
+    "collector_number": "1",
+    "rarity": "rare",
+    "mana_cost": "{1}{G}",
+    "cmc": 2,
+    "type_line": "Sorcery",
+    "colors": [
+      "G"
+    ],
+    "color_identity": [
+      "G"
+    ],
+    "images": {
+      "small": "https://cards.scryfall.io/small/front/3/7/37d275d1-5ec7-4168-af2c-16b4e08aef08.jpg?1790133496",
+      "normal": "https://cards.scryfall.io/normal/front/3/7/37d275d1-5ec7-4168-af2c-16b4e08aef08.jpg?1790133496",
+      "large": "https://cards.scryfall.io/large/front/3/7/37d275d1-5ec7-4168-af2c-16b4e08aef08.jpg?1790133496",
+      "art_crop": "https://cards.scryfall.io/art_crop/front/3/7/37d275d1-5ec7-4168-af2c-16b4e08aef08.jpg?1790133496"
+    },
+    "faces": null,
+    "oracle_text": "Search your library for a Plains, Island, Swamp, or Mountain card, put it onto the battlefield tapped, then shuffle.",
+    "prices": {
+      "eur": null,
+      "eur_foil": null,
+      "usd": null,
+      "usd_foil": null
+    },
+    "cardmarket_url": "https://www.cardmarket.com/en/Magic/Products/Search?referrer=scryfall&searchString=Farseek&utm_campaign=card_prices&utm_medium=text&utm_source=scryfall",
+    "finishes": [
+      "nonfoil",
+      "foil"
+    ],
+    "released_at": "2027-02-26"
+  }
+}
