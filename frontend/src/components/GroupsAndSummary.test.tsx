@@ -89,7 +89,7 @@ describe('PrintingOption', () => {
     const { ragavan } = cards;
     render(<PrintingOption card={ragavan} />);
     const button = screen.getByRole('button');
-    expect(button).toHaveTextContent(`${ragavan.set_name}#${ragavan.collector_number}${ragavan.released_at.slice(0, 4)}`);
+    expect(button).toHaveTextContent(`${ragavan.set.name}#${ragavan.collector_number}${ragavan.released_at.slice(0, 4)}`);
     expect(within(button).getByText(eur(ragavan.prices.eur))).toBeInTheDocument();
   });
 
@@ -102,7 +102,7 @@ describe('PrintingOption', () => {
     const user = userEvent.setup();
     const onSelect = vi.fn<(card: CardSummary) => void>();
     const { rerender } = render(<PrintingOption card={cards.ragavan} onSelect={onSelect} />);
-    const button = screen.getByRole('button', { name: new RegExp(cards.ragavan.set_name) });
+    const button = screen.getByRole('button', { name: new RegExp(cards.ragavan.set.name) });
     expect(button).toHaveAttribute('aria-pressed', 'false');
 
     await user.click(button);
@@ -145,8 +145,24 @@ describe('RarityBadge and SetSymbol', () => {
 
   it('shows the set code in capitals, titled with the set name and classed by rarity', () => {
     render(<SetSymbol card={unpricedCard} />);
-    const symbol = screen.getByTitle(unpricedCard.set_name);
-    expect(symbol).toHaveTextContent(unpricedCard.set_code.toUpperCase());
+    const symbol = screen.getByTitle(unpricedCard.set.name);
+    expect(symbol).toHaveTextContent(new RegExp(`^${unpricedCard.set.code.toUpperCase()}$`));
     expect(symbol).toHaveClass(`set-symbol--${unpricedCard.rarity}`);
+  });
+
+  it("shows the set's symbol as a decorative image, beside the code that names it", () => {
+    const { container } = render(<SetSymbol card={cards.ragavan} />);
+    const icon = container.querySelector('img');
+    expect(icon).toHaveAttribute('src', cards.ragavan.set.icon_svg_uri);
+    // The code and the title already say which set it is, so screen readers skip the image.
+    expect(icon).toHaveAttribute('alt', '');
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('shows just the code when the set has no symbol', () => {
+    const card = { ...cards.ragavan, set: { ...cards.ragavan.set, icon_svg_uri: null } };
+    const { container } = render(<SetSymbol card={card} />);
+    expect(container.querySelector('img')).toBeNull();
+    expect(screen.getByTitle(card.set.name)).toHaveTextContent('MH2');
   });
 });

@@ -118,6 +118,10 @@ func TestMappingMatchesTheFrontendFixtures(t *testing.T) {
 				t.Fatalf("toRow: %v", err)
 			}
 			got, want := asJSON(t, row), fixtures[key]
+			// The fixtures carry the whole set (code, name, icon); a card row has its code,
+			// and the rest is in the sets table.
+			set, _ := want["set"].(map[string]any)
+			want["set_code"] = set["code"]
 			for field, g := range got {
 				if w := want[field]; !reflect.DeepEqual(stripImageVersions(g), stripImageVersions(w)) {
 					t.Errorf("%s:\n got  %v\n want %v", field, g, w)

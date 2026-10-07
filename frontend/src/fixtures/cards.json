@@ -3,8 +3,11 @@
     "id": "435589bb-27c6-4a6d-9d63-394d5092b9d8",
     "oracle_id": "4457ed35-7c10-48c8-9776-456485fdf070",
     "name": "Lightning Bolt",
-    "set_code": "m10",
-    "set_name": "Magic 2010",
+    "set": {
+      "code": "m10",
+      "name": "Magic 2010",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/m10.svg?1791172800"
+    },
     "collector_number": "146",
     "rarity": "common",
     "lang": "en",
@@ -43,8 +46,11 @@
     "id": "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
     "oracle_id": "37108cd4-bbab-4ce3-9ed6-f60e8422e703",
     "name": "Ragavan, Nimble Pilferer",
-    "set_code": "mh2",
-    "set_name": "Modern Horizons 2",
+    "set": {
+      "code": "mh2",
+      "name": "Modern Horizons 2",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/mh2.svg?1791172800"
+    },
     "collector_number": "138",
     "rarity": "mythic",
     "lang": "en",
@@ -83,8 +89,11 @@
     "id": "11bf83bb-c95b-4b4f-9a56-ce7a1816307a",
     "oracle_id": "edd531b9-f615-4399-8c8c-1c5e18c4acbf",
     "name": "Delver of Secrets // Insectile Aberration",
-    "set_code": "isd",
-    "set_name": "Innistrad",
+    "set": {
+      "code": "isd",
+      "name": "Innistrad",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/isd.svg?1791172800"
+    },
     "collector_number": "51",
     "rarity": "common",
     "lang": "en",
@@ -148,8 +157,11 @@
     "id": "0e09b054-4d33-4a12-bf2a-9b0009f33044",
     "oracle_id": "ae92942b-919c-4ea9-b693-85fcef765d5a",
     "name": "Fire // Ice",
-    "set_code": "mh2",
-    "set_name": "Modern Horizons 2",
+    "set": {
+      "code": "mh2",
+      "name": "Modern Horizons 2",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/mh2.svg?1791172800"
+    },
     "collector_number": "290",
     "rarity": "rare",
     "lang": "en",
@@ -206,8 +218,11 @@
     "id": "3e3f0bcd-0796-494d-bf51-94b33c1671e9",
     "oracle_id": "ea9709b6-4c37-4d5a-b04d-cd4c42e4f9dd",
     "name": "Propaganda",
-    "set_code": "sld",
-    "set_name": "Secret Lair Drop",
+    "set": {
+      "code": "sld",
+      "name": "Secret Lair Drop",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/star.svg?1791172800"
+    },
     "collector_number": "381",
     "rarity": "rare",
     "lang": "en",
@@ -270,8 +285,11 @@
     "id": "73542493-cd0b-4bb7-a5b8-8f889c76e4d6",
     "oracle_id": "68954295-54e3-4303-a6bc-fc4547a4e3a3",
     "name": "Llanowar Elves",
-    "set_code": "m19",
-    "set_name": "Core Set 2019",
+    "set": {
+      "code": "m19",
+      "name": "Core Set 2019",
+      "icon_svg_uri": "https://svgs.scryfall.io/sets/m19.svg?1791172800"
+    },
     "collector_number": "314",
     "rarity": "common",
     "lang": "en",

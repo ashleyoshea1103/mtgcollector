@@ -12,7 +12,7 @@ describe('CardDetail', () => {
   it('names the printing: set, number, rarity and release date', () => {
     render(<CardDetail card={ragavan} />);
     const printing = screen.getByRole('heading', { level: 2, name: ragavan.name }).nextElementSibling!;
-    expect(printing).toHaveTextContent(`${ragavan.set_name} #${ragavan.collector_number}`);
+    expect(printing).toHaveTextContent(`${ragavan.set.name} #${ragavan.collector_number}`);
     expect(within(printing as HTMLElement).getByTitle('Mythic rare')).toHaveTextContent('M');
     expect(within(printing as HTMLElement).getByText(ragavan.released_at)).toHaveAttribute('datetime', ragavan.released_at);
   });

@@ -14,7 +14,7 @@ import (
 
 // Every struct the API sends or receives.
 var all = []any{
-	CardImages{}, CardFace{}, Prices{}, CardSummary{}, Card{}, CollectionEntry{}, ValueTotal{},
+	CardImages{}, CardFace{}, Prices{}, CardSet{}, CardSummary{}, Card{}, CollectionEntry{}, ValueTotal{},
 	GroupSummary{}, EntryPage{}, GroupMember{}, GroupMemberPage{}, CustomGroup{}, CollectionStats{},
 	Health{}, NewEntry{},
 }

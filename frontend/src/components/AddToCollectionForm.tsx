@@ -41,7 +41,7 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
   return (
     <form className="add-form" onSubmit={handleSubmit}>
       <p className="add-form__card">
-        Adding <strong>{card.name}</strong> ({card.set_code.toUpperCase()} #{card.collector_number}) at{' '}
+        Adding <strong>{card.name}</strong> ({card.set.name} #{card.collector_number}) at{' '}
         <Price prices={card.prices} finish={finish} /> each
       </p>
 

@@ -47,6 +47,18 @@ img {
   text-align: center;
 }
 
+/* Set symbols sit in a line of text, at the text's height. */
+.set-symbol {
+  text-decoration: none;
+  white-space: nowrap;
+}
+.set-symbol__icon {
+  width: auto;
+  height: 1em;
+  margin-right: 0.2em;
+  vertical-align: -0.125em;
+}
+
 .card-tile__media {
   position: relative;
 }

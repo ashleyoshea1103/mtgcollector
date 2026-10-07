@@ -12,8 +12,7 @@ describe('fixture cards', () => {
       id: string,
       oracle_id: string,
       name: string,
-      set_code: string,
-      set_name: string,
+      set: { code: string, name: string },
       collector_number: string,
       lang: string,
       mana_cost: string,
@@ -34,12 +33,13 @@ describe('fixture cards', () => {
     expect(Object.values(card.prices).every(priceOrNull)).toBe(true);
   });
 
-  it.each(Object.entries(cards))('%s only links to Scryfall images and Cardmarket', (_, card) => {
+  it.each(Object.entries(cards))('%s only links to Scryfall images and icons, and Cardmarket', (_, card) => {
     const urls = [
       ...Object.values(card.images ?? {}),
       ...(card.faces ?? []).flatMap((f) => Object.values(f.images ?? {})),
     ];
     for (const url of urls) expect(url).toMatch(/^https:\/\/cards\.scryfall\.io\//);
+    expect(card.set.icon_svg_uri ?? 'https://svgs.scryfall.io/').toMatch(/^https:\/\/svgs\.scryfall\.io\//);
     expect(card.cardmarket_url ?? 'https://www.cardmarket.com/').toMatch(/^https:\/\/www\.cardmarket\.com\//);
   });
 });

@@ -34,7 +34,7 @@ export function CardDetail({ card, entries = [] }: Props) {
         <header className="card-detail__header">
           <h2 className="card-detail__name">{card.name}</h2>
           <p className="card-detail__printing">
-            <SetSymbol card={card} /> {card.set_name} #{card.collector_number} <RarityBadge rarity={card.rarity} />{' '}
+            <SetSymbol card={card} /> {card.set.name} #{card.collector_number} <RarityBadge rarity={card.rarity} />{' '}
             <time dateTime={card.released_at}>{card.released_at}</time>
           </p>
         </header>

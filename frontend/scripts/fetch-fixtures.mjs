@@ -26,6 +26,7 @@ const CARDS = {
 };
 
 const IMAGE_HOST = 'https://cards.scryfall.io/';
+const SET_ICON_HOST = 'https://svgs.scryfall.io/';
 const CARDMARKET_HOST = 'https://www.cardmarket.com/';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -43,7 +44,10 @@ function images(u) {
 /** Each different non-empty value of a face field, in order, joined as Scryfall writes them ("A // B"). */
 const joinDistinct = (faces, field) => [...new Set(faces.map((f) => f[field]).filter(Boolean))].join(' // ');
 
-function toCard(c) {
+/** The app's CardSet for a Scryfall set object. */
+const toSet = (s) => ({ code: s.code, name: s.name, icon_svg_uri: onHost(s.icon_svg_uri, SET_ICON_HOST) });
+
+function toCard(c, set) {
   const faces = c.card_faces ?? null;
   const front = faces?.[0];
   // Reversible cards put everything on the faces, and their top-level name repeats faces
@@ -56,8 +60,7 @@ function toCard(c) {
     id: c.id,
     oracle_id: c.oracle_id ?? front?.oracle_id,
     name: reversible ? joinDistinct(faces, 'name') : c.name,
-    set_code: c.set,
-    set_name: c.set_name,
+    set,
     collector_number: c.collector_number,
     rarity: c.rarity,
     lang: c.lang,
@@ -89,19 +92,26 @@ function toCard(c) {
     cardmarket_url: onHost(c.purchase_uris?.cardmarket, CARDMARKET_HOST),
   };
 
-  for (const field of ['oracle_id', 'name', 'set_code', 'rarity', 'lang', 'cmc', 'type_line', 'colors', 'finishes']) {
+  for (const field of ['oracle_id', 'name', 'rarity', 'lang', 'cmc', 'type_line', 'colors', 'finishes']) {
     if (card[field] === undefined) throw new Error(`${c.set}/${c.collector_number}: missing ${field}`);
   }
   return card;
 }
 
-const out = {};
-for (const [key, path] of Object.entries(CARDS)) {
+async function get(path) {
   const res = await fetch('https://api.scryfall.com' + path, { headers: HEADERS, signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
-  out[key] = toCard(await res.json());
-  console.log(`${key}: ${out[key].name} (${out[key].set_code} #${out[key].collector_number})`);
   await sleep(150); // Scryfall asks for 50–100 ms between requests
+  return res.json();
+}
+
+const out = {};
+const sets = {};
+for (const [key, path] of Object.entries(CARDS)) {
+  const card = await get(path);
+  sets[card.set] ??= toSet(await get(`/sets/${card.set}`));
+  out[key] = toCard(card, sets[card.set]);
+  console.log(`${key}: ${out[key].name} (${out[key].set.code} #${out[key].collector_number})`);
 }
 
 await writeFile(new URL('../src/fixtures/cards.json', import.meta.url), JSON.stringify(out, null, 2) + '\n');
