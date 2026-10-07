@@ -75,6 +75,7 @@ func New(t testing.TB) *pgxpool.Pool {
 		t.Fatalf("parse TEST_DATABASE_URL: %v", err)
 	}
 	cfg.ConnConfig.RuntimeParams["search_path"] = schema + ",public"
+	db.Configure(cfg)
 	cfg.MaxConns = 4 // many tests run at once; keep well inside Postgres's max_connections
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {

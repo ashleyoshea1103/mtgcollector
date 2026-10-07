@@ -64,7 +64,9 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
+          cache-dependency-path: |
+            backend/go.sum
+            backend/tools/go.sum
 
       - name: Set up test database
         # The same script developers run; it saves the new roles' passwords in ~/.pgpass.

@@ -40,26 +40,31 @@ function images(u) {
   return Object.values(sizes).every((url) => onHost(url, IMAGE_HOST)) ? sizes : null;
 }
 
+/** Each different non-empty value of a face field, in order, joined as Scryfall writes them ("A // B"). */
+const joinDistinct = (faces, field) => [...new Set(faces.map((f) => f[field]).filter(Boolean))].join(' // ');
+
 function toCard(c) {
   const faces = c.card_faces ?? null;
   const front = faces?.[0];
-  // Reversible cards put everything on the faces (both sides are the same card);
-  // other multi-face layouts (split, transform…) describe the whole card at the top level.
-  const reversible = c.layout === 'reversible_card';
+  // Reversible cards put everything on the faces, and their top-level name repeats faces
+  // ("Propaganda // Propaganda"); other multi-face layouts (split, transform…) describe the
+  // whole card at the top level. For reversible cards, each distinct face name, cost and
+  // type is taken once, which gives the name other printings of the card have.
+  const reversible = c.layout === 'reversible_card' && front;
 
   const card = {
     id: c.id,
     oracle_id: c.oracle_id ?? front?.oracle_id,
-    name: reversible ? front.name : c.name,
+    name: reversible ? joinDistinct(faces, 'name') : c.name,
     set_code: c.set,
     set_name: c.set_name,
     collector_number: c.collector_number,
     rarity: c.rarity,
     lang: c.lang,
-    mana_cost: c.mana_cost ?? (reversible ? front.mana_cost : (faces?.map((f) => f.mana_cost).filter(Boolean).join(' // ') ?? '')),
+    mana_cost: c.mana_cost ?? (reversible ? joinDistinct(faces, 'mana_cost') : (faces?.map((f) => f.mana_cost).filter(Boolean).join(' // ') ?? '')),
     cmc: c.cmc ?? front?.cmc,
-    type_line: c.type_line ?? front?.type_line,
-    colors: c.colors ?? (reversible ? front.colors : [...new Set(faces?.flatMap((f) => f.colors ?? []) ?? [])]),
+    type_line: c.type_line ?? (reversible ? joinDistinct(faces, 'type_line') : front?.type_line),
+    colors: c.colors ?? [...new Set(faces?.flatMap((f) => f.colors ?? []) ?? [])],
     color_identity: c.color_identity,
     images: images(c.image_uris ?? front?.image_uris),
     prices: {

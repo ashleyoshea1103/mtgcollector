@@ -12,7 +12,7 @@ You need Node 24 (see `frontend/.nvmrc`), Go (see `backend/go.mod`) and PostgreS
 ./scripts/install-hooks.sh   # the pre-push check
 ./scripts/setup-dev-db.sh    # the local databases; asks for your PostgreSQL superuser password
 ```
-Run the API (it applies database migrations when it starts):
+Run the API. It applies database migrations when it starts, then imports Scryfall's card data in the background (about 80 MB, 10 seconds or so) and again once a day. Set `SCRYFALL_SYNC=off` to skip that, and `go run ./cmd/sync` to import on demand.
 ```bash
 cd backend
 go run ./cmd/server
@@ -25,7 +25,7 @@ npm run dev
 ```
 Open http://localhost:5173/dev/components to see the component gallery, and http://localhost:5173/api/health to check that the API can reach its database.
 
-After changing the Go structs in `backend/internal/contract`, regenerate the frontend's types with `go tool tygo generate` in `backend/`.
+After changing the Go structs in `backend/internal/contract`, or the SQL in `backend/internal/db` (migrations or queries), run `go generate ./...` in `backend/`. It regenerates the frontend's types with tygo and the database code in `backend/internal/store` with sqlc. The tools are pinned in their own module, `backend/tools/go.mod`, so their dependencies don't mix with the app's.
 
 ## Workflow
 - `main` holds releases and `develop` is where work is integrated.

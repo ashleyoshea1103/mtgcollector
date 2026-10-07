@@ -14,8 +14,8 @@
 
 | Stage | What it runs |
 |---|---|
-| 0. Setup | Lockfile sources, checked before anything is installed (`scripts/check-lockfile.mjs`: every package from the npm registry over HTTPS, with a sha512 hash, under its own name); a clean `npm ci --ignore-scripts` in CI and in the hook. Backend: `go.mod` and `go.sum` are tidy (`go mod tidy -diff`) |
-| 1. Compile | Backend: `frontend/src/types.ts` matches what tygo generates from `backend/internal/contract`; `gofmt`, `go vet`, staticcheck and `go build`. Frontend: oxlint (warnings fail; skipped, todo and focused tests are errors), `tsc -b`, and `vite build`, which fails if any dev-only module (the gallery or fixtures) is in the production bundle |
+| 0. Setup | Lockfile sources, checked before anything is installed (`scripts/check-lockfile.mjs`: every package from the npm registry over HTTPS, with a sha512 hash, under its own name); a clean `npm ci --ignore-scripts` in CI and in the hook. Backend: `go.mod` and `go.sum` are tidy (`go mod tidy -diff`), for the app and for the tools module (`backend/tools`) |
+| 1. Compile | Backend: `frontend/src/types.ts` matches what tygo generates from `backend/internal/contract`; the sqlc code in `backend/internal/store` matches the SQL (`sqlc diff`); `gofmt`, `go vet`, staticcheck and `go build`. Frontend: oxlint (warnings fail; skipped, todo and focused tests are errors), `tsc -b`, and `vite build`, which fails if any dev-only module (the gallery or fixtures) is in the production bundle |
 | 2. Unit tests | Backend: `go test ./...` (no database). Frontend: `npm run test:unit` (Vitest, `src/**/*.test.ts`: pure logic, including the shared pricing cases in `testdata/pricing-cases.json`) |
 | 3. Behaviour checks | Backend: `go test -tags=integration ./...`, the API and migrations against a real PostgreSQL. Each test gets a freshly migrated schema of its own, dropped when it ends. Frontend: `npm run test:behaviour` (Vitest + React Testing Library in jsdom, `src/**/*.test.tsx`: components rendered and used as a user would) |
 
@@ -67,5 +67,5 @@ Don't bypass the hook with `git push --no-verify`. Fix the failure instead.
 - `frontend/package*.json`
 - `frontend/.npmrc`
 - `frontend/vite.config.ts`
-- `backend/go.mod`, `backend/tygo.yaml` and `backend/internal/testdb`
+- `backend/go.mod`, `backend/tools/go.mod`, `backend/tygo.yaml`, `backend/sqlc.yaml`, `backend/generate.go` and `backend/internal/testdb`
 - the tests

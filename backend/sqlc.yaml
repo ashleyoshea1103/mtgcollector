@@ -1,0 +1,13 @@
+# Generates type-safe Go for the SQL in internal/db/queries (into internal/store), checked
+# against the schema the migrations build. Run `go generate ./...` here in backend/ after
+# changing either; verify fails if the generated code is stale.
+version: "2"
+sql:
+  - engine: postgresql
+    schema: internal/db/migrations
+    queries: internal/db/queries
+    gen:
+      go:
+        package: store
+        out: internal/store
+        sql_package: pgx/v5
