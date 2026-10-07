@@ -31,6 +31,15 @@ describe('TooltipText', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
+  it('closes on Escape without the pointer moving', async () => {
+    const user = userEvent.setup();
+    render(<TooltipText tooltip="No price available">—</TooltipText>);
+    await user.hover(screen.getByText('—'));
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
   it("doesn't open for a touch, which would leave it stuck open", () => {
     render(<TooltipText tooltip="German">DE</TooltipText>);
     fireEvent.pointerEnter(screen.getByText('DE'), { pointerType: 'touch' });
@@ -61,6 +70,9 @@ describe('Tooltip', () => {
         <Button>Sort</Button>
       </Tooltip>,
     );
+    // React Aria only opens tooltips on hover once the last input was a pointer (an earlier
+    // test pressed keys), so click elsewhere first, as a mouse user would have.
+    await user.click(document.body);
     await user.hover(screen.getByRole('button', { name: 'Sort' }));
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Sort by price');
     await user.unhover(screen.getByRole('button', { name: 'Sort' }));

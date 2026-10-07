@@ -10,6 +10,12 @@ describe('Loading', () => {
     rerender(<Loading label="Loading cards…" />);
     expect(screen.getByRole('status')).toHaveTextContent('Loading cards…');
   });
+
+  it('can be quiet, where many could appear at once', () => {
+    render(<Loading live={false} />);
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
 });
 
 describe('Skeleton', () => {

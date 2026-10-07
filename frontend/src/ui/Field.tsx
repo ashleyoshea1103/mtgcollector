@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useEffectEvent, useId, useRef, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
+import { createContext, useContext, useEffect, useEffectEvent, useId, useRef, useState, type AriaAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
 
 interface FieldControl {
   id: string;
@@ -48,18 +48,31 @@ export function Field({ label, description, error, className, children }: FieldP
   );
 }
 
-/** The id and ARIA wiring for a control inside a Field (nothing outside one). */
-function useFieldControl(): Partial<Pick<InputHTMLAttributes<HTMLElement>, 'id' | 'aria-describedby' | 'aria-invalid'>> {
-  const field = useContext(FieldContext);
-  if (!field) return {};
-  return { id: field.id, 'aria-describedby': field.describedBy, 'aria-invalid': field.invalid || undefined };
+interface ControlWiring {
+  id?: string;
+  'aria-describedby'?: string;
+  'aria-invalid'?: AriaAttributes['aria-invalid'];
 }
 
-type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'id'>;
+/**
+ * A control's id and ARIA wiring: the caller's own, merged with its Field's. Inside a Field
+ * the field's id wins (its label points at it); descriptions from both are read.
+ */
+function useFieldControl(own: ControlWiring): ControlWiring {
+  const field = useContext(FieldContext);
+  if (!field) return { id: own.id, 'aria-describedby': own['aria-describedby'], 'aria-invalid': own['aria-invalid'] };
+  return {
+    id: field.id,
+    'aria-describedby': [own['aria-describedby'], field.describedBy].filter(Boolean).join(' ') || undefined,
+    'aria-invalid': own['aria-invalid'] ?? (field.invalid || undefined),
+  };
+}
+
+type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>;
 
 /** A single-line text input. */
 export function TextInput({ className, ...rest }: InputProps) {
-  const control = useFieldControl();
+  const control = useFieldControl(rest);
   return <input {...rest} {...control} type="text" className={['text-input', className].filter(Boolean).join(' ')} />;
 }
 
@@ -69,7 +82,7 @@ export function TextInput({ className, ...rest }: InputProps) {
  * parse it on submit.
  */
 export function NumberInput({ className, ...rest }: InputProps) {
-  const control = useFieldControl();
+  const control = useFieldControl(rest);
   return (
     <input {...rest} {...control} type="number" inputMode="numeric" className={['number-input', className].filter(Boolean).join(' ')} />
   );
@@ -80,7 +93,7 @@ export interface SelectOption<T extends string> {
   label: string;
 }
 
-interface SelectProps<T extends string> extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'id' | 'value' | 'onChange' | 'children'> {
+interface SelectProps<T extends string> extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'onChange' | 'children'> {
   options: readonly SelectOption<T>[];
   value: T;
   onChange: (value: T) => void;
@@ -91,7 +104,7 @@ interface SelectProps<T extends string> extends Omit<SelectHTMLAttributes<HTMLSe
  * (and shows as its native picker on phones).
  */
 export function Select<T extends string>({ options, value, onChange, className, ...rest }: SelectProps<T>) {
-  const control = useFieldControl();
+  const control = useFieldControl(rest);
   return (
     <select
       {...rest}
@@ -123,7 +136,7 @@ export function SearchInput({ defaultValue = '', onSearch, delay = 300, classNam
   const [text, setText] = useState(defaultValue);
   // The last query reported, so a pause after Enter or a clear doesn't report it again.
   const reported = useRef(defaultValue);
-  const control = useFieldControl();
+  const control = useFieldControl(rest);
 
   const report = (query: string) => {
     if (query === reported.current) return;
@@ -153,7 +166,10 @@ export function SearchInput({ defaultValue = '', onSearch, delay = 300, classNam
           onKeyDown?.(e);
           if (e.key === 'Enter') report(text);
           if (e.key === 'Escape' && text !== '') {
-            e.preventDefault(); // the browser would clear it too, without telling us
+            // The browser would clear it too, without telling us; and an enclosing dialog,
+            // popover or menu would close. Only an Escape in an empty box goes further.
+            e.preventDefault();
+            e.stopPropagation();
             clear();
           }
         }}

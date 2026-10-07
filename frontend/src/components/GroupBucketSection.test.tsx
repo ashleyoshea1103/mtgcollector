@@ -119,6 +119,8 @@ describe('GroupBucketSection', () => {
   it('shows a loading state, and no "Show more", while the first page is on its way', () => {
     render(<GroupBucketSection group={red.group} onLoadMore={() => {}} />);
     expect(screen.getByText('Loading…')).toBeInTheDocument();
+    // One live region per group would flood screen readers when many groups load at once.
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument();
   });
 

@@ -3,13 +3,18 @@ import { Button } from './Button';
 
 interface LoadingProps {
   label?: string;
+  /**
+   * Announce it as it appears (the default). Turn off where many can appear at once, such as
+   * one per collection group, so screen readers aren't flooded; the text is still readable.
+   */
+  live?: boolean;
   className?: string;
 }
 
 /** Says something is loading, politely announced to screen readers. */
-export function Loading({ label = 'Loading…', className }: LoadingProps) {
+export function Loading({ label = 'Loading…', live = true, className }: LoadingProps) {
   return (
-    <p className={['loading', className].filter(Boolean).join(' ')} role="status">
+    <p className={['loading', className].filter(Boolean).join(' ')} role={live ? 'status' : undefined}>
       {label}
     </p>
   );

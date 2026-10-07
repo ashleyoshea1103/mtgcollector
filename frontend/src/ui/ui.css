@@ -82,6 +82,10 @@
   display: inline-flex;
   align-items: center;
 }
+/* Its own clear button replaces the browser's, which clears without reporting at once. */
+.search-input input::-webkit-search-cancel-button {
+  appearance: none;
+}
 
 .skeleton {
   display: grid;

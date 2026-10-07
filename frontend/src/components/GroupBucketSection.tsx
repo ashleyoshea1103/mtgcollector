@@ -83,7 +83,7 @@ export function GroupBucketSection({
       {entries === undefined && loadFailed ? (
         <ErrorState className="group-bucket__error" message="Couldn't load these cards." onRetry={() => onLoad?.()} />
       ) : entries === undefined ? (
-        <Loading className="group-bucket__loading" />
+        <Loading className="group-bucket__loading" live={false} />
       ) : entries.length === 0 ? (
         <EmptyState className="group-bucket__empty" title="No cards in this group" />
       ) : (

@@ -1,6 +1,8 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Button } from './Button';
+import { Dialog } from './Dialog';
 import { Field, NumberInput, SearchInput, Select, TextInput } from './Field';
 
 describe('Field', () => {
@@ -44,6 +46,30 @@ describe('Field', () => {
     );
     expect(input).toHaveAccessibleDescription('As on the box Required');
     expect(input).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it("keeps the control's own description and invalid state, adding the field's", () => {
+    render(
+      <>
+        <p id="stock">3 in stock</p>
+        <Field label="Qty" description="1 to 999">
+          <NumberInput aria-describedby="stock" aria-invalid />
+        </Field>
+      </>,
+    );
+    const input = screen.getByRole('spinbutton', { name: 'Qty' });
+    expect(input).toHaveAccessibleDescription('3 in stock 1 to 999');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('can be named by a label elsewhere when not in a Field', () => {
+    render(
+      <>
+        <label htmlFor="sort">Sort</label>
+        <Select id="sort" options={[{ value: 'name', label: 'Name' }]} value="name" onChange={() => {}} />
+      </>,
+    );
+    expect(screen.getByRole('combobox', { name: 'Sort' })).toBeInTheDocument();
   });
 
   it('gives each field its own ids', () => {
@@ -132,6 +158,22 @@ describe('SearchInput', () => {
     expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument();
     act(() => vi.advanceTimersByTime(1000));
     expect(onSearch.mock.calls).toEqual([['ice'], [''], ['fire'], ['']]);
+  });
+
+  it('clears on Escape without closing the dialog it is in; a second Escape closes it', async () => {
+    const user = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
+    render(
+      <Dialog title="Find a card" trigger={<Button>Find</Button>}>
+        <SearchInput aria-label="Search" onSearch={() => {}} />
+      </Dialog>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Find' }));
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'bolt');
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('');
+    expect(screen.getByRole('dialog', { name: 'Find a card' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it("doesn't report the starting text on mount", () => {

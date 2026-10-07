@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { Tooltip as AriaTooltip, TooltipTrigger, TooltipTriggerStateContext, type Placement } from 'react-aria-components';
 import { VisuallyHidden } from './VisuallyHidden';
 
@@ -49,12 +49,19 @@ interface TooltipTextProps {
  * tab stops), so keyboard users rely on the announced full form instead.
  */
 export function TooltipText({ tooltip, children, as: Tag = 'span', className, announce = true }: TooltipTextProps) {
-  const ref = useRef<HTMLElement>(null);
+  const ref = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
+  // Escape dismisses it without moving the pointer (WCAG 1.4.13, content on hover).
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open]);
   return (
     <>
       <Tag
-        ref={ref as never}
+        ref={ref}
         className={className}
         data-tooltip={tooltip}
         aria-hidden
