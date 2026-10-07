@@ -31,6 +31,21 @@ jobs:
     name: verify
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      # For the backend behaviour tests. Only reachable from this job, and discarded with it.
+      # The tests don't use this superuser: the "Set up test database" step creates the same
+      # non-superuser roles as on a developer's machine, so CI can't pass on superuser rights.
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
     steps:
       # Actions are pinned to commit SHAs (tags can be moved); the comment says which release.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,6 +59,18 @@ jobs:
           node-version-file: frontend/.nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Set up test database
+        # The same script developers run; it saves the new roles' passwords in ~/.pgpass.
+        run: ./scripts/setup-dev-db.sh
+        env:
+          PGPASSWORD: ci-only-password
 
       - name: Verify
         run: |

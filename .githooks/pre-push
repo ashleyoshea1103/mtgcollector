@@ -27,9 +27,32 @@ blocked() {
   exit 1
 }
 
-# What verified code must not change: git config and the installed hooks.
+# Where the user's go env file is (it's watched below). Asked with the settings that could
+# make `go` itself fetch and run something overridden, in case that file was tampered with.
+go_env_file=''
+if command -v go >/dev/null; then
+  go_env_file=$(GOTOOLCHAIN=local GOFLAGS='' GOPROXY=off go env GOENV) ||
+    blocked "couldn't read your Go settings (go env GOENV); check the go env file"
+fi
+# Go settings for verifying, so verified code can't inherit them, or have planted them
+# earlier: ignore the go env file and GOFLAGS, use the installed Go, and fetch modules only
+# through the public proxy, checked against the public checksum database. The module and
+# build caches are the hook's own, so verified code can't leave anything in the caches your
+# everyday Go builds use.
+export GOENV=off GOFLAGS='' GOTOOLCHAIN=local GOWORK=off \
+  GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org GONOSUMDB='' GONOPROXY='' GOPRIVATE='' GOINSECURE='' \
+  GOMODCACHE="$git_dir/pre-push-go/mod" GOCACHE="$git_dir/pre-push-go/build"
+
+# What verified code must not change: git config (this repository's, your global and the
+# system's), the installed hooks, and the go env file, which every later `go` command reads.
 git_state() {
-  { cat "$git_dir/config"; find "$git_dir/hooks" -type f -exec cksum {} + 2>/dev/null | sort; } | cksum
+  {
+    cat "$git_dir/config"
+    git config --global --list 2>/dev/null || true
+    git config --system --list 2>/dev/null || true
+    find "$git_dir/hooks" -type f -exec cksum {} + 2>/dev/null | sort
+    if [[ -n $go_env_file && -e $go_env_file ]]; then cksum <"$go_env_file" 2>/dev/null || echo unreadable; fi
+  } | cksum
 }
 
 # git passes one line per ref: <local ref> <local sha> <remote ref> <remote sha>
@@ -69,7 +92,13 @@ for commit in ${commits[@]+"${commits[@]}"}; do
   before=$(git_state)
   "$wt/scripts/verify.sh" || blocked "verify failed for ${commit:0:7}"
   [[ $(git_state) == "$before" ]] ||
-    blocked "verifying ${commit:0:7} changed .git/config or .git/hooks; check them (git config --list --local) and reinstall the hook"
+    blocked "verifying ${commit:0:7} changed .git/config, .git/hooks or the go env file; check them (git config --list --local, go env) and reinstall the hook"
+  # The commit's modules are checked against their recorded hashes, so one edited in the hook's
+  # module cache (which later verifications would compile in) is caught.
+  if [[ -f $wt/backend/go.mod ]]; then
+    go -C "$wt/backend" mod verify >/dev/null ||
+      blocked "verifying ${commit:0:7} left the hook's Go module cache modified; delete $git_dir/pre-push-go and push again"
+  fi
 
   git -C "$root" worktree remove --force "$wt" # free its node_modules before the next one
   current_wt=''

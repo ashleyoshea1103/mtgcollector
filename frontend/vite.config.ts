@@ -25,6 +25,12 @@ function forbidDevOnlyModules(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), forbidDevOnlyModules()],
+  server: {
+    // The app calls the API on its own origin, as it will in production: in development,
+    // Vite forwards /api to the Go server (backend/cmd/server, default 127.0.0.1:8080). An IP,
+    // not "localhost", which can resolve to ::1 while the server listens on IPv4 only.
+    proxy: { '/api': 'http://127.0.0.1:8080' },
+  },
   test: {
     // A stray .only would silently skip every other test; fail instead, locally as well as in CI.
     allowOnly: false,

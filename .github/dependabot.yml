@@ -1,4 +1,4 @@
-# Keeps the SHA-pinned GitHub Actions and npm dependencies up to date. Updates
+# Keeps the SHA-pinned GitHub Actions, npm and Go dependencies up to date. Updates
 # arrive as pull requests into develop and must pass `verify` like any other.
 # The cooldown lets new releases settle for a few days before they're proposed,
 # which avoids picking up a compromised release in its first hours.
@@ -22,5 +22,17 @@ updates:
       semver-major-days: 14
     groups:
       # One pull request for all minor and patch updates, rather than one per package.
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: gomod
+    directory: /backend
+    target-branch: develop
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
       minor-and-patch:
         update-types: [minor, patch]
