@@ -20,18 +20,23 @@ var (
 const upsertSets = `-- name: UpsertSets :batchexec
 
 INSERT INTO sets (code, scryfall_id, name, set_type, released_at, icon_svg_uri, parent_set_code)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (code) DO UPDATE
-   SET scryfall_id     = EXCLUDED.scryfall_id,
+SELECT $1::text, $2::uuid, $3::text, $4::text, $5::date,
+       $6::text, $7::text
+ WHERE NOT EXISTS (
+       SELECT FROM sets s
+        WHERE s.scryfall_id = $2::uuid
+          AND (s.code, s.name, s.set_type, s.released_at, s.icon_svg_uri, s.parent_set_code)
+              IS NOT DISTINCT FROM
+              ($1::text, $3::text, $4::text, $5::date,
+               $6::text, $7::text))
+ON CONFLICT (scryfall_id) DO UPDATE
+   SET code            = EXCLUDED.code,
        name            = EXCLUDED.name,
        set_type        = EXCLUDED.set_type,
        released_at     = EXCLUDED.released_at,
        icon_svg_uri    = EXCLUDED.icon_svg_uri,
        parent_set_code = EXCLUDED.parent_set_code,
        updated_at      = now()
- WHERE (sets.scryfall_id, sets.name, sets.set_type, sets.released_at, sets.icon_svg_uri, sets.parent_set_code)
-       IS DISTINCT FROM
-       (EXCLUDED.scryfall_id, EXCLUDED.name, EXCLUDED.set_type, EXCLUDED.released_at, EXCLUDED.icon_svg_uri, EXCLUDED.parent_set_code)
 `
 
 type UpsertSetsBatchResults struct {
@@ -51,7 +56,9 @@ type UpsertSetsParams struct {
 }
 
 // Queries for the Scryfall import (internal/cards).
-// Inserts a set, or updates it if anything about it changed. Sent as one batch for all sets.
+// Inserts a set, or updates it if anything about it changed (including its code: a set is
+// identified by its Scryfall id, and a new code cascades to its cards). Sets that haven't
+// changed aren't touched, so they aren't locked or rewritten. Sent as one batch for all sets.
 func (q *Queries) UpsertSets(ctx context.Context, arg []UpsertSetsParams) *UpsertSetsBatchResults {
 	batch := &pgx.Batch{}
 	for _, a := range arg {

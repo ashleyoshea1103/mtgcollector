@@ -124,6 +124,11 @@ $unformatted"
 # Each Go check covers the integration-tagged test files too.
 run 'backend: go vet' go -C backend vet -tags=integration ./...
 run 'backend: sqlc code matches the SQL' go -C backend tool -modfile=tools/go.mod sqlc diff
+# sqlc diff doesn't notice generated files left behind by a deleted query file.
+for generated_go in backend/internal/store/*.sql.go; do
+  query_file=backend/internal/db/queries/$(basename "${generated_go%.go}")
+  [[ -f $query_file ]] || fail "$generated_go was generated from $query_file, which no longer exists; delete it"
+done
 run 'backend: staticcheck' go -C backend tool -modfile=tools/go.mod staticcheck -tags=integration ./...
 run 'backend: go build' go -C backend build ./...
 run 'frontend: lint' npm run --prefix frontend --silent lint

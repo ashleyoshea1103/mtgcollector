@@ -11,6 +11,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const analyzeStagedCards = `-- name: AnalyzeStagedCards :exec
+ANALYZE cards_staging
+`
+
+// Gives the planner the staged table's real size before the merge (autovacuum won't have yet).
+func (q *Queries) AnalyzeStagedCards(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, analyzeStagedCards)
+	return err
+}
+
 const clearStagedCards = `-- name: ClearStagedCards :exec
 TRUNCATE cards_staging
 `
@@ -20,53 +30,87 @@ func (q *Queries) ClearStagedCards(ctx context.Context) error {
 	return err
 }
 
+const countCards = `-- name: CountCards :one
+SELECT count(*) AS present,
+       count(*) FILTER (WHERE NOT EXISTS (SELECT FROM cards_staging s WHERE s.id = c.id)) AS unstaged
+  FROM cards c
+ WHERE c.gone_since IS NULL
+`
+
+type CountCardsRow struct {
+	Present  int64
+	Unstaged int64
+}
+
+// Cards in the latest bulk file (not gone), and how many of those aren't staged now: the
+// ones this import would mark gone.
+func (q *Queries) CountCards(ctx context.Context) (CountCardsRow, error) {
+	row := q.db.QueryRow(ctx, countCards)
+	var i CountCardsRow
+	err := row.Scan(&i.Present, &i.Unstaged)
+	return i, err
+}
+
+const failedImportsOf = `-- name: FailedImportsOf :one
+SELECT count(*)
+  FROM scryfall_syncs
+ WHERE bulk_updated_at = $1 AND (error IS NOT NULL OR finished_at IS NULL)
+`
+
+// How many imports of this bulk file have failed (or never finished).
+func (q *Queries) FailedImportsOf(ctx context.Context, bulkUpdatedAt pgtype.Timestamptz) (int64, error) {
+	row := q.db.QueryRow(ctx, failedImportsOf, bulkUpdatedAt)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const finishSync = `-- name: FinishSync :exec
 UPDATE scryfall_syncs
-   SET finished_at     = now(),
-       bulk_updated_at = $2,
-       sets_seen       = $3,
-       cards_seen      = $4,
-       cards_skipped   = $5,
-       cards_changed   = $6,
-       error           = $7
+   SET finished_at   = now(),
+       sets_seen     = $2,
+       cards_seen    = $3,
+       cards_skipped = $4,
+       cards_changed = $5,
+       cards_gone    = $6,
+       error         = $7
  WHERE id = $1
 `
 
 type FinishSyncParams struct {
-	ID            int64
-	BulkUpdatedAt pgtype.Timestamptz
-	SetsSeen      pgtype.Int4
-	CardsSeen     pgtype.Int4
-	CardsSkipped  pgtype.Int4
-	CardsChanged  pgtype.Int4
-	Error         pgtype.Text
+	ID           int64
+	SetsSeen     pgtype.Int4
+	CardsSeen    pgtype.Int4
+	CardsSkipped pgtype.Int4
+	CardsChanged pgtype.Int4
+	CardsGone    pgtype.Int4
+	Error        pgtype.Text
 }
 
 func (q *Queries) FinishSync(ctx context.Context, arg FinishSyncParams) error {
 	_, err := q.db.Exec(ctx, finishSync,
 		arg.ID,
-		arg.BulkUpdatedAt,
 		arg.SetsSeen,
 		arg.CardsSeen,
 		arg.CardsSkipped,
 		arg.CardsChanged,
+		arg.CardsGone,
 		arg.Error,
 	)
 	return err
 }
 
-const lastSuccessfulSync = `-- name: LastSuccessfulSync :one
-SELECT id, started_at, finished_at, bulk_updated_at, sets_seen, cards_seen, cards_skipped, cards_changed, error
+const lastImport = `-- name: LastImport :one
+SELECT id, started_at, finished_at, bulk_updated_at, sets_seen, cards_seen, cards_skipped, cards_changed, cards_gone, error
   FROM scryfall_syncs
  WHERE finished_at IS NOT NULL AND error IS NULL
  ORDER BY finished_at DESC
  LIMIT 1
 `
 
-// The most recent import that finished without an error (including ones that found the
-// bulk file unchanged and imported nothing).
-func (q *Queries) LastSuccessfulSync(ctx context.Context) (ScryfallSync, error) {
-	row := q.db.QueryRow(ctx, lastSuccessfulSync)
+// The most recent import that read a bulk file and succeeded.
+func (q *Queries) LastImport(ctx context.Context) (ScryfallSync, error) {
+	row := q.db.QueryRow(ctx, lastImport)
 	var i ScryfallSync
 	err := row.Scan(
 		&i.ID,
@@ -77,9 +121,29 @@ func (q *Queries) LastSuccessfulSync(ctx context.Context) (ScryfallSync, error) 
 		&i.CardsSeen,
 		&i.CardsSkipped,
 		&i.CardsChanged,
+		&i.CardsGone,
 		&i.Error,
 	)
 	return i, err
+}
+
+const markGoneCards = `-- name: MarkGoneCards :execrows
+UPDATE cards c
+   SET gone_since = now(), price_eur = NULL, price_eur_foil = NULL, price_usd = NULL,
+       price_usd_foil = NULL, price_usd_etched = NULL, updated_at = now()
+ WHERE c.gone_since IS NULL
+   AND NOT EXISTS (SELECT FROM cards_staging s WHERE s.id = c.id)
+`
+
+// Cards that weren't in this import: Scryfall deleted or merged them, made them digital-only,
+// or they couldn't be read. Their prices are cleared so no total keeps using a frozen price;
+// the rows stay, as collections may refer to them.
+func (q *Queries) MarkGoneCards(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, markGoneCards)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const mergeStagedCards = `-- name: MergeStagedCards :execrows
@@ -89,13 +153,25 @@ INSERT INTO cards (
     price_eur, price_eur_foil, price_usd, price_usd_foil, price_usd_etched,
     cardmarket_id, cardmarket_url, released_at
 )
-SELECT DISTINCT ON (id)
-    id, oracle_id, name, lang, set_code, collector_number, rarity, layout, mana_cost, cmc,
-    type_line, oracle_text, colors, color_identity, finishes, images, faces,
-    price_eur, price_eur_foil, price_usd, price_usd_foil, price_usd_etched,
-    cardmarket_id, cardmarket_url, released_at
-  FROM cards_staging
- ORDER BY id
+SELECT DISTINCT ON (s.id)
+    s.id, s.oracle_id, s.name, s.lang, s.set_code, s.collector_number, s.rarity, s.layout, s.mana_cost, s.cmc,
+    s.type_line, s.oracle_text, s.colors, s.color_identity, s.finishes, s.images, s.faces,
+    s.price_eur, s.price_eur_foil, s.price_usd, s.price_usd_foil, s.price_usd_etched,
+    s.cardmarket_id, s.cardmarket_url, s.released_at
+  FROM cards_staging s
+  LEFT JOIN cards c ON c.id = s.id
+ WHERE c.id IS NULL
+    OR c.gone_since IS NOT NULL
+    OR (c.oracle_id, c.name, c.lang, c.set_code, c.collector_number, c.rarity, c.layout, c.mana_cost,
+        c.cmc, c.type_line, c.oracle_text, c.colors, c.color_identity, c.finishes, c.images, c.faces,
+        c.price_eur, c.price_eur_foil, c.price_usd, c.price_usd_foil, c.price_usd_etched,
+        c.cardmarket_id, c.cardmarket_url, c.released_at)
+       IS DISTINCT FROM
+       (s.oracle_id, s.name, s.lang, s.set_code, s.collector_number, s.rarity, s.layout, s.mana_cost,
+        s.cmc, s.type_line, s.oracle_text, s.colors, s.color_identity, s.finishes, s.images, s.faces,
+        s.price_eur, s.price_eur_foil, s.price_usd, s.price_usd_foil, s.price_usd_etched,
+        s.cardmarket_id, s.cardmarket_url, s.released_at)
+ ORDER BY s.id
 ON CONFLICT (id) DO UPDATE
    SET oracle_id        = EXCLUDED.oracle_id,
        name             = EXCLUDED.name,
@@ -121,24 +197,13 @@ ON CONFLICT (id) DO UPDATE
        cardmarket_id    = EXCLUDED.cardmarket_id,
        cardmarket_url   = EXCLUDED.cardmarket_url,
        released_at      = EXCLUDED.released_at,
+       gone_since       = NULL,
        updated_at       = now()
- WHERE (cards.oracle_id, cards.name, cards.lang, cards.set_code, cards.collector_number, cards.rarity,
-        cards.layout, cards.mana_cost, cards.cmc, cards.type_line, cards.oracle_text, cards.colors,
-        cards.color_identity, cards.finishes, cards.images, cards.faces, cards.price_eur,
-        cards.price_eur_foil, cards.price_usd, cards.price_usd_foil, cards.price_usd_etched,
-        cards.cardmarket_id, cards.cardmarket_url, cards.released_at)
-       IS DISTINCT FROM
-       (EXCLUDED.oracle_id, EXCLUDED.name, EXCLUDED.lang, EXCLUDED.set_code, EXCLUDED.collector_number,
-        EXCLUDED.rarity, EXCLUDED.layout, EXCLUDED.mana_cost, EXCLUDED.cmc, EXCLUDED.type_line,
-        EXCLUDED.oracle_text, EXCLUDED.colors, EXCLUDED.color_identity, EXCLUDED.finishes,
-        EXCLUDED.images, EXCLUDED.faces, EXCLUDED.price_eur, EXCLUDED.price_eur_foil, EXCLUDED.price_usd,
-        EXCLUDED.price_usd_foil, EXCLUDED.price_usd_etched, EXCLUDED.cardmarket_id,
-        EXCLUDED.cardmarket_url, EXCLUDED.released_at)
 `
 
-// Moves the staged cards into cards: new ones are inserted, and existing ones are updated
-// only if something changed, so a daily import rewrites just the cards whose prices moved.
-// Returns how many cards were inserted or updated.
+// Moves the staged cards into cards. Only new cards, changed cards and cards coming back
+// after being gone are written: the rest aren't touched, so a daily import that moves a
+// few prices rewrites (and locks, and logs) just those rows. Returns how many were written.
 func (q *Queries) MergeStagedCards(ctx context.Context) (int64, error) {
 	result, err := q.db.Exec(ctx, mergeStagedCards)
 	if err != nil {
@@ -176,12 +241,13 @@ type StageCardsParams struct {
 }
 
 const startSync = `-- name: StartSync :one
-INSERT INTO scryfall_syncs DEFAULT VALUES
+INSERT INTO scryfall_syncs (bulk_updated_at)
+VALUES ($1)
 RETURNING id
 `
 
-func (q *Queries) StartSync(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, startSync)
+func (q *Queries) StartSync(ctx context.Context, bulkUpdatedAt pgtype.Timestamptz) (int64, error) {
+	row := q.db.QueryRow(ctx, startSync, bulkUpdatedAt)
 	var id int64
 	err := row.Scan(&id)
 	return id, err

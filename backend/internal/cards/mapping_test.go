@@ -305,3 +305,67 @@ func TestCostAndColoursFromTheFaces(t *testing.T) {
 		t.Errorf("colors = %v", row.Colors)
 	}
 }
+
+// A reversible card whose two faces are different cards (as in Tarkir: Dragonstorm) is
+// named like the card's other printings, not after its first face.
+func TestReversibleCardsWithDifferentFaces(t *testing.T) {
+	c := rawCard(t, "sld-381")
+	c.Faces[0].Name, c.Faces[0].ManaCost, c.Faces[0].TypeLine, c.Faces[0].Colors = "Scavenger Regent", "{3}{B}", "Creature — Dragon", []string{"B"}
+	c.Faces[1].Name, c.Faces[1].ManaCost, c.Faces[1].TypeLine, c.Faces[1].Colors = "Exude Toxin", "{X}{B}{B}", "Sorcery — Omen", []string{"B"}
+	row, err := toRow(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.Name != "Scavenger Regent // Exude Toxin" || row.ManaCost != "{3}{B} // {X}{B}{B}" ||
+		row.TypeLine != "Creature — Dragon // Sorcery — Omen" || !reflect.DeepEqual(row.Colors, []string{"B"}) {
+		t.Errorf("got %q, %q, %q, %v", row.Name, row.ManaCost, row.TypeLine, row.Colors)
+	}
+}
+
+func TestEveryPriceAndTheCardmarketIDAreKept(t *testing.T) {
+	c := rawCard(t, "m10-146")
+	c.Prices = scryfall.Prices{EUR: ptr("1.01"), EURFoil: ptr("2.02"), USD: ptr("3.03"), USDFoil: ptr("4.04"), USDEtched: ptr("5.05")}
+	id := int32(21219)
+	c.CardmarketID = &id
+	row, err := toRow(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []struct {
+		name string
+		got  driver.Valuer
+		want string
+	}{
+		{"eur", row.PriceEur, "1.01"}, {"eur_foil", row.PriceEurFoil, "2.02"}, {"usd", row.PriceUsd, "3.03"},
+		{"usd_foil", row.PriceUsdFoil, "4.04"}, {"usd_etched", row.PriceUsdEtched, "5.05"},
+	} {
+		if v, err := p.got.Value(); err != nil || v != p.want {
+			t.Errorf("price %s = %v (%v), want %s", p.name, v, err, p.want)
+		}
+	}
+	if !row.CardmarketID.Valid || row.CardmarketID.Int32 != 21219 {
+		t.Errorf("cardmarket_id = %+v", row.CardmarketID)
+	}
+}
+
+func TestCardsThePostgresColumnsWouldRejectAreSkipped(t *testing.T) {
+	for name, spoil := range map[string]func(*scryfall.Card){
+		"NUL in the name":       func(c *scryfall.Card) { c.Name = "Lightning\x00Bolt" },
+		"NUL in the rules text": func(c *scryfall.Card) { c.OracleText = ptr("Deal 3\x00") },
+		"NUL in a colour":       func(c *scryfall.Card) { c.Colors = []string{"R\x00"} },
+		"odd set code":          func(c *scryfall.Card) { c.Set = "M10'" },
+		"odd language":          func(c *scryfall.Card) { c.Lang = "english" },
+		"long collector number": func(c *scryfall.Card) { c.CollectorNumber = strings.Repeat("9", 17) },
+		"NUL in a face":         func(c *scryfall.Card) { c.Faces = []scryfall.Face{{Name: "A\x00"}} },
+		"price too big":         func(c *scryfall.Card) { c.Prices.EUR = ptr("12345678912") },
+		"price with junk":       func(c *scryfall.Card) { c.Prices.EUR = ptr("1x5") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := rawCard(t, "m10-146")
+			spoil(&c)
+			if _, err := toRow(c); err == nil {
+				t.Error("toRow accepted it")
+			}
+		})
+	}
+}

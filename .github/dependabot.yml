@@ -40,6 +40,10 @@ updates:
   - package-ecosystem: gomod
     directory: /backend/tools
     target-branch: develop
+    # The tools are only `tool` directives, so every requirement is marked indirect, which
+    # Dependabot otherwise leaves alone.
+    allow:
+      - dependency-type: all
     schedule:
       interval: weekly
     cooldown:

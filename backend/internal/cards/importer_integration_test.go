@@ -172,9 +172,9 @@ func TestAnUnchangedBulkFileIsntReadAgain(t *testing.T) {
 	if !res.Unchanged || src.reads != 1 {
 		t.Errorf("second Run() = %+v after %d reads, want unchanged without reading again", res, src.reads)
 	}
-	// It still counts as a successful import for the daily schedule.
-	if n := count(t, pool, `SELECT count(*) FROM scryfall_syncs WHERE finished_at IS NOT NULL AND error IS NULL`); n != 2 {
-		t.Errorf("%d successful imports recorded, want 2", n)
+	// A check that found nothing new isn't an import: it doesn't restart the daily clock.
+	if n := count(t, pool, `SELECT count(*) FROM scryfall_syncs`); n != 1 {
+		t.Errorf("%d imports recorded, want 1", n)
 	}
 }
 

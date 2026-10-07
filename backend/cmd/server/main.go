@@ -7,7 +7,9 @@
 //	DATABASE_URL   Postgres connection URL (default: the local development database;
 //	               the password comes from pgpass, see scripts/setup-dev-db.sh)
 //	ADDR           address to listen on (default: 127.0.0.1:8080, where the Vite dev proxy sends /api)
-//	SCRYFALL_SYNC  "daily" (the default) or "off"; `go run ./cmd/sync` imports on demand
+//	SCRYFALL_SYNC  "daily" (the default) or "off"; `go run ./cmd/sync` imports on demand.
+//	               With several server instances, leave it on for one: the others would
+//	               only find the import lock taken.
 package main
 
 import (
@@ -21,8 +23,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/api"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
@@ -78,7 +78,7 @@ func main() {
 }
 
 func run(ctx context.Context, cfg config) error {
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

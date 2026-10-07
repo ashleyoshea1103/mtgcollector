@@ -34,6 +34,7 @@ type Card struct {
 	CardmarketID    pgtype.Int4
 	CardmarketUrl   pgtype.Text
 	ReleasedAt      pgtype.Date
+	GoneSince       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
 }
 
@@ -63,6 +64,7 @@ type CardsStaging struct {
 	CardmarketID    pgtype.Int4
 	CardmarketUrl   pgtype.Text
 	ReleasedAt      pgtype.Date
+	GoneSince       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
 }
 
@@ -75,6 +77,7 @@ type ScryfallSync struct {
 	CardsSeen     pgtype.Int4
 	CardsSkipped  pgtype.Int4
 	CardsChanged  pgtype.Int4
+	CardsGone     pgtype.Int4
 	Error         pgtype.Text
 }
 

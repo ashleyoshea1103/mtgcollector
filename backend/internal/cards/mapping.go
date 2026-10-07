@@ -1,6 +1,7 @@
 package cards
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -18,7 +20,15 @@ import (
 )
 
 // A price as Scryfall writes them ("0.31"), small enough for numeric(10,2).
-var priceFormat = regexp.MustCompile(`^[0-9]{1,8}(.[0-9]{1,2})?$`)
+var priceFormat = regexp.MustCompile(`^[0-9]{1,8}(\.[0-9]{1,2})?$`)
+
+// What Scryfall's codes look like; the cards and sets tables check the same.
+var (
+	setCodeFormat = regexp.MustCompile(`^[a-z0-9]{1,8}$`)
+	langFormat    = regexp.MustCompile(`^[a-z]{2,3}$`)
+)
+
+const maxCollectorNumber = 16 // characters; Scryfall's longest is 9
 
 var (
 	knownRarities = []string{"common", "uncommon", "rare", "mythic", "special", "bonus"}
@@ -34,8 +44,10 @@ func toRow(c scryfall.Card) (store.StageCardsParams, error) {
 	if len(c.Faces) > 0 {
 		front = &c.Faces[0]
 	}
-	// Reversible cards put everything on the faces (both sides are the same card); other
-	// multi-face layouts (split, transform...) describe the whole card at the top level.
+	// Reversible cards put everything on the faces, and their top-level name repeats faces
+	// ("Propaganda // Propaganda"); other multi-face layouts (split, transform...) describe
+	// the whole card at the top level. For reversible cards, each distinct face name, cost
+	// and type is taken once, which gives the name other printings of the card have.
 	reversible := c.Layout == "reversible_card" && front != nil
 
 	var err error
@@ -52,7 +64,7 @@ func toRow(c scryfall.Card) (store.StageCardsParams, error) {
 
 	row.Name = c.Name
 	if reversible {
-		row.Name = front.Name
+		row.Name = joinDistinct(c.Faces, func(f scryfall.Face) string { return f.Name })
 	}
 	row.Lang = c.Lang
 	row.SetCode = c.Set
@@ -64,6 +76,14 @@ func toRow(c scryfall.Card) (store.StageCardsParams, error) {
 		if f.value == "" {
 			return row, fmt.Errorf("%s is missing", f.name)
 		}
+	}
+	switch {
+	case !setCodeFormat.MatchString(row.SetCode):
+		return row, fmt.Errorf("odd set code %q", row.SetCode)
+	case !langFormat.MatchString(row.Lang):
+		return row, fmt.Errorf("odd language %q", row.Lang)
+	case utf8.RuneCountInString(row.CollectorNumber) > maxCollectorNumber:
+		return row, fmt.Errorf("collector number %q is too long", row.CollectorNumber)
 	}
 	if !slices.Contains(knownRarities, c.Rarity) {
 		return row, fmt.Errorf("unknown rarity %q", c.Rarity)
@@ -83,7 +103,7 @@ func toRow(c scryfall.Card) (store.StageCardsParams, error) {
 	case c.ManaCost != nil:
 		row.ManaCost = *c.ManaCost
 	case reversible:
-		row.ManaCost = front.ManaCost
+		row.ManaCost = joinDistinct(c.Faces, func(f scryfall.Face) string { return f.ManaCost })
 	default:
 		var costs []string
 		for _, f := range c.Faces {
@@ -108,6 +128,8 @@ func toRow(c scryfall.Card) (store.StageCardsParams, error) {
 	switch {
 	case c.TypeLine != nil:
 		row.TypeLine = *c.TypeLine
+	case reversible:
+		row.TypeLine = joinDistinct(c.Faces, func(f scryfall.Face) string { return f.TypeLine })
 	case front != nil:
 		row.TypeLine = front.TypeLine
 	default:
@@ -120,8 +142,6 @@ func toRow(c scryfall.Card) (store.StageCardsParams, error) {
 	switch {
 	case c.Colors != nil:
 		row.Colors = c.Colors
-	case reversible:
-		row.Colors = front.Colors
 	default:
 		for _, f := range c.Faces {
 			for _, color := range f.Colors {
@@ -139,15 +159,15 @@ func toRow(c scryfall.Card) (store.StageCardsParams, error) {
 		imageURIs = front.ImageURIs
 	}
 	// Missing images and faces are SQL NULL (not JSON null), so "IS NULL" means "none".
-	if img := images(imageURIs); img != nil {
+	if img := imagesOf(imageURIs); img != nil {
 		if row.Images, err = json.Marshal(img); err != nil {
 			return row, err
 		}
 	}
 	if len(c.Faces) > 0 {
-		faces := make([]contract.CardFace, len(c.Faces))
+		faces := make([]storedFace, len(c.Faces))
 		for i, f := range c.Faces {
-			faces[i] = contract.CardFace{Name: f.Name, ManaCost: f.ManaCost, TypeLine: f.TypeLine, Images: images(f.ImageURIs)}
+			faces[i] = storedFace{Name: f.Name, ManaCost: f.ManaCost, TypeLine: f.TypeLine, Images: imagesOf(f.ImageURIs)}
 			if f.OracleText != nil {
 				faces[i].OracleText = *f.OracleText
 			}
@@ -191,12 +211,52 @@ func toRow(c scryfall.Card) (store.StageCardsParams, error) {
 		return row, fmt.Errorf("released_at: %w", err)
 	}
 	row.ReleasedAt = pgtype.Date{Time: released, Valid: true}
+
+	// Postgres text and jsonb can't hold a NUL character: one would fail the whole import.
+	text := []string{row.Name, row.CollectorNumber, row.Layout, row.ManaCost, row.TypeLine, row.OracleText.String}
+	for _, s := range slices.Concat(text, row.Colors, row.ColorIdentity) {
+		if strings.ContainsRune(s, 0) {
+			return row, errors.New("text contains a NUL character")
+		}
+	}
+	if bytes.Contains(row.Faces, []byte(`\u0000`)) {
+		return row, errors.New("a face's text contains a NUL character")
+	}
 	return row, nil
 }
 
-// images returns the card's image URLs if all four are Scryfall image URLs, else nil
-// (stored as JSON null, and shown as a placeholder).
-func images(u *scryfall.ImageURIs) *contract.CardImages {
+// joinDistinct joins each different non-empty value of the faces' field, in order, the
+// way Scryfall writes multi-face names and costs ("A // B").
+func joinDistinct(faces []scryfall.Face, field func(scryfall.Face) string) string {
+	var parts []string
+	for _, f := range faces {
+		if v := field(f); v != "" && !slices.Contains(parts, v) {
+			parts = append(parts, v)
+		}
+	}
+	return strings.Join(parts, " // ")
+}
+
+// How images and faces are stored (as jsonb). The API maps them to its own contract types,
+// so a change to the API's shapes doesn't change what's stored.
+type storedImages struct {
+	Small   string `json:"small"`
+	Normal  string `json:"normal"`
+	Large   string `json:"large"`
+	ArtCrop string `json:"art_crop"`
+}
+
+type storedFace struct {
+	Name       string        `json:"name"`
+	ManaCost   string        `json:"mana_cost"`
+	TypeLine   string        `json:"type_line"`
+	OracleText string        `json:"oracle_text,omitempty"`
+	Images     *storedImages `json:"images"`
+}
+
+// imagesOf returns the card's image URLs if all four are Scryfall image URLs, else nil
+// (stored as null, and shown as a placeholder).
+func imagesOf(u *scryfall.ImageURIs) *storedImages {
 	if u == nil {
 		return nil
 	}
@@ -205,14 +265,17 @@ func images(u *scryfall.ImageURIs) *contract.CardImages {
 			return nil
 		}
 	}
-	return &contract.CardImages{Small: u.Small, Normal: u.Normal, Large: u.Large, ArtCrop: u.ArtCrop}
+	return &storedImages{Small: u.Small, Normal: u.Normal, Large: u.Large, ArtCrop: u.ArtCrop}
 }
 
 // setRow maps a Scryfall set to a row for the sets table.
 func setRow(s scryfall.Set) (store.UpsertSetsParams, error) {
 	row := store.UpsertSetsParams{Code: s.Code, Name: s.Name, SetType: s.SetType}
-	if s.Code == "" || s.Name == "" || s.SetType == "" {
-		return row, errors.New("code, name or set_type is missing")
+	if s.Name == "" || s.SetType == "" {
+		return row, errors.New("name or set_type is missing")
+	}
+	if !setCodeFormat.MatchString(s.Code) {
+		return row, fmt.Errorf("odd set code %q", s.Code)
 	}
 	var err error
 	if row.ScryfallID, err = parseUUID(s.ID); err != nil {

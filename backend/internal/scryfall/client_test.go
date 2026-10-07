@@ -264,3 +264,33 @@ func TestCheckURL(t *testing.T) {
 		}
 	}
 }
+
+// URLs that would be dangerous anywhere other than a plain link (in a CSS url(), an
+// attribute built by hand, a log line) are refused, even on the right host.
+func TestCheckURLRefusesUnsafeCharacters(t *testing.T) {
+	for _, raw := range []string{
+		`https://cards.scryfall.io/x'),url('https://evil.example/`,
+		`https://cards.scryfall.io/x"onerror="alert(1).jpg`,
+		`https://cards.scryfall.io/<script>`,
+		"https://cards.scryfall.io/x" + string(rune(0x202e)) + ".jpg", // right-to-left override
+		`https://cards.scryfall.io/a b.jpg`,
+		`https://cards.scryfall.io/x.jpg#frag`,
+		`https://cards.scryfall.io\@evil.example/x.jpg`,
+		`HTTPS://cards.scryfall.io/x.jpg`,
+		`https://cards.scryfall.io./x.jpg`,
+	} {
+		if CheckURL(raw, ImageHost) == nil {
+			t.Errorf("CheckURL(%q) accepted it", raw)
+		}
+	}
+	// What real Scryfall data looks like is accepted.
+	for raw, host := range map[string]string{
+		"https://cards.scryfall.io/normal/front/3/e/3e3f0bcd-0796-494d-bf51-94b33c1671e9.jpg?1783923536":                             ImageHost,
+		"https://svgs.scryfall.io/sets/mh2.svg?1783000000":                                                                           SetIconHost,
+		"https://www.cardmarket.com/en/Magic/Products/Search?referrer=scryfall&searchString=Lightning+Bolt&utm_campaign=card_prices": CardmarketHost,
+	} {
+		if err := CheckURL(raw, host); err != nil {
+			t.Errorf("CheckURL(%q): %v", raw, err)
+		}
+	}
+}

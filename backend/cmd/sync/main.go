@@ -17,8 +17,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/scryfall"
@@ -40,7 +38,7 @@ func run(ctx context.Context, force bool) error {
 	if url == "" {
 		url = db.DefaultURL
 	}
-	pool, err := pgxpool.New(ctx, url)
+	pool, err := db.Open(ctx, url)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}

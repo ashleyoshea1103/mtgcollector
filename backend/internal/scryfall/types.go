@@ -1,9 +1,10 @@
 package scryfall
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
+	"strings"
 )
 
 // Card is the part of a Scryfall card object the app uses
@@ -83,20 +84,29 @@ const (
 	CardmarketHost = "www.cardmarket.com"
 )
 
-// CheckURL returns an error unless raw is an absolute https URL on exactly host, with no
-// username or password in it. URLs from Scryfall end up in pages and requests, so anything
-// else is refused rather than trusted.
+// After the scheme and host, a URL may only have a path and query made of these characters.
+// Real Scryfall and Cardmarket URLs fit; quotes, brackets, spaces, backslashes, '@', '#' and
+// control or bidi characters don't, so a stored URL is safe however it's later used (an
+// attribute, a CSS url(), a log line), not just as a link.
+var safeRest = regexp.MustCompile(`^(/[A-Za-z0-9/._~%-]*)?(\?[A-Za-z0-9=&+%._~-]*)?$`)
+
+// CheckURL returns an error unless raw is https://host followed by a plain path and query
+// (see safeRest): no other scheme, host, port or user, and nothing that needs escaping.
+// URLs from Scryfall end up in pages and requests, so anything else is refused, not trusted.
 func CheckURL(raw, host string) error {
-	u, err := url.Parse(raw)
+	prefix := "https://" + host
+	if isLoopback(host) {
+		prefix = "http://" + host // httptest servers only serve plain http
+	}
+	rest, ok := strings.CutPrefix(raw, prefix)
 	switch {
-	case err != nil:
-		return err
-	case u.Scheme != "https" && !(u.Scheme == "http" && isLoopback(host)):
-		return fmt.Errorf("%q: not https", raw)
-	case u.Host != host:
-		return fmt.Errorf("%q: not on %s", raw, host)
-	case u.User != nil:
-		return errors.New("URL has credentials in it")
+	case !ok:
+		return fmt.Errorf("%q: not %s", raw, prefix)
+	case !safeRest.MatchString(rest):
+		return fmt.Errorf("%q: unexpected characters after %s", raw, prefix)
+	}
+	if u, err := url.Parse(raw); err != nil || u.Host != host || u.User != nil {
+		return fmt.Errorf("%q: not a plain URL on %s", raw, host) // belt and braces: the above implies these
 	}
 	return nil
 }
