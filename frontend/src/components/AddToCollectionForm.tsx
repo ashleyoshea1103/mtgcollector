@@ -4,6 +4,7 @@ import { defaultFinish } from '../lib/price';
 import { MAX_QUANTITY, parseQuantity } from '../lib/quantity';
 import type { CardSummary, Condition, CustomGroup, Finish, NewEntry } from '../types';
 import { Price } from './Price';
+import { SetSymbol } from './SetSymbol';
 
 interface Props {
   card: CardSummary;
@@ -41,7 +42,7 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
   return (
     <form className="add-form" onSubmit={handleSubmit}>
       <p className="add-form__card">
-        Adding <strong>{card.name}</strong> ({card.set_code.toUpperCase()} #{card.collector_number}) at{' '}
+        Adding <strong>{card.name}</strong> (<SetSymbol set={card.set} rarity={card.rarity} nameShown /> {card.set.name} #{card.collector_number}) at{' '}
         <Price prices={card.prices} finish={finish} /> each
       </p>
 

@@ -89,8 +89,14 @@ describe('PrintingOption', () => {
     const { ragavan } = cards;
     render(<PrintingOption card={ragavan} />);
     const button = screen.getByRole('button');
-    expect(button).toHaveTextContent(`${ragavan.set_name}#${ragavan.collector_number}${ragavan.released_at.slice(0, 4)}`);
+    expect(button).toHaveTextContent(`${ragavan.set.name}#${ragavan.collector_number}${ragavan.released_at.slice(0, 4)}`);
     expect(within(button).getByText(eur(ragavan.prices.eur))).toBeInTheDocument();
+    expect(within(button).getByTitle(ragavan.set.name)).toHaveClass('set-symbol');
+  });
+
+  it('is named by the set once: the symbol beside the name is skipped', () => {
+    render(<PrintingOption card={cards.ragavan} />);
+    expect(screen.getByRole('button', { name: new RegExp(`^${cards.ragavan.set.name}`) })).toBeInTheDocument();
   });
 
   it('prices a foil-only printing at its foil price', () => {
@@ -102,7 +108,7 @@ describe('PrintingOption', () => {
     const user = userEvent.setup();
     const onSelect = vi.fn<(card: CardSummary) => void>();
     const { rerender } = render(<PrintingOption card={cards.ragavan} onSelect={onSelect} />);
-    const button = screen.getByRole('button', { name: new RegExp(cards.ragavan.set_name) });
+    const button = screen.getByRole('button', { name: new RegExp(cards.ragavan.set.name) });
     expect(button).toHaveAttribute('aria-pressed', 'false');
 
     await user.click(button);
@@ -144,9 +150,52 @@ describe('RarityBadge and SetSymbol', () => {
   });
 
   it('shows the set code in capitals, titled with the set name and classed by rarity', () => {
-    render(<SetSymbol card={unpricedCard} />);
-    const symbol = screen.getByTitle(unpricedCard.set_name);
-    expect(symbol).toHaveTextContent(unpricedCard.set_code.toUpperCase());
+    render(<SetSymbol set={unpricedCard.set} rarity={unpricedCard.rarity} />);
+    const symbol = screen.getByTitle(unpricedCard.set.name);
+    expect(symbol).toHaveTextContent(new RegExp(`^${unpricedCard.set.code.toUpperCase()}$`));
     expect(symbol).toHaveClass(`set-symbol--${unpricedCard.rarity}`);
+  });
+
+  it('has no rarity class when no rarity is given', () => {
+    render(<SetSymbol set={cards.ragavan.set} />);
+    expect(screen.getByTitle(cards.ragavan.set.name)).toHaveAttribute('class', 'set-symbol');
+  });
+
+  it("shows the set's symbol as a decorative image, beside the code that names it", () => {
+    const { container } = render(<SetSymbol set={cards.ragavan.set} rarity={cards.ragavan.rarity} />);
+    const icon = container.querySelector('img');
+    expect(icon).toHaveAttribute('src', cards.ragavan.set.icon_svg_uri);
+    // The code and the title already say which set it is, so screen readers skip the image.
+    expect(icon).toHaveAttribute('alt', '');
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it("doesn't tell Scryfall which page loaded the symbol", () => {
+    const { container } = render(<SetSymbol set={cards.ragavan.set} rarity={cards.ragavan.rarity} />);
+    expect(container.querySelector('img')).toHaveAttribute('referrerpolicy', 'no-referrer');
+  });
+
+  it.each(['https://evil.example/mh2.svg', 'data:image/svg+xml,<svg onload="alert(1)"/>'])(
+    "won't load a symbol from anywhere but Scryfall's icon host (%s)",
+    (url) => {
+      const card = { ...cards.ragavan, set: { ...cards.ragavan.set, icon_svg_uri: url } };
+      const { container } = render(<SetSymbol set={card.set} rarity={card.rarity} />);
+      expect(container.querySelector('img')).toBeNull();
+      expect(screen.getByTitle(card.set.name)).toHaveTextContent('MH2');
+    },
+  );
+
+  it("is hidden from screen readers when the set's name is shown beside it", () => {
+    const { rerender } = render(<SetSymbol set={cards.ragavan.set} rarity={cards.ragavan.rarity} />);
+    expect(screen.getByTitle(cards.ragavan.set.name)).not.toHaveAttribute('aria-hidden');
+    rerender(<SetSymbol set={cards.ragavan.set} rarity={cards.ragavan.rarity} nameShown />);
+    expect(screen.getByTitle(cards.ragavan.set.name)).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('shows just the code when the set has no symbol', () => {
+    const card = { ...cards.ragavan, set: { ...cards.ragavan.set, icon_svg_uri: null } };
+    const { container } = render(<SetSymbol set={card.set} rarity={card.rarity} />);
+    expect(container.querySelector('img')).toBeNull();
+    expect(screen.getByTitle(card.set.name)).toHaveTextContent('MH2');
   });
 });

@@ -64,14 +64,29 @@ export interface Prices {
   usd_etched: number | null;
 }
 /**
+ * The set a printing belongs to: with the collector number, it says exactly which
+ * printing of a card someone owns.
+ */
+export interface CardSet {
+  /**
+   * Scryfall's set code, e.g. "mh2".
+   */
+  code: string;
+  name: string;
+  /**
+   * The set's symbol: an SVG on svgs.scryfall.io, or null. Only ever show it with <img>,
+   * which doesn't run scripts inside an SVG.
+   */
+  icon_svg_uri: string | null;
+}
+/**
  * The fields list views need (search results, collection entries).
  */
 export interface CardSummary {
   id: string;
   oracle_id: string;
   name: string;
-  set_code: string;
-  set_name: string;
+  set: CardSet;
   collector_number: string;
   rarity: Rarity;
   /**
@@ -158,6 +173,10 @@ export type SortBy = typeof SortByName | typeof SortByPrice | typeof SortByCMC |
 export interface GroupSummary extends ValueTotal {
   key: string;
   label: string;
+  /**
+   * The set, when grouping by set (so the header can show its symbol); null otherwise.
+   */
+  set: CardSet | null;
   /**
    * Number of collection entries (distinct printing/finish/condition/language rows).
    */

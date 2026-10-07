@@ -14,7 +14,7 @@ import (
 
 // Every struct the API sends or receives.
 var all = []any{
-	CardImages{}, CardFace{}, Prices{}, CardSummary{}, Card{}, CollectionEntry{}, ValueTotal{},
+	CardImages{}, CardFace{}, Prices{}, CardSet{}, CardSummary{}, Card{}, CollectionEntry{}, ValueTotal{},
 	GroupSummary{}, EntryPage{}, GroupMember{}, GroupMemberPage{}, CustomGroup{}, CollectionStats{},
 	Health{}, NewEntry{},
 }
@@ -147,7 +147,7 @@ func TestEmbeddedTotalsAreFlattened(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"card_count":3,"value_eur":1.5,"unpriced_count":1,"key":"R","label":"","entry_count":0}`
+	want := `{"card_count":3,"value_eur":1.5,"unpriced_count":1,"key":"R","label":"","set":null,"entry_count":0}`
 	if string(b) != want {
 		t.Errorf("got  %s\nwant %s", b, want)
 	}

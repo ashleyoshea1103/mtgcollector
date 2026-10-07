@@ -30,6 +30,7 @@ export function CardImage({ card, size = 'normal', face = 0, className = '' }: P
       alt={alt}
       loading="lazy"
       decoding="async"
+      referrerPolicy="no-referrer"
     />
   );
 }

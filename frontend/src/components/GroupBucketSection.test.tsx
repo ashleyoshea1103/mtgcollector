@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { colorGroups, makeGroup } from '../fixtures';
+import { colorGroups, makeGroup, setGroup } from '../fixtures';
 import { eur } from '../test/helpers';
 import { GroupBucketSection } from './GroupBucketSection';
 
@@ -15,6 +15,19 @@ describe('GroupBucketSection', () => {
     expect(screen.getByRole('heading', { name: /^Red/ })).toBeInTheDocument();
     expect(toggle('Red')).toHaveTextContent(`${red.group.card_count} cards`);
     expect(toggle('Red')).toHaveTextContent(eur(red.group.value_eur));
+  });
+
+  it("shows the set's symbol in a set group's header, named by the set once", () => {
+    const { container } = render(<GroupBucketSection {...setGroup} />);
+    const set = setGroup.group.set!;
+    expect(toggle(set.name)).toBeInTheDocument();
+    expect(within(toggle(set.name)).getByTitle(set.name)).toHaveTextContent(set.code.toUpperCase());
+    expect(container.querySelector('.group-bucket__toggle img')).toHaveAttribute('src', set.icon_svg_uri);
+  });
+
+  it("shows no set symbol in a group that isn't a set", () => {
+    const { container } = render(<GroupBucketSection {...red} />);
+    expect(container.querySelector('.group-bucket__toggle .set-symbol')).toBeNull();
   });
 
   it('counts cards with the right plural', () => {

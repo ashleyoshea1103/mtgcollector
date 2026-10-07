@@ -12,6 +12,13 @@ const select = (name: string) => screen.getByRole('combobox', { name });
 const submit = () => userEvent.click(screen.getByRole('button', { name: 'Add to collection' }));
 
 describe('AddToCollectionForm', () => {
+  it('says exactly which printing is being added', () => {
+    const { container } = render(<AddToCollectionForm card={ragavan} onSubmit={vi.fn<(entry: NewEntry) => void>()} />);
+    const line = container.querySelector('.add-form__card')!;
+    expect(line).toHaveTextContent(`Adding ${ragavan.name} (MH2 ${ragavan.set.name} #${ragavan.collector_number})`);
+    expect(within(line as HTMLElement).getByTitle(ragavan.set.name)).toHaveClass('set-symbol');
+  });
+
   it('submits one near-mint English copy by default', async () => {
     const onSubmit = vi.fn<(entry: NewEntry) => void>();
     render(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} />);

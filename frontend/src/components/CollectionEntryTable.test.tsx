@@ -20,7 +20,7 @@ describe('CollectionEntryTable', () => {
     const cells = cellsByColumn(rowFor(name));
     expect(cells.Qty).toHaveTextContent(new RegExp(`^${entry.quantity}$`));
     expect(cells.Type).toHaveTextContent(entry.card.type_line);
-    expect(cells.Set).toHaveTextContent(`${entry.card.set_code.toUpperCase()} #${entry.card.collector_number}`);
+    expect(cells.Set).toHaveTextContent(`${entry.card.set.code.toUpperCase()} ${entry.card.set.name} #${entry.card.collector_number}`);
     expect(within(cells.Condition).getByTitle(CONDITIONS[entry.condition])).toHaveTextContent(entry.condition);
     expect(cells.Finish).toHaveTextContent(new RegExp(`^${FINISHES[entry.finish]}$`));
     expect(cells.Language).toHaveTextContent(new RegExp(`^${LANGUAGES[entry.language]}$`));

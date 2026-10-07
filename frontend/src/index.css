@@ -47,6 +47,22 @@ img {
   text-align: center;
 }
 
+/* Set symbols sit in a line of text, at the text's height. */
+.set-symbol {
+  white-space: nowrap;
+}
+/* Never squeezed to nothing in a narrow flex row (img { max-width: 100% } would allow it),
+   and holds its space before the lazy image arrives. */
+.set-symbol__icon {
+  width: auto;
+  min-width: 1em;
+  max-width: none;
+  flex-shrink: 0;
+  height: 1em;
+  margin-right: 0.2em;
+  vertical-align: -0.125em;
+}
+
 .card-tile__media {
   position: relative;
 }

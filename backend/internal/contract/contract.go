@@ -69,15 +69,25 @@ type Prices struct {
 	USDEtched *float64 `json:"usd_etched" tstype:"number | null,required"`
 }
 
+// The set a printing belongs to: with the collector number, it says exactly which
+// printing of a card someone owns.
+type CardSet struct {
+	// Scryfall's set code, e.g. "mh2".
+	Code string `json:"code"`
+	Name string `json:"name"`
+	// The set's symbol: an SVG on svgs.scryfall.io, or null. Only ever show it with <img>,
+	// which doesn't run scripts inside an SVG.
+	IconSVGURI *string `json:"icon_svg_uri" tstype:"string | null,required"`
+}
+
 // The fields list views need (search results, collection entries).
 type CardSummary struct {
-	ID              string `json:"id"`
-	OracleID        string `json:"oracle_id"`
-	Name            string `json:"name"`
-	SetCode         string `json:"set_code"`
-	SetName         string `json:"set_name"`
-	CollectorNumber string `json:"collector_number"`
-	Rarity          Rarity `json:"rarity"`
+	ID              string  `json:"id"`
+	OracleID        string  `json:"oracle_id"`
+	Name            string  `json:"name"`
+	Set             CardSet `json:"set"`
+	CollectorNumber string  `json:"collector_number"`
+	Rarity          Rarity  `json:"rarity"`
 	// Scryfall language code of this printing, e.g. "en", "ja".
 	Lang          string   `json:"lang"`
 	ManaCost      string   `json:"mana_cost"`
@@ -152,6 +162,8 @@ type GroupSummary struct {
 	ValueTotal `tstype:",extends"`
 	Key        string `json:"key"`
 	Label      string `json:"label"`
+	// The set, when grouping by set (so the header can show its symbol); null otherwise.
+	Set *CardSet `json:"set" tstype:"CardSet | null,required"`
 	// Number of collection entries (distinct printing/finish/condition/language rows).
 	EntryCount int `json:"entry_count"`
 }

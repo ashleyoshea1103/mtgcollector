@@ -14,7 +14,7 @@ import { PrintingOption } from '../components/PrintingOption';
 import { RarityBadge } from '../components/RarityBadge';
 import { SetSymbol } from '../components/SetSymbol';
 import { DEV_ONLY_MARKER } from '../devOnly';
-import { cards, colorGroups, customGroups, entries, stats, unpricedCard } from '../fixtures';
+import { cards, colorGroups, customGroups, entries, setGroup, stats, unpricedCard } from '../fixtures';
 import type { Card, NewEntry } from '../types';
 
 const allCards = [...Object.values(cards), unpricedCard];
@@ -54,7 +54,7 @@ export function ComponentGallery() {
         <ul>
           {allCards.map((c) => (
             <li key={c.id}>
-              {c.name}: <ManaCost cost={c.mana_cost} /> <SetSymbol card={c} /> <RarityBadge rarity={c.rarity} />
+              {c.name}: <ManaCost cost={c.mana_cost} /> <SetSymbol set={c.set} rarity={c.rarity} /> <RarityBadge rarity={c.rarity} />
             </li>
           ))}
           <li>
@@ -111,7 +111,7 @@ export function ComponentGallery() {
         <CollectionEntryTable entries={allEntries} renderActions={() => <button type="button">Remove</button>} />
       </Section>
 
-      <Section name="GroupBucketSection" note="The collection grouped by color. Green has only unpriced cards; Trade binder below is partly unpriced. The last group starts closed.">
+      <Section name="GroupBucketSection" note="The collection grouped by color. Green has only unpriced cards; Trade binder below is partly unpriced. The last color group starts closed; after them, a group from grouping by set.">
         <fieldset className="gallery__controls">
           <legend>View</legend>
           {(['grid', 'list'] as const).map((v) => (
@@ -123,6 +123,7 @@ export function ComponentGallery() {
         {colorGroups.map(({ group, entries }, i) => (
           <GroupBucketSection key={group.key} group={group} entries={entries} view={view} defaultOpen={i < colorGroups.length - 1} />
         ))}
+        <GroupBucketSection {...setGroup} view={view} />
       </Section>
 
       <Section name="CustomGroupCard" note="A binder, a deck and an empty box.">
