@@ -147,7 +147,7 @@ func TestEmbeddedTotalsAreFlattened(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"card_count":3,"value_eur":1.5,"unpriced_count":1,"key":"R","label":"","entry_count":0}`
+	want := `{"card_count":3,"value_eur":1.5,"unpriced_count":1,"key":"R","label":"","set":null,"entry_count":0}`
 	if string(b) != want {
 		t.Errorf("got  %s\nwant %s", b, want)
 	}

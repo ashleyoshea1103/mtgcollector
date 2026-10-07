@@ -3,6 +3,7 @@ import { countOf } from '../lib/format';
 import type { CollectionEntry, GroupSummary } from '../types';
 import { CollectionEntryTable } from './CollectionEntryTable';
 import { CollectionEntryTile } from './CollectionEntryTile';
+import { SetSymbol } from './SetSymbol';
 import { TotalValue } from './TotalValue';
 
 export type CollectionView = 'grid' | 'list';
@@ -68,6 +69,11 @@ export function GroupBucketSection({
     <section className={`group-bucket group-bucket--${view}${isOpen ? ' group-bucket--open' : ''}`}>
       <h2 className="group-bucket__header">
         <button type="button" className="group-bucket__toggle" aria-expanded={isOpen} onClick={toggle}>
+          {group.set && (
+            <>
+              <SetSymbol set={group.set} nameShown />{' '}
+            </>
+          )}
           <span className="group-bucket__label">{group.label}</span>{' '}
           <span className="group-bucket__count">{countOf(group.card_count, 'card')}</span>{' '}
           <span className="group-bucket__value">

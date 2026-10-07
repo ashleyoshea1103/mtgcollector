@@ -22,6 +22,7 @@ describe('fixture cards', () => {
       color_identity: expect.any(Array),
       released_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     });
+    expect(Object.keys(card.set).sort()).toEqual(['code', 'icon_svg_uri', 'name']);
     expect(['common', 'uncommon', 'rare', 'mythic', 'special', 'bonus']).toContain(card.rarity);
     expect(card.finishes.length).toBeGreaterThan(0);
     for (const finish of card.finishes) expect(['nonfoil', 'foil', 'etched']).toContain(finish);

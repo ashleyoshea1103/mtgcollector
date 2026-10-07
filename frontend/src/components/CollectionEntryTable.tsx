@@ -24,7 +24,7 @@ export function CollectionEntryRow({ entry, actions }: RowProps) {
       </td>
       <td className="entry-row__type">{card.type_line}</td>
       <td className="entry-row__set">
-        <SetSymbol card={card} nameShown /> {card.set.name} #{card.collector_number}
+        <SetSymbol set={card.set} rarity={card.rarity} nameShown /> {card.set.name} #{card.collector_number}
       </td>
       <td className="entry-row__condition">
         <abbr title={labelFor(CONDITIONS, entry.condition)}>{entry.condition}</abbr>

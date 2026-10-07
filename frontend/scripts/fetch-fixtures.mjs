@@ -50,7 +50,10 @@ function images(u) {
 const joinDistinct = (faces, field) => [...new Set(faces.map((f) => f[field]).filter(Boolean))].join(' // ');
 
 /** The app's CardSet for a Scryfall set object. */
-const toSet = (s) => ({ code: s.code, name: s.name, icon_svg_uri: onHost(s.icon_svg_uri, SET_ICON_HOST) });
+function toSet(s) {
+  if (typeof s.code !== 'string' || !s.code || typeof s.name !== 'string' || !s.name) throw new Error(`set ${s.code}: missing code or name`);
+  return { code: s.code, name: s.name, icon_svg_uri: onHost(s.icon_svg_uri, SET_ICON_HOST) };
+}
 
 function toCard(c, set) {
   const faces = c.card_faces ?? null;

@@ -174,6 +174,10 @@ export interface GroupSummary extends ValueTotal {
   key: string;
   label: string;
   /**
+   * The set, when grouping by set (so the header can show its symbol); null otherwise.
+   */
+  set: CardSet | null;
+  /**
    * Number of collection entries (distinct printing/finish/condition/language rows).
    */
   entry_count: number /* int */;

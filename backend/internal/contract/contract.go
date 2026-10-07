@@ -162,6 +162,8 @@ type GroupSummary struct {
 	ValueTotal `tstype:",extends"`
 	Key        string `json:"key"`
 	Label      string `json:"label"`
+	// The set, when grouping by set (so the header can show its symbol); null otherwise.
+	Set *CardSet `json:"set" tstype:"CardSet | null,required"`
 	// Number of collection entries (distinct printing/finish/condition/language rows).
 	EntryCount int `json:"entry_count"`
 }

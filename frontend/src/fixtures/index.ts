@@ -3,7 +3,7 @@
 // values from these objects rather than hardcode prices.
 import { DEV_ONLY_MARKER } from '../devOnly';
 import { lineValue, priceFor, roundToCents } from '../lib/price';
-import type { Card, CardSummary, CollectionEntry, CollectionStats, CustomGroup, GroupSummary, ValueTotal } from '../types';
+import type { Card, CardSet, CardSummary, CollectionEntry, CollectionStats, CustomGroup, GroupSummary, ValueTotal } from '../types';
 import rawCards from './cards.json';
 
 type FixtureCard = 'lightningBolt' | 'ragavan' | 'delver' | 'fireIce' | 'propaganda' | 'llanowarElves';
@@ -50,8 +50,13 @@ export function totalOf(entries: CollectionEntry[]): ValueTotal {
   };
 }
 
-export function makeGroup(key: string, label: string, entries: CollectionEntry[]): { group: GroupSummary; entries: CollectionEntry[] } {
-  return { group: { key, label, entry_count: entries.length, ...totalOf(entries) }, entries };
+export function makeGroup(
+  key: string,
+  label: string,
+  entries: CollectionEntry[],
+  set: CardSet | null = null,
+): { group: GroupSummary; entries: CollectionEntry[] } {
+  return { group: { key, label, set, entry_count: entries.length, ...totalOf(entries) }, entries };
 }
 
 export const entries = {
@@ -75,6 +80,9 @@ export const colorGroups = [
   makeGroup('G', 'Green', [entries.unpricedElves]),
   makeGroup('M', 'Multicolor', [entries.etchedFireIce]),
 ];
+
+/** One group of the collection grouped by set, whose header carries the set. */
+export const setGroup = makeGroup(cards.ragavan.set.code, cards.ragavan.set.name, [entries.foilRagavan, entries.etchedFireIce], cards.ragavan.set);
 
 function customGroup(id: number, name: string, kind: CustomGroup['kind'], description: string, members: CollectionEntry[]): CustomGroup {
   return {
