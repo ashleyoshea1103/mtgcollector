@@ -14,17 +14,17 @@
 
 | Stage | What it runs |
 |---|---|
-| 0. Setup | Lockfile sources, checked before anything is installed (`scripts/check-lockfile.mjs`: every package from the npm registry over HTTPS, with a sha512 hash, under its own name); a clean `npm ci --ignore-scripts` in CI and in the hook |
-| 1. Compile | Frontend: oxlint (warnings fail; skipped, todo and focused tests are errors), `tsc -b`, and `vite build`, which fails if any dev-only module (the gallery or fixtures) is in the production bundle |
-| 2. Unit tests | Frontend: `npm run test:unit` (Vitest, `src/**/*.test.ts`: pure logic, including the shared pricing cases in `testdata/pricing-cases.json`) |
-| 3. Behaviour checks | Frontend: `npm run test:behaviour` (Vitest + React Testing Library in jsdom, `src/**/*.test.tsx`: components rendered and used as a user would) |
+| 0. Setup | Lockfile sources, checked before anything is installed (`scripts/check-lockfile.mjs`: every package from the npm registry over HTTPS, with a sha512 hash, under its own name); a clean `npm ci --ignore-scripts` in CI and in the hook. Backend: `go.mod` and `go.sum` are tidy (`go mod tidy -diff`) |
+| 1. Compile | Backend: `frontend/src/types.ts` matches what tygo generates from `backend/internal/contract`; `gofmt`, `go vet`, staticcheck and `go build`. Frontend: oxlint (warnings fail; skipped, todo and focused tests are errors), `tsc -b`, and `vite build`, which fails if any dev-only module (the gallery or fixtures) is in the production bundle |
+| 2. Unit tests | Backend: `go test ./...` (no database). Frontend: `npm run test:unit` (Vitest, `src/**/*.test.ts`: pure logic, including the shared pricing cases in `testdata/pricing-cases.json`) |
+| 3. Behaviour checks | Backend: `go test -tags=integration ./...`, the API and migrations against a real PostgreSQL. Each test gets a freshly migrated schema of its own, dropped when it ends. Frontend: `npm run test:behaviour` (Vitest + React Testing Library in jsdom, `src/**/*.test.tsx`: components rendered and used as a user would) |
 
 It also fails when:
 - `frontend/` is missing;
 - a file anywhere in the repo looks like a test but Vitest would never run it. Only `frontend/src/**/*.test.ts` and `*.test.tsx` run; names like `x.spec.ts`, `x_test.ts`, `X.TEST.ts` or anything under `__tests__/` are flagged;
 - a test uses `.only`.
 
-The backend stages (`go vet`/`go build`, `go test -short`, and API tests against Postgres) are added along with the backend.
+The backend behaviour tests need a database, and fail (never skip) without one. They use `TEST_DATABASE_URL`, which defaults to the local `mtgcollector_test` database that `scripts/setup-dev-db.sh` creates; CI runs them against a PostgreSQL 18 service container. Go must be the version in `backend/go.mod` or newer: verify sets `GOTOOLCHAIN=local`, so a pushed change can't make it download a different Go.
 
 The same script runs in two places:
 
@@ -32,11 +32,14 @@ The same script runs in two places:
 - **In CI**, from `.github/workflows/verify.yml`. It runs on every pull request into `develop` or `main` (including when one is retargeted) and on every push to them. CI runs under a German locale, so tests can't assume English price formatting.
 
 ### Setup
-Use Node 24 (`frontend/.nvmrc`). Then, once per clone:
+Use Node 24 (`frontend/.nvmrc`), Go (`backend/go.mod`) and a local PostgreSQL 18. Then, once per clone:
 ```bash
 ./scripts/install-hooks.sh
+./scripts/setup-dev-db.sh
 ```
-This copies `.githooks/pre-push` and `scripts/check-lockfile.mjs` into `.git/hooks`. They're copies, not links, so checking out a branch that changes them can't change what runs when you push. `verify` warns in three cases:
+`setup-dev-db.sh` asks for your PostgreSQL superuser password. It creates a `mtgcollector` role (not a superuser) with a random password, and the `mtgcollector` and `mtgcollector_test` databases it owns. It saves the password in your pgpass file (`%APPDATA%\postgresql\pgpass.conf` on Windows), where the server, the tests and the hook find it. Running it again is safe, and it sets a new password.
+
+`install-hooks.sh` copies `.githooks/pre-push` and `scripts/check-lockfile.mjs` into `.git/hooks`. They're copies, not links, so checking out a branch that changes them can't change what runs when you push. `verify` warns in three cases:
 - the hook isn't installed;
 - `core.hooksPath` is set, which makes git ignore the installed hook;
 - either file has changed since you installed it.
@@ -60,4 +63,5 @@ Don't bypass the hook with `git push --no-verify`. Fix the failure instead.
 - `frontend/package*.json`
 - `frontend/.npmrc`
 - `frontend/vite.config.ts`
+- `backend/go.mod`, `backend/tygo.yaml` and `backend/internal/testdb`
 - the tests

@@ -1,0 +1,13 @@
+# Generates frontend/src/types.ts from the API contract (internal/contract).
+# After changing the contract, run `go tool tygo generate` here in backend/.
+# verify fails if the committed types.ts doesn't match.
+packages:
+  - path: github.com/ashleyoshea1103/mtgcollector/backend/internal/contract
+    output_path: ../frontend/src/types.ts
+    indent: "  "
+    enum_style: union
+    exclude_files:
+      - doc.go
+    frontmatter: |
+      // The JSON shapes the API sends and receives, generated from the Go structs in
+      // backend/internal/contract. Edit those, then run `go tool tygo generate` in backend/.

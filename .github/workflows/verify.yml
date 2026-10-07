@@ -31,6 +31,21 @@ jobs:
     name: verify
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      # For the backend behaviour tests. Only reachable from this job, and discarded with it.
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: mtgcollector
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: mtgcollector_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mtgcollector -d mtgcollector_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
     steps:
       # Actions are pinned to commit SHAs (tags can be moved); the comment says which release.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,6 +60,12 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
       - name: Verify
         run: |
           locale=$(node -p 'Intl.DateTimeFormat().resolvedOptions().locale')
@@ -53,6 +74,7 @@ jobs:
           ./scripts/verify.sh
         env:
           CI: 'true'
+          TEST_DATABASE_URL: postgres://mtgcollector:ci-only-password@localhost:5432/mtgcollector_test
           # Run under a locale whose prices look different from en-GB/en-US ("1,55 €",
           # with a non-breaking space), so locale assumptions in tests fail here.
           LC_ALL: de_DE.UTF-8
