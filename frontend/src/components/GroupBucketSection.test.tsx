@@ -1,8 +1,8 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { colorGroups, makeGroup, setGroup } from '../fixtures';
-import { eur } from '../test/helpers';
+import { eur, getByTooltip } from '../test/helpers';
 import { GroupBucketSection } from './GroupBucketSection';
 
 const red = colorGroups.find(({ group }) => group.key === 'R')!;
@@ -21,7 +21,7 @@ describe('GroupBucketSection', () => {
     const { container } = render(<GroupBucketSection {...setGroup} />);
     const set = setGroup.group.set!;
     expect(toggle(set.name)).toBeInTheDocument();
-    expect(within(toggle(set.name)).getByTitle(set.name)).toHaveTextContent(set.code.toUpperCase());
+    expect(getByTooltip(toggle(set.name), set.name)).toHaveTextContent(set.code.toUpperCase());
     expect(container.querySelector('.group-bucket__toggle img')).toHaveAttribute('src', set.icon_svg_uri);
   });
 
@@ -46,7 +46,7 @@ describe('GroupBucketSection', () => {
 
   it('shows a dash rather than €0 for a group with no prices', () => {
     render(<GroupBucketSection {...green} />);
-    expect(within(toggle('Green')).getByTitle('No price available')).toBeInTheDocument();
+    expect(getByTooltip(toggle('Green'), 'No price available')).toBeInTheDocument();
   });
 
   it('shows entries as tiles in grid view', () => {
@@ -153,6 +153,11 @@ describe('GroupBucketSection', () => {
     expect(onLoad).toHaveBeenCalledTimes(2); // once on mount, once for the retry
   });
 
+  it('says so when an open group has no cards', () => {
+    render(<GroupBucketSection group={makeGroup('E', 'Empty', []).group} entries={[]} />);
+    expect(screen.getByText('No cards in this group')).toBeInTheDocument();
+  });
+
   it('offers to load more only when there is more, and not twice at once', async () => {
     const user = userEvent.setup();
     const onLoadMore = vi.fn<() => void>();
@@ -163,6 +168,9 @@ describe('GroupBucketSection', () => {
     expect(onLoadMore).toHaveBeenCalledOnce();
 
     rerender(<GroupBucketSection {...red} onLoadMore={onLoadMore} loadingMore />);
-    expect(screen.getByRole('button', { name: 'Loading…' })).toBeDisabled();
+    const busy = screen.getByRole('button', { name: 'Loading…' });
+    expect(busy).toHaveAttribute('aria-disabled', 'true');
+    await user.click(busy);
+    expect(onLoadMore).toHaveBeenCalledOnce();
   });
 });

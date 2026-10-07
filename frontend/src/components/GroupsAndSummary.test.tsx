@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, customGroups, stats, unpricedCard } from '../fixtures';
 import { COLORS, RARITIES } from '../lib/labels';
-import { eur } from '../test/helpers';
+import { eur, getByTooltip } from '../test/helpers';
 import type { CardSummary, CustomGroup } from '../types';
 import { CollectionSummary } from './CollectionSummary';
 import { CustomGroupCard } from './CustomGroupCard';
@@ -91,7 +91,7 @@ describe('PrintingOption', () => {
     const button = screen.getByRole('button');
     expect(button).toHaveTextContent(`${ragavan.set.name}#${ragavan.collector_number}${ragavan.released_at.slice(0, 4)}`);
     expect(within(button).getByText(eur(ragavan.prices.eur))).toBeInTheDocument();
-    expect(within(button).getByTitle(ragavan.set.name)).toHaveClass('set-symbol');
+    expect(getByTooltip(button, ragavan.set.name)).toHaveClass('set-symbol');
   });
 
   it('is named by the set once: the symbol beside the name is skipped', () => {
@@ -127,12 +127,12 @@ describe('ManaCost', () => {
 
   it('renders one symbol per pip, with a slash-free class, and separates split-card halves', () => {
     const { container } = render(<ManaCost cost="{W/U/P}{2} // {1}{U}" />);
-    const symbols = [...container.querySelectorAll('.mana-symbol')];
-    expect(symbols.map((el) => [el.textContent, el.getAttribute('title'), el.className])).toEqual([
-      ['W/U/P', '{W/U/P}', 'mana-symbol mana-symbol--wup'],
-      ['2', '{2}', 'mana-symbol mana-symbol--2'],
-      ['1', '{1}', 'mana-symbol mana-symbol--1'],
-      ['U', '{U}', 'mana-symbol mana-symbol--u'],
+    const symbols = [...container.querySelectorAll<HTMLElement>('.mana-symbol')];
+    expect(symbols.map((el) => [el.textContent, el.dataset.tooltip, el.className])).toEqual([
+      ['W/U/P', 'Phyrexian white or blue', 'mana-symbol mana-symbol--wup'],
+      ['2', '2 generic', 'mana-symbol mana-symbol--2'],
+      ['1', '1 generic', 'mana-symbol mana-symbol--1'],
+      ['U', 'blue', 'mana-symbol mana-symbol--u'],
     ]);
     expect(container.querySelector('.mana-cost__separator')!.textContent).toBe(' // ');
   });
@@ -146,19 +146,19 @@ describe('ManaCost', () => {
 describe('RarityBadge and SetSymbol', () => {
   it.each(Object.entries(RARITIES))('abbreviates %s with its full name as the title', (rarity, label) => {
     render(<RarityBadge rarity={rarity as keyof typeof RARITIES} />);
-    expect(screen.getByTitle(label)).toHaveTextContent(new RegExp(`^${rarity[0].toUpperCase()}$`));
+    expect(getByTooltip(document.body, label)).toHaveTextContent(new RegExp(`^${rarity[0].toUpperCase()}$`));
   });
 
   it('shows the set code in capitals, titled with the set name and classed by rarity', () => {
     render(<SetSymbol set={unpricedCard.set} rarity={unpricedCard.rarity} />);
-    const symbol = screen.getByTitle(unpricedCard.set.name);
+    const symbol = getByTooltip(document.body, unpricedCard.set.name);
     expect(symbol).toHaveTextContent(new RegExp(`^${unpricedCard.set.code.toUpperCase()}$`));
     expect(symbol).toHaveClass(`set-symbol--${unpricedCard.rarity}`);
   });
 
   it('has no rarity class when no rarity is given', () => {
     render(<SetSymbol set={cards.ragavan.set} />);
-    expect(screen.getByTitle(cards.ragavan.set.name)).toHaveAttribute('class', 'set-symbol');
+    expect(getByTooltip(document.body, cards.ragavan.set.name)).toHaveAttribute('class', 'set-symbol');
   });
 
   it("shows the set's symbol as a decorative image, beside the code that names it", () => {
@@ -181,21 +181,23 @@ describe('RarityBadge and SetSymbol', () => {
       const card = { ...cards.ragavan, set: { ...cards.ragavan.set, icon_svg_uri: url } };
       const { container } = render(<SetSymbol set={card.set} rarity={card.rarity} />);
       expect(container.querySelector('img')).toBeNull();
-      expect(screen.getByTitle(card.set.name)).toHaveTextContent('MH2');
+      expect(getByTooltip(document.body, card.set.name)).toHaveTextContent('MH2');
     },
   );
 
-  it("is hidden from screen readers when the set's name is shown beside it", () => {
+  it("is read as the set's name, or skipped when the name is shown beside it", () => {
     const { rerender } = render(<SetSymbol set={cards.ragavan.set} rarity={cards.ragavan.rarity} />);
-    expect(screen.getByTitle(cards.ragavan.set.name)).not.toHaveAttribute('aria-hidden');
+    expect(getByTooltip(document.body, cards.ragavan.set.name)).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText(cards.ragavan.set.name)).toHaveClass('visually-hidden');
     rerender(<SetSymbol set={cards.ragavan.set} rarity={cards.ragavan.rarity} nameShown />);
-    expect(screen.getByTitle(cards.ragavan.set.name)).toHaveAttribute('aria-hidden', 'true');
+    expect(getByTooltip(document.body, cards.ragavan.set.name)).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByText(cards.ragavan.set.name)).not.toBeInTheDocument();
   });
 
   it('shows just the code when the set has no symbol', () => {
     const card = { ...cards.ragavan, set: { ...cards.ragavan.set, icon_svg_uri: null } };
     const { container } = render(<SetSymbol set={card.set} rarity={card.rarity} />);
     expect(container.querySelector('img')).toBeNull();
-    expect(screen.getByTitle(card.set.name)).toHaveTextContent('MH2');
+    expect(getByTooltip(document.body, card.set.name)).toHaveTextContent('MH2');
   });
 });

@@ -3,7 +3,7 @@ import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 /** Modules that exist only for development: the component gallery and its fixture data. */
-const DEV_ONLY_MODULES = /[\\/]src[\\/](fixtures[\\/]|pages[\\/]ComponentGallery\.tsx|devOnly\.ts)/;
+const DEV_ONLY_MODULES = /[\\/]src[\\/](fixtures[\\/]|pages[\\/](ComponentGallery\.tsx|PrimitivesGallery\.tsx|gallerySections\.ts)|devOnly\.ts)/;
 
 /** Fails a production build that bundles any dev-only module, however it got imported. */
 function forbidDevOnlyModules(): Plugin {

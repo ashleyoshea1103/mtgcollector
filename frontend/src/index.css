@@ -1,7 +1,9 @@
 /*
  * Base styles only: enough to make the components readable. The visual design
  * is still to be decided, so components expose BEM-style class names
- * (block__element--modifier) for the real stylesheet to target later.
+ * (block__element--modifier) for the real stylesheet to target later. Every value
+ * comes from the tokens in src/styles/tokens.css; the src/ui primitives have their
+ * own structural rules in src/ui/ui.css.
  */
 
 *,
@@ -12,9 +14,12 @@
 
 body {
   margin: 0;
-  padding: 1rem;
-  font-family: system-ui, sans-serif;
-  line-height: 1.4;
+  padding: var(--space-4);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-body);
 }
 
 img {
@@ -42,14 +47,15 @@ img {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  border: 1px dashed currentColor;
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
   text-align: center;
 }
 
 /* Set symbols sit in a line of text, at the text's height. */
 .set-symbol {
   white-space: nowrap;
+  text-decoration: none;
 }
 /* Never squeezed to nothing in a narrow flex row (img { max-width: 100% } would allow it),
    and holds its space before the lazy image arrives. */
@@ -63,34 +69,52 @@ img {
   vertical-align: -0.125em;
 }
 
+/* Rarity colours, from the tokens. */
+.set-symbol--common,
+.rarity-badge--common {
+  color: var(--rarity-common);
+}
+.set-symbol--uncommon,
+.rarity-badge--uncommon {
+  color: var(--rarity-uncommon);
+}
+.set-symbol--rare,
+.rarity-badge--rare {
+  color: var(--rarity-rare);
+}
+.set-symbol--mythic,
+.rarity-badge--mythic {
+  color: var(--rarity-mythic);
+}
+.set-symbol--special,
+.rarity-badge--special {
+  color: var(--rarity-special);
+}
+.set-symbol--bonus,
+.rarity-badge--bonus {
+  color: var(--rarity-bonus);
+}
+.rarity-badge abbr {
+  text-decoration: none;
+}
+
 .card-tile__media {
   position: relative;
 }
 .card-tile__overlay {
   position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
+  top: var(--space-2);
+  left: var(--space-2);
 }
 .card-tile__body p,
 .card-tile__name {
-  margin: 0.25rem 0;
-}
-
-.entry-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1rem;
-}
-.group-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1rem;
+  margin: var(--space-1) 0;
 }
 
 .custom-group-card__previews {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 0.25rem;
+  gap: var(--space-1);
   min-height: 4rem;
 }
 
@@ -100,37 +124,23 @@ img {
 }
 .entry-table th,
 .entry-table td {
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   text-align: left;
 }
 
 .group-bucket__header {
   margin: 0;
-  font-size: 1.25rem;
-}
-.group-bucket__toggle {
-  font: inherit;
-  cursor: pointer;
-  border: 0;
-  background: none;
-  padding: 0;
-  text-align: left;
-}
-.group-bucket__toggle::before {
-  content: '▸ ';
-}
-.group-bucket__toggle[aria-expanded='true']::before {
-  content: '▾ ';
+  font-size: var(--font-size-lg);
 }
 
 .card-detail {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 .card-detail__images {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 .card-detail__oracle {
   white-space: pre-line;
@@ -138,21 +148,18 @@ img {
 
 .add-form {
   display: grid;
-  gap: 0.5rem;
+  gap: var(--space-2);
   max-width: 24rem;
-}
-.add-form__field {
-  display: grid;
 }
 
 .printing-list {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--space-1);
   max-width: 32rem;
 }
 .printing-option {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-3);
   text-align: left;
 }
 .printing-option__set {
@@ -168,22 +175,41 @@ img {
 .mana-symbol::after {
   content: '}';
 }
+/* Coloured mana, from the tokens. */
+.mana-symbol--w {
+  background: var(--mana-w);
+}
+.mana-symbol--u {
+  background: var(--mana-u);
+}
+.mana-symbol--b {
+  background: var(--mana-b);
+}
+.mana-symbol--r {
+  background: var(--mana-r);
+}
+.mana-symbol--g {
+  background: var(--mana-g);
+}
+.mana-symbol--c {
+  background: var(--mana-c);
+}
 
 /* Gallery page */
 .gallery__section {
-  margin-block: 2rem;
-  padding-top: 1rem;
-  border-top: 1px solid;
+  margin-block: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
 }
 .gallery__toc {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 .gallery__row {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--space-4);
   align-items: flex-start;
 }
 .gallery__row .card-image {
@@ -191,4 +217,29 @@ img {
 }
 .gallery__note {
   font-style: italic;
+}
+.gallery__swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.gallery__swatch-colour {
+  display: inline-block;
+  width: var(--space-5);
+  height: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.gallery__space {
+  display: inline-block;
+  height: var(--space-3);
+  background: var(--color-accent);
+  vertical-align: middle;
+}
+.gallery__box {
+  padding: var(--space-2);
+  border: 1px dashed var(--color-border);
+}
+.gallery__form {
+  max-width: 24rem;
 }

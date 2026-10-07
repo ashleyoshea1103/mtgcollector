@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { countOf } from '../lib/format';
 import { GROUP_KINDS, labelFor } from '../lib/labels';
 import type { CustomGroup } from '../types';
+import { Cluster, EmptyState } from '../ui';
 import { TotalValue } from './TotalValue';
 
 interface Props {
@@ -19,19 +20,23 @@ export function CustomGroupCard({ group, actions }: Props) {
         {previews.length > 0 ? (
           previews.map((src, i) => <img key={i} src={src} alt="" loading="lazy" />)
         ) : (
-          <p className="custom-group-card__empty">No cards yet</p>
+          <EmptyState className="custom-group-card__empty" title="No cards yet" />
         )}
       </div>
       <h3 className="custom-group-card__name">{group.name}</h3>
-      <p className="custom-group-card__meta">
+      <Cluster as="p" className="custom-group-card__meta">
         <span className="custom-group-card__kind">{labelFor(GROUP_KINDS, group.kind)}</span>
         <span className="custom-group-card__count">
           {countOf(group.card_count, 'card')}
         </span>
         <TotalValue total={group} />
-      </p>
+      </Cluster>
       {group.description && <p className="custom-group-card__description">{group.description}</p>}
-      {actions && <footer className="custom-group-card__actions">{actions}</footer>}
+      {actions && (
+        <Cluster as="footer" className="custom-group-card__actions">
+          {actions}
+        </Cluster>
+      )}
     </article>
   );
 }

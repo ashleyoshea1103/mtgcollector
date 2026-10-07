@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { CONDITIONS, FINISHES, labelFor, LANGUAGES } from '../lib/labels';
 import type { CollectionEntry } from '../types';
+import { Badge, Cluster, TooltipText } from '../ui';
 import { CardTile } from './CardTile';
 import { Price } from './Price';
 
@@ -17,20 +18,20 @@ export function CollectionEntryTile({ entry, actions }: Props) {
       finish={entry.finish}
       unitPrice={entry.unit_price_eur}
       className="entry-tile"
-      overlay={<span className="entry-tile__quantity">{entry.quantity}×</span>}
+      overlay={<Badge className="entry-tile__quantity">{entry.quantity}×</Badge>}
       actions={actions}
     >
-      <p className="entry-tile__copy">
-        <abbr className="entry-tile__condition" title={labelFor(CONDITIONS, entry.condition)}>
+      <Cluster as="p" className="entry-tile__copy">
+        <TooltipText as="abbr" className="entry-tile__condition" tooltip={labelFor(CONDITIONS, entry.condition)}>
           {entry.condition}
-        </abbr>
-        {entry.finish !== 'nonfoil' && <span className="entry-tile__finish">{labelFor(FINISHES, entry.finish)}</span>}
+        </TooltipText>
+        {entry.finish !== 'nonfoil' && <Badge className="entry-tile__finish">{labelFor(FINISHES, entry.finish)}</Badge>}
         {entry.language !== 'en' && (
-          <abbr className="entry-tile__language" title={labelFor(LANGUAGES, entry.language)}>
+          <TooltipText as="abbr" className="entry-tile__language" tooltip={labelFor(LANGUAGES, entry.language)}>
             {entry.language.toUpperCase()}
-          </abbr>
+          </TooltipText>
         )}
-      </p>
+      </Cluster>
       <p className="entry-tile__value">
         Value <Price value={entry.value_eur} />
       </p>

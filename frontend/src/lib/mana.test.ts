@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeManaCost, parseManaCost } from './mana';
+import { describeManaCost, describeManaSymbol, parseManaCost } from './mana';
 
 describe('parseManaCost', () => {
   it('splits a cost into symbols', () => {
@@ -39,5 +39,24 @@ describe('describeManaCost', () => {
 
   it('passes unknown symbols through', () => {
     expect(describeManaCost('{½}{∞}')).toBe('½, ∞');
+  });
+});
+
+describe('describeManaSymbol', () => {
+  it.each([
+    ['2', '2 generic'],
+    ['R', 'red'],
+    ['W/U', 'white or blue'],
+    ['B/P', 'Phyrexian black'],
+    ['W/U/P', 'Phyrexian white or blue'],
+    ['2/W', '2 generic or white'],
+    ['T', 'tap'],
+    ['?', '?'],
+  ])('names {%s} as "%s"', (symbol, words) => {
+    expect(describeManaSymbol(symbol)).toBe(words);
+  });
+
+  it("doesn't treat inherited object keys as symbol names", () => {
+    expect(describeManaSymbol('constructor')).toBe('constructor');
   });
 });

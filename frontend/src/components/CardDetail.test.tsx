@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, entries, serverPricedBolts } from '../fixtures';
 import { describeManaCost } from '../lib/mana';
-import { cellsByColumn, eur, usd } from '../test/helpers';
+import { cellsByColumn, eur, getByTooltip, usd } from '../test/helpers';
 import { CardDetail } from './CardDetail';
 
 const { delver, fireIce, lightningBolt, propaganda, ragavan } = cards;
@@ -13,8 +13,8 @@ describe('CardDetail', () => {
     render(<CardDetail card={ragavan} />);
     const printing = screen.getByRole('heading', { level: 2, name: ragavan.name }).nextElementSibling!;
     expect(printing).toHaveTextContent(`${ragavan.set.name} #${ragavan.collector_number}`);
-    expect(within(printing as HTMLElement).getByTitle(ragavan.set.name)).toHaveTextContent('MH2');
-    expect(within(printing as HTMLElement).getByTitle('Mythic rare')).toHaveTextContent('M');
+    expect(getByTooltip(printing as HTMLElement, ragavan.set.name)).toHaveTextContent('MH2');
+    expect(getByTooltip(printing as HTMLElement, 'Mythic rare')).toHaveTextContent('M');
     expect(within(printing as HTMLElement).getByText(ragavan.released_at)).toHaveAttribute('datetime', ragavan.released_at);
   });
 

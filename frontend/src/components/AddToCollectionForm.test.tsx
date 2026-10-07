@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, customGroups } from '../fixtures';
 import { LANGUAGES } from '../lib/labels';
-import { eur } from '../test/helpers';
+import { eur, getByTooltip } from '../test/helpers';
 import type { NewEntry } from '../types';
 import { AddToCollectionForm } from './AddToCollectionForm';
 
@@ -16,7 +16,7 @@ describe('AddToCollectionForm', () => {
     const { container } = render(<AddToCollectionForm card={ragavan} onSubmit={vi.fn<(entry: NewEntry) => void>()} />);
     const line = container.querySelector('.add-form__card')!;
     expect(line).toHaveTextContent(`Adding ${ragavan.name} (MH2 ${ragavan.set.name} #${ragavan.collector_number})`);
-    expect(within(line as HTMLElement).getByTitle(ragavan.set.name)).toHaveClass('set-symbol');
+    expect(getByTooltip(line as HTMLElement, ragavan.set.name)).toHaveClass('set-symbol');
   });
 
   it('submits one near-mint English copy by default', async () => {
@@ -183,8 +183,12 @@ describe('AddToCollectionForm', () => {
     expect(screen.queryByRole('combobox', { name: 'Add to group' })).not.toBeInTheDocument();
   });
 
-  it('disables the button while submitting', () => {
-    render(<AddToCollectionForm card={lightningBolt} onSubmit={() => {}} submitting />);
-    expect(screen.getByRole('button', { name: 'Adding…' })).toBeDisabled();
+  it("won't submit twice: the button is busy while submitting", async () => {
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
+    render(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} submitting />);
+    const button = screen.getByRole('button', { name: 'Adding…' });
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(button);
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

@@ -28,7 +28,7 @@ const SYMBOL_NAMES: Record<string, string> = {
 };
 
 /** One symbol in words: "2" → "2 generic", "W/U" → "white or blue", "B/P" → "Phyrexian black". */
-function symbolName(symbol: string): string {
+export function describeManaSymbol(symbol: string): string {
   if (/^\d+$/.test(symbol)) return `${symbol} generic`;
   const parts = symbol.split('/');
   const phyrexian = parts.at(-1) === 'P' && parts.length > 1;
@@ -44,6 +44,6 @@ function symbolName(symbol: string): string {
  */
 export function describeManaCost(cost: string): string {
   return parseManaCost(cost)
-    .map((symbols) => symbols.map(symbolName).join(', '))
+    .map((symbols) => symbols.map(describeManaSymbol).join(', '))
     .join(', then ');
 }

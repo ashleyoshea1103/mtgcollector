@@ -1,6 +1,7 @@
-import { useEffect, useEffectEvent, useState, type ReactNode } from 'react';
+import { useEffect, useEffectEvent, type ReactNode } from 'react';
 import { countOf } from '../lib/format';
 import type { CollectionEntry, GroupSummary } from '../types';
+import { Button, Disclosure, EmptyState, ErrorState, Grid, Loading, useDisclosureState } from '../ui';
 import { CollectionEntryTable } from './CollectionEntryTable';
 import { CollectionEntryTile } from './CollectionEntryTile';
 import { SetSymbol } from './SetSymbol';
@@ -22,7 +23,7 @@ interface Props {
   onLoad?: () => void;
   /** Called by the "Show more" button, which is shown only when this is set. */
   onLoadMore?: () => void;
-  /** True while a further page is being fetched; disables "Show more". */
+  /** True while a further page is being fetched; "Show more" ignores presses meanwhile. */
   loadingMore?: boolean;
   /** True when fetching the first page failed; shows a message with a retry that calls onLoad. */
   loadFailed?: boolean;
@@ -46,16 +47,7 @@ export function GroupBucketSection({
   loadFailed = false,
   renderActions,
 }: Props) {
-  const [ownOpen, setOwnOpen] = useState(open ?? defaultOpen);
-  // Track the controlled value so that if the parent stops controlling it,
-  // the section stays where it was instead of jumping back to defaultOpen.
-  if (open !== undefined && open !== ownOpen) setOwnOpen(open);
-  const isOpen = open ?? ownOpen;
-
-  const toggle = () => {
-    if (open === undefined) setOwnOpen(!isOpen);
-    onOpenChange?.(!isOpen);
-  };
+  const [isOpen, setOpen] = useDisclosureState({ open, defaultOpen, onOpenChange });
 
   // Ask for entries when the section starts needing them (on mount if it starts open),
   // not again just because the parent passed a new callback.
@@ -66,9 +58,15 @@ export function GroupBucketSection({
   }, [needsEntries]);
 
   return (
-    <section className={`group-bucket group-bucket--${view}${isOpen ? ' group-bucket--open' : ''}`}>
-      <h2 className="group-bucket__header">
-        <button type="button" className="group-bucket__toggle" aria-expanded={isOpen} onClick={toggle}>
+    <Disclosure
+      className={`group-bucket group-bucket--${view}${isOpen ? ' group-bucket--open' : ''}`}
+      headingClassName="group-bucket__header"
+      triggerClassName="group-bucket__toggle"
+      panelClassName="group-bucket__body"
+      open={isOpen}
+      onOpenChange={setOpen}
+      title={
+        <>
           {group.set && (
             <>
               <SetSymbol set={group.set} nameShown />{' '}
@@ -79,40 +77,33 @@ export function GroupBucketSection({
           <span className="group-bucket__value">
             <TotalValue total={group} />
           </span>
-        </button>
-      </h2>
-
-      {isOpen && (
-        <div className="group-bucket__body">
-          {entries === undefined && loadFailed ? (
-            <p className="group-bucket__error" role="alert">
-              Couldn't load these cards.{' '}
-              <button type="button" onClick={() => onLoad?.()}>
-                Try again
-              </button>
-            </p>
-          ) : entries === undefined ? (
-            <p className="group-bucket__loading">Loading…</p>
+        </>
+      }
+    >
+      {entries === undefined && loadFailed ? (
+        <ErrorState className="group-bucket__error" message="Couldn't load these cards." onRetry={() => onLoad?.()} />
+      ) : entries === undefined ? (
+        <Loading className="group-bucket__loading" />
+      ) : entries.length === 0 ? (
+        <EmptyState className="group-bucket__empty" title="No cards in this group" />
+      ) : (
+        <>
+          {view === 'grid' ? (
+            <Grid minItemWidth="180px" className="entry-grid">
+              {entries.map((entry) => (
+                <CollectionEntryTile key={entry.id} entry={entry} actions={renderActions?.(entry)} />
+              ))}
+            </Grid>
           ) : (
-            <>
-              {view === 'grid' ? (
-                <div className="entry-grid">
-                  {entries.map((entry) => (
-                    <CollectionEntryTile key={entry.id} entry={entry} actions={renderActions?.(entry)} />
-                  ))}
-                </div>
-              ) : (
-                <CollectionEntryTable entries={entries} renderActions={renderActions} />
-              )}
-              {onLoadMore && (
-                <button type="button" className="group-bucket__more" onClick={onLoadMore} disabled={loadingMore}>
-                  {loadingMore ? 'Loading…' : 'Show more'}
-                </button>
-              )}
-            </>
+            <CollectionEntryTable entries={entries} renderActions={renderActions} />
           )}
-        </div>
+          {onLoadMore && (
+            <Button className="group-bucket__more" onPress={onLoadMore} busy={loadingMore}>
+              {loadingMore ? 'Loading…' : 'Show more'}
+            </Button>
+          )}
+        </>
       )}
-    </section>
+    </Disclosure>
   );
 }
