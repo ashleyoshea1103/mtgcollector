@@ -3,9 +3,11 @@
 package db_test
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
-	"github.com/ashleyoshea1103/mtgcollector/backend/db"
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/testdb"
 )
 
@@ -63,5 +65,24 @@ func TestEachTestGetsItsOwnSchema(t *testing.T) {
 	}
 	if visible {
 		t.Error("a table created in one test's schema is visible from another's")
+	}
+}
+
+func TestStaleTestSchemasAreDropped(t *testing.T) {
+	pool := testdb.New(t)
+	// A schema left by a test run killed three hours ago, before its cleanup could run.
+	stale := fmt.Sprintf("test_%d_deadbeef", time.Now().Add(-3*time.Hour).Unix())
+	if _, err := pool.Exec(t.Context(), "CREATE SCHEMA "+stale); err != nil {
+		t.Fatal(err)
+	}
+
+	testdb.New(t) // the next test to start sweeps it
+
+	var exists bool
+	if err := pool.QueryRow(t.Context(), `SELECT EXISTS (SELECT FROM pg_namespace WHERE nspname = $1)`, stale).Scan(&exists); err != nil {
+		t.Fatal(err)
+	}
+	if exists {
+		t.Errorf("stale schema %s is still there", stale)
 	}
 }

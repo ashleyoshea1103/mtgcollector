@@ -7,5 +7,6 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;
 
 -- +goose Down
-DROP EXTENSION IF EXISTS citext;
-DROP EXTENSION IF EXISTS pg_trgm;
+-- The extensions stay: they're shared by every schema in the database (including other
+-- tests' schemas), and dropping them would break whatever else uses them.
+SELECT 1;

@@ -5,7 +5,7 @@
 //
 //	DATABASE_URL  Postgres connection URL (default: the local development database;
 //	              the password comes from pgpass, see scripts/setup-dev-db.sh)
-//	ADDR          address to listen on (default: localhost:8080)
+//	ADDR          address to listen on (default: 127.0.0.1:8080, where the Vite dev proxy sends /api)
 package main
 
 import (
@@ -21,8 +21,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/ashleyoshea1103/mtgcollector/backend/db"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/api"
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
 )
 
 type config struct {
@@ -32,7 +32,7 @@ type config struct {
 
 const (
 	defaultDatabaseURL = "postgres://mtgcollector@localhost:5432/mtgcollector"
-	defaultAddr        = "localhost:8080"
+	defaultAddr        = "127.0.0.1:8080"
 	shutdownTimeout    = 10 * time.Second
 )
 
@@ -50,6 +50,10 @@ func loadConfig(getenv func(string) string) config {
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	go func() {
+		<-ctx.Done()
+		stop() // a second Ctrl-C during the graceful shutdown kills the process
+	}()
 	if err := run(ctx, loadConfig(os.Getenv)); err != nil {
 		slog.Error("server stopped", "error", err)
 		os.Exit(1)

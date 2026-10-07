@@ -25,7 +25,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if err != nil {
 		return err
 	}
-	locker, err := lock.NewPostgresSessionLocker()
+	// Retry every second (goose's default is every 5) for up to five minutes: parallel
+	// test packages each migrate their own schema and wait on this one lock.
+	locker, err := lock.NewPostgresSessionLocker(lock.WithLockTimeout(1, 300))
 	if err != nil {
 		return err
 	}

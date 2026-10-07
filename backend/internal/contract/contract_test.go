@@ -2,6 +2,11 @@ package contract
 
 import (
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -14,6 +19,39 @@ var all = []any{
 	Health{}, NewEntry{},
 }
 
+// `all` must list every struct in the package's Go files, or the rule test below misses it.
+func TestAllListsEveryStruct(t *testing.T) {
+	listed := map[string]bool{}
+	for _, v := range all {
+		listed[reflect.TypeOf(v).Name()] = true
+	}
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range files {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), name, src, parser.SkipObjectResolution)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			if spec, ok := n.(*ast.TypeSpec); ok {
+				if _, isStruct := spec.Type.(*ast.StructType); isStruct && !listed[spec.Name.Name] {
+					t.Errorf("%s: struct %s is missing from `all`", name, spec.Name.Name)
+				}
+			}
+			return true
+		})
+	}
+}
+
 // The rules in doc.go that tygo can't check: they decide whether types.ts tells
 // the truth about the JSON.
 func TestStructsFollowTheContractRules(t *testing.T) {
@@ -23,24 +61,39 @@ func TestStructsFollowTheContractRules(t *testing.T) {
 			f := typ.Field(i)
 			where := typ.Name() + "." + f.Name
 			tstype := f.Tag.Get("tstype")
+			name, opts, _ := strings.Cut(f.Tag.Get("json"), ",")
 			if f.Anonymous {
-				if tstype != ",extends" {
-					t.Errorf("%s: embedded structs need `tstype:\",extends\"` so the TypeScript extends them", where)
+				// encoding/json flattens an embedded struct only when it has no json name, and a
+				// nil embedded pointer drops all its fields; the TypeScript always extends it.
+				if tstype != ",extends" || name != "" || f.Type.Kind() != reflect.Struct {
+					t.Errorf("%s: embed structs by value, with no json tag and `tstype:\",extends\"`", where)
 				}
 				continue
 			}
-			name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
 			if name == "" || name == "-" {
 				t.Errorf("%s: needs a json name", where)
 			}
-			if f.Type.Kind() == reflect.Pointer && !strings.HasSuffix(tstype, " | null,required") {
+			nullable := strings.HasSuffix(tstype, " | null,required")
+			if f.Type.Kind() == reflect.Pointer && !nullable {
 				t.Errorf("%s: a pointer is encoded as null, so it needs `tstype:\"T | null,required\"` (got %q)", where, tstype)
 			}
-			if strings.Contains(tstype, "| null") && f.Type.Kind() != reflect.Pointer && f.Type.Kind() != reflect.Slice {
+			if strings.Contains(tstype, "| null") && !canBeNull(f.Type) {
 				t.Errorf("%s: says it can be null, but a %s never encodes as null", where, f.Type.Kind())
+			}
+			// The TypeScript says the key is always there (null or not), so it can't be left out.
+			if nullable && (strings.Contains(opts, "omitempty") || strings.Contains(opts, "omitzero")) {
+				t.Errorf("%s: `,required` in the TypeScript but omitempty/omitzero in the JSON", where)
 			}
 		}
 	}
+}
+
+func canBeNull(t reflect.Type) bool {
+	switch t.Kind() {
+	case reflect.Pointer, reflect.Slice, reflect.Map:
+		return true
+	}
+	return false
 }
 
 func TestJSONEncodingMatchesTheTypeScript(t *testing.T) {

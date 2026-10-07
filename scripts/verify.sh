@@ -17,7 +17,7 @@ set -euo pipefail
 
 # Use the Go that's installed, never one a pushed go.mod asks to download.
 export GOTOOLCHAIN=local
-export TEST_DATABASE_URL=${TEST_DATABASE_URL:-postgres://mtgcollector@localhost:5432/mtgcollector_test}
+export TEST_DATABASE_URL=${TEST_DATABASE_URL:-postgres://mtgcollector_test@localhost:5432/mtgcollector_test}
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -82,13 +82,23 @@ stray_tests=$(git -c core.quotePath=false ls-files |
   grep -vE '^frontend/src/.*\.test\.tsx?$' || true)
 [[ -z "$stray_tests" ]] || fail "test files that would never run (rename to src/**/*.test.ts or *.test.tsx):
 $stray_tests"
+# Go test files must be in backend/ (the only Go module), and each must build either by default
+# or with the integration tag: one with a misspelled build tag would silently never run.
+stray_go_tests=$(
+  git -c core.quotePath=false ls-files | grep -E '_test\.go$' | grep -v '^backend/' || true
+  go -C backend list -tags=integration -f '{{range .IgnoredGoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}' ./... |
+    grep '_test\.go$' || true
+)
+[[ -z "$stray_go_tests" ]] || fail "Go test files that would never run (move them into backend/, or fix their //go:build line):
+$stray_go_tests"
 
 # --- 1. compile -------------------------------------------------------------
 stage '1/3 compile'
-printf -- '--- %s
-' 'backend: frontend/src/types.ts matches the Go contract'
+printf -- '--- %s\n' 'backend: frontend/src/types.ts matches the Go contract'
 # Generate into a scratch file with the same config, so a stale (or hand-edited) types.ts is
-# reported, not overwritten.
+# reported, not overwritten. One output_path, so the sed can't point two packages at one file.
+[[ $(grep -c 'output_path:' backend/tygo.yaml) == 1 ]] ||
+  fail 'backend/tygo.yaml must have exactly one output_path (verify only compares frontend/src/types.ts)'
 generated=$(mktemp -d)
 trap 'rm -rf "$generated"' EXIT
 generated_ts=$generated/types.ts
@@ -117,14 +127,15 @@ fi
 
 # --- 2. unit tests ----------------------------------------------------------
 stage '2/3 unit tests'
-run 'backend: unit tests' go -C backend test ./...
+run 'backend: unit tests' go -C backend test -count=1 ./...
 run 'frontend: unit tests' npm run --prefix frontend --silent test:unit
 
 # --- 3. behaviour checks ----------------------------------------------------
 stage '3/3 behaviour checks'
 # The integration tag adds the tests that use the database (each gets a schema of its own).
-# Without a database they fail, never skip.
-run 'backend: API behaviour tests (Postgres)' go -C backend test -tags=integration ./...
+# Without a database they fail, never skip. -count=1 because a cached pass would skip the
+# database, whose state isn't part of Go's test cache key.
+run 'backend: API behaviour tests (Postgres)' go -C backend test -count=1 -tags=integration ./...
 run 'frontend: behaviour tests' npm run --prefix frontend --silent test:behaviour
 
 printf '\n%sverify passed%s\n' "$green" "$reset"

@@ -27,9 +27,22 @@ blocked() {
   exit 1
 }
 
-# What verified code must not change: git config and the installed hooks.
+# Go settings that verified code could otherwise inherit, or have planted earlier: ignore the
+# user's go env file and GOFLAGS, use the installed Go, and fetch modules only through the
+# public proxy, checked against the public checksum database.
+go_env_file=''
+if command -v go >/dev/null; then go_env_file=$(go env GOENV 2>/dev/null || true); fi
+export GOENV=off GOFLAGS='' GOTOOLCHAIN=local GOWORK=off \
+  GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org GONOSUMDB='' GONOPROXY='' GOPRIVATE='' GOINSECURE=''
+
+# What verified code must not change: git config, the installed hooks, and the go env file,
+# which every later `go` command (outside this hook) reads.
 git_state() {
-  { cat "$git_dir/config"; find "$git_dir/hooks" -type f -exec cksum {} + 2>/dev/null | sort; } | cksum
+  {
+    cat "$git_dir/config"
+    find "$git_dir/hooks" -type f -exec cksum {} + 2>/dev/null | sort
+    if [[ -n $go_env_file && -f $go_env_file ]]; then cksum <"$go_env_file"; fi
+  } | cksum
 }
 
 # git passes one line per ref: <local ref> <local sha> <remote ref> <remote sha>
@@ -69,7 +82,13 @@ for commit in ${commits[@]+"${commits[@]}"}; do
   before=$(git_state)
   "$wt/scripts/verify.sh" || blocked "verify failed for ${commit:0:7}"
   [[ $(git_state) == "$before" ]] ||
-    blocked "verifying ${commit:0:7} changed .git/config or .git/hooks; check them (git config --list --local) and reinstall the hook"
+    blocked "verifying ${commit:0:7} changed .git/config, .git/hooks or the go env file; check them (git config --list --local, go env) and reinstall the hook"
+  # Every module used is checked against go.sum, so a module edited in the shared cache
+  # (which later builds of any commit would compile in) is caught.
+  if [[ -f $wt/backend/go.mod ]]; then
+    go -C "$wt/backend" mod verify >/dev/null ||
+      blocked "verifying ${commit:0:7} left the Go module cache modified; run \`go clean -modcache\` and push again"
+  fi
 
   git -C "$root" worktree remove --force "$wt" # free its node_modules before the next one
   current_wt=''

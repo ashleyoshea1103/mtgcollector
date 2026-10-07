@@ -26,20 +26,3 @@ func TestHealthAgainstARealDatabase(t *testing.T) {
 		t.Errorf("GET /api/health = %d %q, want 200 {\"status\":\"ok\"}", res.StatusCode, body)
 	}
 }
-
-func TestHealthOnceTheDatabaseHasGone(t *testing.T) {
-	pool := testdb.New(t)
-	srv := httptest.NewServer(NewHandler(pool))
-	t.Cleanup(srv.Close)
-	pool.Close() // what the handler sees when the database goes away
-
-	res, err := http.Get(srv.URL + "/api/health")
-	if err != nil {
-		t.Fatal(err)
-	}
-	res.Body.Close()
-
-	if res.StatusCode != http.StatusServiceUnavailable {
-		t.Errorf("status = %d, want 503", res.StatusCode)
-	}
-}

@@ -41,7 +41,7 @@ func health(db Pinger) http.HandlerFunc {
 }
 
 // securityHeaders sets headers for responses that are only ever JSON: nothing in
-// them may load, run or be framed, sniffed as another type, or cached.
+// them may load, run or be framed, sniffed as another type, cached, or used by other sites.
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -49,6 +49,7 @@ func securityHeaders(next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("Cache-Control", "no-store")
+		h.Set("Cross-Origin-Resource-Policy", "same-origin") // other sites can't load responses, e.g. as a <script>
 		next.ServeHTTP(w, r)
 	})
 }

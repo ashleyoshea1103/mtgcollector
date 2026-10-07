@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type fakeDB struct {
@@ -60,23 +62,25 @@ func TestHealthReportsUnavailableWithoutLeakingTheReason(t *testing.T) {
 
 func TestHealthGivesTheDatabaseABoundedTime(t *testing.T) {
 	db := &fakeDB{}
-	start := time.Now()
 	get(t, NewHandler(db), http.MethodGet, "/api/health")
+	end := time.Now()
 
 	if db.deadline.IsZero() {
 		t.Fatal("Ping got a context without a deadline, so a hung database would hang the health check")
 	}
-	if wait := db.deadline.Sub(start); wait > healthTimeout {
-		t.Errorf("Ping deadline is %v away, want at most %v", wait, healthTimeout)
+	// The deadline was set during the request, so it's at most healthTimeout after the request ended.
+	if over := db.deadline.Sub(end); over > healthTimeout {
+		t.Errorf("Ping deadline is %v after the request ended, want at most %v", over, healthTimeout)
 	}
 }
 
 func TestEveryResponseGetsTheSecurityHeaders(t *testing.T) {
 	want := map[string]string{
-		"Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
-		"X-Content-Type-Options":  "nosniff",
-		"Referrer-Policy":         "no-referrer",
-		"Cache-Control":           "no-store",
+		"Content-Security-Policy":      "default-src 'none'; frame-ancestors 'none'",
+		"X-Content-Type-Options":       "nosniff",
+		"Referrer-Policy":              "no-referrer",
+		"Cache-Control":                "no-store",
+		"Cross-Origin-Resource-Policy": "same-origin",
 	}
 	for _, tc := range []struct{ name, method, path string }{
 		{"a route", http.MethodGet, "/api/health"},
@@ -103,5 +107,20 @@ func TestOnlyGETReachesTheHealthCheck(t *testing.T) {
 	}
 	if db.called {
 		t.Error("POST reached the database")
+	}
+}
+
+func TestHealthWithARealPoolAndNoServer(t *testing.T) {
+	// Port 1 on loopback: nothing listens there, so every connection attempt is refused.
+	pool, err := pgxpool.New(t.Context(), "postgres://nobody@127.0.0.1:1/nothing?connect_timeout=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+
+	rec := get(t, NewHandler(pool), http.MethodGet, "/api/health")
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("status = %d, want 503", rec.Code)
 	}
 }
