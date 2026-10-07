@@ -159,6 +159,28 @@ describe('RarityBadge and SetSymbol', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
+  it("doesn't tell Scryfall which page loaded the symbol", () => {
+    const { container } = render(<SetSymbol card={cards.ragavan} />);
+    expect(container.querySelector('img')).toHaveAttribute('referrerpolicy', 'no-referrer');
+  });
+
+  it.each(['https://evil.example/mh2.svg', 'data:image/svg+xml,<svg onload="alert(1)"/>'])(
+    "won't load a symbol from anywhere but Scryfall's icon host (%s)",
+    (url) => {
+      const card = { ...cards.ragavan, set: { ...cards.ragavan.set, icon_svg_uri: url } };
+      const { container } = render(<SetSymbol card={card} />);
+      expect(container.querySelector('img')).toBeNull();
+      expect(screen.getByTitle(card.set.name)).toHaveTextContent('MH2');
+    },
+  );
+
+  it("is hidden from screen readers when the set's name is shown beside it", () => {
+    const { rerender } = render(<SetSymbol card={cards.ragavan} />);
+    expect(screen.getByTitle(cards.ragavan.set.name)).not.toHaveAttribute('aria-hidden');
+    rerender(<SetSymbol card={cards.ragavan} nameShown />);
+    expect(screen.getByTitle(cards.ragavan.set.name)).toHaveAttribute('aria-hidden', 'true');
+  });
+
   it('shows just the code when the set has no symbol', () => {
     const card = { ...cards.ragavan, set: { ...cards.ragavan.set, icon_svg_uri: null } };
     const { container } = render(<SetSymbol card={card} />);

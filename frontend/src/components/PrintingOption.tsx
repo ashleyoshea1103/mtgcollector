@@ -18,7 +18,7 @@ export function PrintingOption({ card, selected = false, onSelect }: Props) {
       aria-pressed={selected}
       onClick={() => onSelect?.(card)}
     >
-      <SetSymbol card={card} />
+      <SetSymbol card={card} nameShown />
       <span className="printing-option__set">{card.set.name}</span>
       <span className="printing-option__number">#{card.collector_number}</span>
       <time className="printing-option__date" dateTime={card.released_at}>

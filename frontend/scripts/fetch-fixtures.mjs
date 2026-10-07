@@ -32,8 +32,13 @@ const CARDMARKET_HOST = 'https://www.cardmarket.com/';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const num = (s) => (s == null ? null : Number(s));
 
-/** Only trust URLs on the hosts we expect; anything else is dropped. */
-const onHost = (url, host) => (typeof url === 'string' && url.startsWith(host) ? url : null);
+/**
+ * Only trust URLs on the hosts we expect, with a plain path and query; anything else is
+ * dropped. The same rule as the importer's (backend/internal/scryfall CheckURL).
+ */
+const SAFE_REST = /^(\/[A-Za-z0-9/._~%-]*)?(\?[A-Za-z0-9=&+%._~-]*)?$/;
+const onHost = (url, host) =>
+  typeof url === 'string' && url.startsWith(host.slice(0, -1)) && SAFE_REST.test(url.slice(host.length - 1)) ? url : null;
 
 function images(u) {
   if (!u) return null;

@@ -122,6 +122,28 @@ func TestMappingMatchesTheFrontendFixtures(t *testing.T) {
 			// and the rest is in the sets table.
 			set, _ := want["set"].(map[string]any)
 			want["set_code"] = set["code"]
+
+			// And the set itself maps the same way (testdata/set-<code>.json is Scryfall's set).
+			b, err := os.ReadFile("testdata/set-" + row.SetCode + ".json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var rawSet scryfall.Set
+			if err := json.Unmarshal(b, &rawSet); err != nil {
+				t.Fatal(err)
+			}
+			setRow, err := setRow(rawSet)
+			if err != nil {
+				t.Fatalf("setRow: %v", err)
+			}
+			var icon any // the fixtures' JSON null
+			if setRow.IconSvgUri.Valid {
+				icon = setRow.IconSvgUri.String
+			}
+			gotSet := map[string]any{"code": setRow.Code, "name": setRow.Name, "icon_svg_uri": icon}
+			if !reflect.DeepEqual(stripImageVersions(gotSet), stripImageVersions(set)) {
+				t.Errorf("set:\n got  %v\n want %v", gotSet, set)
+			}
 			for field, g := range got {
 				if w := want[field]; !reflect.DeepEqual(stripImageVersions(g), stripImageVersions(w)) {
 					t.Errorf("%s:\n got  %v\n want %v", field, g, w)
@@ -131,12 +153,12 @@ func TestMappingMatchesTheFrontendFixtures(t *testing.T) {
 	}
 }
 
-// stripImageVersions drops the ?1234 cache-busting suffix Scryfall puts on image URLs,
+// stripImageVersions drops the ?1234 cache-busting suffix Scryfall puts on image and icon URLs,
 // which changes whenever an image is re-scanned.
 func stripImageVersions(v any) any {
 	switch v := v.(type) {
 	case string:
-		if strings.HasPrefix(v, "https://"+scryfall.ImageHost+"/") {
+		if strings.HasPrefix(v, "https://"+scryfall.ImageHost+"/") || strings.HasPrefix(v, "https://"+scryfall.SetIconHost+"/") {
 			v, _, _ = strings.Cut(v, "?")
 		}
 		return v

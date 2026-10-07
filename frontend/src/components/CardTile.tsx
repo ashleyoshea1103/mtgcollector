@@ -31,7 +31,7 @@ export function CardTile({ card, finish = defaultFinish(card), unitPrice, overla
       <div className="card-tile__body">
         <h3 className="card-tile__name">{card.name}</h3>
         <p className="card-tile__printing">
-          <SetSymbol card={card} /> <span className="card-tile__set">{card.set.name}</span>{' '}
+          <SetSymbol card={card} nameShown /> <span className="card-tile__set">{card.set.name}</span>{' '}
           <span className="card-tile__number">#{card.collector_number}</span>
         </p>
         <p className="card-tile__price">

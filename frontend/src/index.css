@@ -49,7 +49,6 @@ img {
 
 /* Set symbols sit in a line of text, at the text's height. */
 .set-symbol {
-  text-decoration: none;
   white-space: nowrap;
 }
 .set-symbol__icon {
