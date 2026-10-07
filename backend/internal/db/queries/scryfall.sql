@@ -1,7 +1,7 @@
 -- Queries for the Scryfall import (internal/cards).
 
--- name: UpsertSet :execrows
--- Inserts a set, or updates it if anything about it changed.
+-- name: UpsertSets :batchexec
+-- Inserts a set, or updates it if anything about it changed. Sent as one batch for all sets.
 INSERT INTO sets (code, scryfall_id, name, set_type, released_at, icon_svg_uri, parent_set_code)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (code) DO UPDATE

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -15,6 +16,9 @@ import (
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/scryfall"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 )
+
+// A price as Scryfall writes them ("0.31"), small enough for numeric(10,2).
+var priceFormat = regexp.MustCompile(`^[0-9]{1,8}(.[0-9]{1,2})?$`)
 
 var (
 	knownRarities = []string{"common", "uncommon", "rare", "mythic", "special", "bonus"}
@@ -54,9 +58,11 @@ func toRow(c scryfall.Card) (store.StageCardsParams, error) {
 	row.SetCode = c.Set
 	row.CollectorNumber = c.CollectorNumber
 	row.Layout = c.Layout
-	for field, v := range map[string]string{"name": row.Name, "lang": row.Lang, "set": row.SetCode, "collector_number": row.CollectorNumber} {
-		if v == "" {
-			return row, fmt.Errorf("%s is missing", field)
+	for _, f := range []struct{ name, value string }{
+		{"name", row.Name}, {"lang", row.Lang}, {"set", row.SetCode}, {"collector_number", row.CollectorNumber},
+	} {
+		if f.value == "" {
+			return row, fmt.Errorf("%s is missing", f.name)
 		}
 	}
 	if !slices.Contains(knownRarities, c.Rarity) {
@@ -164,8 +170,9 @@ func toRow(c scryfall.Card) (store.StageCardsParams, error) {
 		if p.src == nil {
 			continue
 		}
-		if _, err := strconv.ParseFloat(*p.src, 64); err != nil || *p.src == "" {
-			return row, fmt.Errorf("price %q is not a number", *p.src)
+		// Plain decimals only: ParseFloat would also take NaN, Inf, -1 and 1e3.
+		if !priceFormat.MatchString(*p.src) {
+			return row, fmt.Errorf("price %q is not a price", *p.src)
 		}
 		if err := p.dst.Scan(*p.src); err != nil {
 			return row, fmt.Errorf("price %q: %w", *p.src, err)
@@ -202,8 +209,8 @@ func images(u *scryfall.ImageURIs) *contract.CardImages {
 }
 
 // setRow maps a Scryfall set to a row for the sets table.
-func setRow(s scryfall.Set) (store.UpsertSetParams, error) {
-	row := store.UpsertSetParams{Code: s.Code, Name: s.Name, SetType: s.SetType}
+func setRow(s scryfall.Set) (store.UpsertSetsParams, error) {
+	row := store.UpsertSetsParams{Code: s.Code, Name: s.Name, SetType: s.SetType}
 	if s.Code == "" || s.Name == "" || s.SetType == "" {
 		return row, errors.New("code, name or set_type is missing")
 	}

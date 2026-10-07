@@ -231,6 +231,12 @@ func TestCardsThatCantBeImportedSayWhy(t *testing.T) {
 		"no cmc":           func(c *scryfall.Card) { c.CMC = nil },
 		"no type line":     func(c *scryfall.Card) { c.TypeLine = nil },
 		"bad price":        func(c *scryfall.Card) { c.Prices.EUR = &bad },
+		"NaN price":        func(c *scryfall.Card) { c.Prices.EUR = ptr("NaN") },
+		"infinite price":   func(c *scryfall.Card) { c.Prices.USD = ptr("Inf") },
+		"negative price":   func(c *scryfall.Card) { c.Prices.EURFoil = ptr("-1.00") },
+		"exponent price":   func(c *scryfall.Card) { c.Prices.EUR = ptr("1e3") },
+		"too big a price":  func(c *scryfall.Card) { c.Prices.EUR = ptr("123456789.00") },
+		"empty price":      func(c *scryfall.Card) { c.Prices.EUR = ptr("") },
 		"bad release date": func(c *scryfall.Card) { c.ReleasedAt = "07/10/2026" },
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -242,6 +248,8 @@ func TestCardsThatCantBeImportedSayWhy(t *testing.T) {
 		})
 	}
 }
+
+func ptr(s string) *string { return &s }
 
 func TestEmptyListsAreNotNull(t *testing.T) {
 	// A colourless card's colours are [], which the contract (and the NOT NULL columns) need.

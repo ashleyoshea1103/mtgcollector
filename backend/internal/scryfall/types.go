@@ -87,10 +87,6 @@ const (
 // username or password in it. URLs from Scryfall end up in pages and requests, so anything
 // else is refused rather than trusted.
 func CheckURL(raw, host string) error {
-	return checkURL(raw, host)
-}
-
-func checkURL(raw, host string) error {
 	u, err := url.Parse(raw)
 	switch {
 	case err != nil:

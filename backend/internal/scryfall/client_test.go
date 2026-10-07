@@ -145,6 +145,8 @@ func collect(t *testing.T, c *Client, f BulkFile) ([]string, error) {
 	err := c.EachCard(t.Context(), f, func(card Card) error {
 		names = append(names, card.Name)
 		return nil
+	}, func(line int, err error) {
+		names = append(names, fmt.Sprintf("bad line %d", line))
 	})
 	return names, err
 }
@@ -168,7 +170,6 @@ func TestEachCardFailsOnABrokenFile(t *testing.T) {
 		"truncated download": whole[:len(whole)-10],
 		"bad checksum":       corrupt,
 		"not gzip":           []byte(`{"name":"Lightning Bolt"}`),
-		"bad JSON line":      gzipLines(t, `{"name":"Lightning Bolt"}`, `{"name":`),
 		"line too long":      gzipLines(t, `{"name":"`+strings.Repeat("x", maxCard)+`"}`),
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -180,6 +181,33 @@ func TestEachCardFailsOnABrokenFile(t *testing.T) {
 	}
 }
 
+// A card Scryfall's way that doesn't decode (a changed field type, say) is reported, and
+// the rest of the file is still read.
+func TestEachCardReportsBadLinesAndCarriesOn(t *testing.T) {
+	c, f := bulkClient(t, gzipLines(t, `{"name":"a"}`, `{"name":"b","cmc":"three"}`, `{"name":`, `{"name":"c"}`))
+	names, err := collect(t, c, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(names, ","); got != "a,bad line 2,bad line 3,c" {
+		t.Errorf("got %s", got)
+	}
+}
+
+// gzip allows a file made of several compressed members (parallel compressors write them);
+// every member must be read, not just the first.
+func TestEachCardReadsEveryGzipMember(t *testing.T) {
+	body := append(gzipLines(t, `{"name":"a"}`), gzipLines(t, `{"name":"b"}`)...)
+	c, f := bulkClient(t, body)
+	names, err := collect(t, c, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(names, ",") != "a,b" {
+		t.Errorf("names = %v, want both members' cards", names)
+	}
+}
+
 func TestEachCardStopsAtTheCallbacksError(t *testing.T) {
 	c, f := bulkClient(t, gzipLines(t, `{"name":"a"}`, `{"name":"b"}`, `{"name":"c"}`))
 	stop := errors.New("stop")
@@ -187,7 +215,7 @@ func TestEachCardStopsAtTheCallbacksError(t *testing.T) {
 	err := c.EachCard(t.Context(), f, func(Card) error {
 		calls++
 		return stop
-	})
+	}, func(int, error) {})
 	if !errors.Is(err, stop) || calls != 1 {
 		t.Errorf("err = %v after %d calls, want stop after 1", err, calls)
 	}
@@ -214,7 +242,7 @@ func TestEachCardHonoursCancellation(t *testing.T) {
 	c, f := bulkClient(t, gzipLines(t, `{"name":"a"}`))
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	if err := c.EachCard(ctx, f, func(Card) error { return nil }); err == nil {
+	if err := c.EachCard(ctx, f, func(Card) error { return nil }, func(int, error) {}); err == nil {
 		t.Error("EachCard ran with a cancelled context")
 	}
 }

@@ -28,6 +28,12 @@ const (
 	maxCard        = 1 << 20  // one card object is a few KB
 )
 
+// How long requests may take: API calls are small, the bulk download isn't.
+const (
+	apiTimeout      = time.Minute
+	downloadTimeout = 30 * time.Minute
+)
+
 // Client calls Scryfall. The zero value is not usable; use New.
 type Client struct {
 	http    *http.Client
@@ -54,14 +60,16 @@ func NewForTest(baseURL string) *Client {
 
 func newClient(baseURL, apiHost, bulkHost string) *Client {
 	c := &Client{baseURL: baseURL, apiHost: apiHost, bulkHost: bulkHost}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = apiTimeout // however long the body takes, the headers come quickly
 	c.http = &http.Client{
-		Timeout: 30 * time.Minute, // the bulk download is large
+		Transport: transport,
 		// Follow redirects only within Scryfall's own hosts.
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
 				return errors.New("too many redirects")
 			}
-			if checkURL(req.URL.String(), c.apiHost) != nil && checkURL(req.URL.String(), c.bulkHost) != nil {
+			if CheckURL(req.URL.String(), c.apiHost) != nil && CheckURL(req.URL.String(), c.bulkHost) != nil {
 				return fmt.Errorf("redirect to %s refused", req.URL.Redacted())
 			}
 			return nil
@@ -84,7 +92,7 @@ func (c *Client) DefaultCards(ctx context.Context) (BulkFile, error) {
 	if err := c.getJSON(ctx, c.baseURL+"/bulk-data/default-cards", &f); err != nil {
 		return BulkFile{}, fmt.Errorf("bulk data metadata: %w", err)
 	}
-	if err := checkURL(f.DownloadURI, c.bulkHost); err != nil {
+	if err := CheckURL(f.DownloadURI, c.bulkHost); err != nil {
 		return BulkFile{}, fmt.Errorf("bulk data download link: %w", err)
 	}
 	return f, nil
@@ -109,7 +117,7 @@ func (c *Client) Sets(ctx context.Context) ([]Set, error) {
 		all = append(all, list.Data...)
 		next = ""
 		if list.HasMore {
-			if err := checkURL(list.NextPage, c.apiHost); err != nil {
+			if err := CheckURL(list.NextPage, c.apiHost); err != nil {
 				return nil, fmt.Errorf("sets: next page link: %w", err)
 			}
 			next = list.NextPage
@@ -119,25 +127,28 @@ func (c *Client) Sets(ctx context.Context) ([]Set, error) {
 }
 
 // EachCard downloads the bulk file and calls fn with each card in it, decoding one card
-// at a time so the file is never held in memory. It stops at the first error fn returns.
-func (c *Client) EachCard(ctx context.Context, f BulkFile, fn func(Card) error) error {
+// at a time so the file is never held in memory. A line that isn't a card Scryfall's way
+// (e.g. a field changed type) is passed to bad instead, so one odd card can't stop the
+// whole import. It stops at the first error fn returns.
+func (c *Client) EachCard(ctx context.Context, f BulkFile, fn func(Card) error, bad func(line int, err error)) error {
+	ctx, cancel := context.WithTimeout(ctx, downloadTimeout)
+	defer cancel()
 	body, err := c.get(ctx, f.DownloadURI, "application/gzip")
 	if err != nil {
 		return fmt.Errorf("bulk file: %w", err)
 	}
 	defer body.Close()
-	return decodeCards(&cappedReader{r: body, left: maxBulkFile}, fn)
+	return decodeCards(&cappedReader{r: body, left: maxBulkFile}, fn, bad)
 }
 
 // decodeCards reads a gzipped JSON Lines file of cards and calls fn with each one. gzip's
 // checksum and length trailer make a truncated or corrupted download fail, rather than
 // import only some of the cards.
-func decodeCards(r io.Reader, fn func(Card) error) error {
-	zr, err := gzip.NewReader(r)
+func decodeCards(r io.Reader, fn func(Card) error, bad func(line int, err error)) error {
+	zr, err := gzip.NewReader(r) // reads every gzip member, as gzip -d does
 	if err != nil {
 		return fmt.Errorf("bulk file: %w", err)
 	}
-	zr.Multistream(false)
 	lines := bufio.NewScanner(&cappedReader{r: zr, left: maxBulkFile})
 	lines.Buffer(make([]byte, 64<<10), maxCard)
 	for n := 1; lines.Scan(); n++ {
@@ -147,7 +158,8 @@ func decodeCards(r io.Reader, fn func(Card) error) error {
 		}
 		var card Card
 		if err := json.Unmarshal(line, &card); err != nil {
-			return fmt.Errorf("bulk file: line %d: %w", n, err)
+			bad(n, err)
+			continue
 		}
 		if err := fn(card); err != nil {
 			return err
@@ -178,6 +190,8 @@ func (c *cappedReader) Read(p []byte) (int, error) {
 }
 
 func (c *Client) getJSON(ctx context.Context, uri string, v any) error {
+	ctx, cancel := context.WithTimeout(ctx, apiTimeout)
+	defer cancel()
 	body, err := c.get(ctx, uri, "application/json")
 	if err != nil {
 		return err

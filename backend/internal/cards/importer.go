@@ -21,7 +21,7 @@ import (
 type Source interface {
 	DefaultCards(ctx context.Context) (scryfall.BulkFile, error)
 	Sets(ctx context.Context) ([]scryfall.Set, error)
-	EachCard(ctx context.Context, f scryfall.BulkFile, fn func(scryfall.Card) error) error
+	EachCard(ctx context.Context, f scryfall.BulkFile, fn func(scryfall.Card) error, bad func(line int, err error)) error
 }
 
 // DefaultLockKey is the Postgres advisory lock that keeps imports from overlapping.
@@ -35,6 +35,10 @@ const batchSize = 1000
 
 // How many skipped cards are logged one by one; the rest are only counted.
 const loggedSkips = 20
+
+// An import that would skip more than this share of the cards is refused, keeping the
+// previous data: that many failures means Scryfall's format changed, not a few odd cards.
+const maxSkippedShare = 0.05
 
 // Importer imports Scryfall's bulk data. Its fields must be set before use.
 type Importer struct {
@@ -140,17 +144,25 @@ func (im *Importer) run(ctx context.Context, conn *pgx.Conn, q *store.Queries, f
 	qtx := q.WithTx(tx)
 
 	known := make(map[string]bool, len(sets))
+	rows := make([]store.UpsertSetsParams, 0, len(sets))
 	for _, s := range sets {
 		row, err := setRow(s)
 		if err != nil {
 			im.Log.WarnContext(ctx, "skipped a Scryfall set", "code", s.Code, "reason", err)
 			continue
 		}
-		if _, err := qtx.UpsertSet(ctx, row); err != nil {
-			return res, fmt.Errorf("set %s: %w", s.Code, err)
-		}
+		rows = append(rows, row)
 		known[s.Code] = true
-		res.SetsSeen++
+	}
+	res.SetsSeen = len(rows)
+	var setErr error
+	qtx.UpsertSets(ctx, rows).Exec(func(i int, err error) { // one round trip for all of them
+		if err != nil && setErr == nil {
+			setErr = fmt.Errorf("set %s: %w", rows[i].Code, err)
+		}
+	})
+	if setErr != nil {
+		return res, setErr
 	}
 
 	if err := qtx.ClearStagedCards(ctx); err != nil {
@@ -167,6 +179,12 @@ func (im *Importer) run(ctx context.Context, conn *pgx.Conn, q *store.Queries, f
 		batch = batch[:0]
 		return nil
 	}
+	skip := func(attrs ...any) {
+		res.CardsSkipped++
+		if res.CardsSkipped <= loggedSkips {
+			im.Log.WarnContext(ctx, "skipped a Scryfall card", attrs...)
+		}
+	}
 	err = im.Source.EachCard(ctx, bulk, func(c scryfall.Card) error {
 		if c.Digital {
 			return nil
@@ -177,10 +195,7 @@ func (im *Importer) run(ctx context.Context, conn *pgx.Conn, q *store.Queries, f
 			err = fmt.Errorf("unknown set %q", c.Set)
 		}
 		if err != nil {
-			res.CardsSkipped++
-			if res.CardsSkipped <= loggedSkips {
-				im.Log.WarnContext(ctx, "skipped a Scryfall card", "id", c.ID, "name", c.Name, "reason", err)
-			}
+			skip("id", c.ID, "name", c.Name, "reason", err)
 			return nil
 		}
 		batch = append(batch, row)
@@ -188,12 +203,19 @@ func (im *Importer) run(ctx context.Context, conn *pgx.Conn, q *store.Queries, f
 			return flush()
 		}
 		return nil
+	}, func(line int, err error) {
+		res.CardsSeen++ // it may have been digital, but it can't be told apart
+		skip("line", line, "reason", err)
 	})
 	if err == nil {
 		err = flush()
 	}
 	if err != nil {
 		return res, err
+	}
+	if res.CardsSeen == 0 || float64(res.CardsSkipped) > maxSkippedShare*float64(res.CardsSeen) {
+		return res, fmt.Errorf("refusing to import: %d of %d cards couldn't be read (see the warnings above)",
+			res.CardsSkipped, res.CardsSeen)
 	}
 
 	changed, err := qtx.MergeStagedCards(ctx)

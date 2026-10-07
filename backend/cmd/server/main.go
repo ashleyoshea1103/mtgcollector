@@ -87,16 +87,29 @@ func run(ctx context.Context, cfg config) error {
 		return err
 	}
 
-	var background sync.WaitGroup
-	defer background.Wait() // before the pool closes: the import uses it
+	var background func(context.Context)
 	if cfg.DailySync {
 		importer := &cards.Importer{Pool: pool, Source: scryfall.New(), LockKey: cards.DefaultLockKey, Log: slog.Default()}
-		background.Go(func() { importer.RunDaily(ctx, syncCheckEvery) })
+		background = func(ctx context.Context) { importer.RunDaily(ctx, syncCheckEvery) }
+	}
+	return serve(ctx, cfg.Addr, api.NewHandler(pool), background)
+}
+
+// serve runs handler on addr, with background (if not nil) running alongside it, until ctx
+// ends or the server fails. Either way it stops background and waits for it before
+// returning, so nothing is still using the database when the caller closes it.
+func serve(ctx context.Context, addr string, handler http.Handler, background func(context.Context)) error {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	bgCtx, stopBackground := context.WithCancel(ctx)
+	defer stopBackground() // runs before wg.Wait: also when the server fails to start
+	if background != nil {
+		wg.Go(func() { background(bgCtx) })
 	}
 
 	srv := &http.Server{
-		Addr:              cfg.Addr,
-		Handler:           api.NewHandler(pool),
+		Addr:              addr,
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -104,7 +117,7 @@ func run(ctx context.Context, cfg config) error {
 	}
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.ListenAndServe() }()
-	slog.Info("listening", "addr", cfg.Addr)
+	slog.Info("listening", "addr", addr)
 
 	select {
 	case err := <-serveErr:

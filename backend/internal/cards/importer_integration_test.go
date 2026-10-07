@@ -24,6 +24,7 @@ type fakeSource struct {
 	sets      []scryfall.Set
 	cards     []scryfall.Card
 	failAfter int // if > 0, EachCard fails after this many cards, like a dropped download
+	badLines  int // lines EachCard reports as undecodable, after the cards
 	reads     int // how many times the bulk file was read
 }
 
@@ -33,7 +34,7 @@ func (f *fakeSource) DefaultCards(context.Context) (scryfall.BulkFile, error) {
 
 func (f *fakeSource) Sets(context.Context) ([]scryfall.Set, error) { return f.sets, nil }
 
-func (f *fakeSource) EachCard(_ context.Context, _ scryfall.BulkFile, fn func(scryfall.Card) error) error {
+func (f *fakeSource) EachCard(_ context.Context, _ scryfall.BulkFile, fn func(scryfall.Card) error, bad func(int, error)) error {
 	f.reads++
 	for i, c := range f.cards {
 		if f.failAfter > 0 && i == f.failAfter {
@@ -42,6 +43,9 @@ func (f *fakeSource) EachCard(_ context.Context, _ scryfall.BulkFile, fn func(sc
 		if err := fn(c); err != nil {
 			return err
 		}
+	}
+	for i := range f.badLines {
+		bad(len(f.cards)+i+1, errors.New("json: cannot unmarshal string into Go struct field"))
 	}
 	return nil
 }
@@ -103,18 +107,24 @@ func TestFirstImportLoadsSetsAndCards(t *testing.T) {
 	broken := rawCard(t, "m10-146")
 	broken.ID, broken.Rarity = randomUUID(), "legendary"
 	src.cards = append(src.cards, digital, unknownSet, broken)
+	// Enough good cards that the two bad ones stay under the share an import may skip.
+	for range 40 {
+		c := rawCard(t, "m19-314")
+		c.ID = randomUUID()
+		src.cards = append(src.cards, c)
+	}
 
 	res, err := newImporter(pool, src).Run(t.Context(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := Result{BulkUpdatedAt: src.updatedAt, SetsSeen: 5, CardsSeen: 8, CardsSkipped: 2, CardsChanged: 6}
+	want := Result{BulkUpdatedAt: src.updatedAt, SetsSeen: 5, CardsSeen: 48, CardsSkipped: 2, CardsChanged: 46}
 	if res != want {
 		t.Errorf("Run() = %+v\nwant     %+v", res, want)
 	}
-	if n := count(t, pool, `SELECT count(*) FROM cards`); n != 6 {
-		t.Errorf("%d cards, want 6 (digital, unknown-set and broken ones left out)", n)
+	if n := count(t, pool, `SELECT count(*) FROM cards`); n != 46 {
+		t.Errorf("%d cards, want 46 (digital, unknown-set and broken ones left out)", n)
 	}
 	if n := count(t, pool, `SELECT count(*) FROM sets`); n != 5 {
 		t.Errorf("%d sets, want 5", n)
@@ -130,7 +140,7 @@ func TestFirstImportLoadsSetsAndCards(t *testing.T) {
 	).Scan(&seen, &skipped, &changed, &errText); err != nil {
 		t.Fatal(err)
 	}
-	if seen != 8 || skipped != 2 || changed != 6 || errText != nil {
+	if seen != 48 || skipped != 2 || changed != 46 || errText != nil {
 		t.Errorf("scryfall_syncs row: seen %d, skipped %d, changed %d, error %v", seen, skipped, changed, errText)
 	}
 	// A spot check that the mapped values reached the table intact.
@@ -306,5 +316,60 @@ func TestDue(t *testing.T) {
 	}
 	if due, err := im.Due(t.Context(), 24*time.Hour); err != nil || !due {
 		t.Errorf("Due() a day later = %v, %v; want true", due, err)
+	}
+}
+
+func TestTooManySkippedCardsAbortTheImport(t *testing.T) {
+	pool := testdb.New(t)
+	src := newSource(t)
+	im := newImporter(pool, src)
+	if _, err := im.Run(t.Context(), false); err != nil {
+		t.Fatal(err)
+	}
+
+	// The next file's format changed: most of its lines no longer decode.
+	price := "99.99"
+	src.cards[0].Prices.EUR = &price
+	src.badLines = 20
+	src.updatedAt = src.updatedAt.Add(24 * time.Hour)
+	_, err := im.Run(t.Context(), false)
+
+	if err == nil {
+		t.Fatal("Run() imported a file where most cards couldn't be read")
+	}
+	if n := count(t, pool, `SELECT count(*) FROM cards WHERE price_eur = 99.99`); n != 0 {
+		t.Error("cards from the refused import were saved")
+	}
+}
+
+func TestRunDailyImportsWhenDueAndStopsOnCancel(t *testing.T) {
+	pool := testdb.New(t)
+	src := newSource(t)
+	im := newImporter(pool, src)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		im.RunDaily(ctx, 50*time.Millisecond)
+		close(done)
+	}()
+
+	// It imports straight away (there's never been an import), then only checks: the next
+	// import isn't due for a day.
+	deadline := time.Now().Add(10 * time.Second)
+	for count(t, pool, `SELECT count(*) FROM scryfall_syncs WHERE finished_at IS NOT NULL`) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("RunDaily didn't import")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	time.Sleep(300 * time.Millisecond) // several more checks
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("RunDaily didn't stop when cancelled")
+	}
+	if n := count(t, pool, `SELECT count(*) FROM scryfall_syncs`); n != 1 || src.reads != 1 {
+		t.Errorf("%d imports recorded, %d bulk reads; want 1 each (later checks found nothing due)", n, src.reads)
 	}
 }
