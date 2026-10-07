@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Button } from './Button';
@@ -60,6 +60,15 @@ describe('Field', () => {
     const input = screen.getByRole('spinbutton', { name: 'Qty' });
     expect(input).toHaveAccessibleDescription('3 in stock 1 to 999');
     expect(input).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it("is marked invalid by a field error even if the control says it isn't", () => {
+    render(
+      <Field label="Qty" error="Too many">
+        <NumberInput aria-invalid={false} />
+      </Field>,
+    );
+    expect(screen.getByRole('spinbutton', { name: 'Qty' })).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('can be named by a label elsewhere when not in a Field', () => {
@@ -156,6 +165,7 @@ describe('SearchInput', () => {
     expect(box).toHaveValue('');
     expect(onSearch).toHaveBeenLastCalledWith('');
     expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument();
+    expect(box).toHaveFocus(); // not lost to <body> when the button disappears
     act(() => vi.advanceTimersByTime(1000));
     expect(onSearch.mock.calls).toEqual([['ice'], [''], ['fire'], ['']]);
   });
@@ -174,6 +184,15 @@ describe('SearchInput', () => {
     expect(screen.getByRole('dialog', { name: 'Find a card' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('leaves Enter and Escape to an input method while it is composing', () => {
+    const { onSearch, box } = setup(300);
+    fireEvent.change(box, { target: { value: 'にほ' } });
+    fireEvent.keyDown(box, { key: 'Enter', isComposing: true });
+    fireEvent.keyDown(box, { key: 'Escape', isComposing: true });
+    expect(onSearch).not.toHaveBeenCalled();
+    expect(box).toHaveValue('にほ');
   });
 
   it("doesn't report the starting text on mount", () => {

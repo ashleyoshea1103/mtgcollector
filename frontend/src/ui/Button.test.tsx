@@ -81,6 +81,8 @@ describe('IconButton', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
     await user.tab();
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Remove');
+    // The tooltip repeats the name, so it isn't read again as the description.
+    expect(screen.getByRole('button', { name: 'Remove' })).not.toHaveAccessibleDescription();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });

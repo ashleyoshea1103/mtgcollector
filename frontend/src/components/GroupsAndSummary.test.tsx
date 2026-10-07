@@ -116,6 +116,11 @@ describe('PrintingOption', () => {
 
     rerender(<PrintingOption card={cards.ragavan} selected onSelect={onSelect} />);
     expect(button).toHaveAttribute('aria-pressed', 'true');
+
+    // Picking the selected one again reports it again (and it stays selected).
+    await user.click(button);
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(button).toHaveAttribute('aria-pressed', 'true');
   });
 });
 

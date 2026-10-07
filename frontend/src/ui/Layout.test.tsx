@@ -21,17 +21,17 @@ describe('Stack, Cluster and Grid', () => {
     const [stack, cluster, grid] = [...container.children] as HTMLElement[];
     expect(stack.tagName).toBe('UL');
     expect(stack).toHaveClass('stack');
-    expect(stack.style.getPropertyValue('--layout-gap')).toBe('var(--space-5)');
+    expect(stack.style.getPropertyValue('--layout-gap')).toBe('var(--spacing-5)');
     expect(screen.getByRole('listitem')).toHaveTextContent('a');
 
     expect(cluster.tagName).toBe('DIV');
     expect(cluster).toHaveClass('cluster', 'meta');
-    expect(cluster.style.getPropertyValue('--layout-gap')).toBe('var(--space-1)');
+    expect(cluster.style.getPropertyValue('--layout-gap')).toBe('var(--spacing-1)');
     expect(cluster.style.getPropertyValue('--cluster-justify')).toBe('space-between');
 
     expect(grid.tagName).toBe('SECTION');
     expect(grid.style.getPropertyValue('--grid-min')).toBe('180px');
-    expect(grid.style.getPropertyValue('--layout-gap')).toBe('var(--space-4)');
+    expect(grid.style.getPropertyValue('--layout-gap')).toBe('var(--spacing-4)');
   });
 });
 

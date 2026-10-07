@@ -14,12 +14,12 @@
 
 body {
   margin: 0;
-  padding: var(--space-4);
+  padding: var(--spacing-4);
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-body);
-  font-size: var(--font-size-md);
-  line-height: var(--line-height-body);
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
 }
 
 img {
@@ -47,7 +47,7 @@ img {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-4);
+  padding: var(--spacing-4);
   border: 1px dashed var(--color-border);
   text-align: center;
 }
@@ -72,27 +72,27 @@ img {
 /* Rarity colours, from the tokens. */
 .set-symbol--common,
 .rarity-badge--common {
-  color: var(--rarity-common);
+  color: var(--color-rarity-common);
 }
 .set-symbol--uncommon,
 .rarity-badge--uncommon {
-  color: var(--rarity-uncommon);
+  color: var(--color-rarity-uncommon);
 }
 .set-symbol--rare,
 .rarity-badge--rare {
-  color: var(--rarity-rare);
+  color: var(--color-rarity-rare);
 }
 .set-symbol--mythic,
 .rarity-badge--mythic {
-  color: var(--rarity-mythic);
+  color: var(--color-rarity-mythic);
 }
 .set-symbol--special,
 .rarity-badge--special {
-  color: var(--rarity-special);
+  color: var(--color-rarity-special);
 }
 .set-symbol--bonus,
 .rarity-badge--bonus {
-  color: var(--rarity-bonus);
+  color: var(--color-rarity-bonus);
 }
 .rarity-badge abbr {
   text-decoration: none;
@@ -103,18 +103,18 @@ img {
 }
 .card-tile__overlay {
   position: absolute;
-  top: var(--space-2);
-  left: var(--space-2);
+  top: var(--spacing-2);
+  left: var(--spacing-2);
 }
 .card-tile__body p,
 .card-tile__name {
-  margin: var(--space-1) 0;
+  margin: var(--spacing-1) 0;
 }
 
 .custom-group-card__previews {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-1);
+  gap: var(--spacing-1);
   min-height: 4rem;
 }
 
@@ -124,23 +124,23 @@ img {
 }
 .entry-table th,
 .entry-table td {
-  padding: var(--space-1) var(--space-2);
+  padding: var(--spacing-1) var(--spacing-2);
   text-align: left;
 }
 
 .group-bucket__header {
   margin: 0;
-  font-size: var(--font-size-lg);
+  font-size: var(--text-lg);
 }
 
 .card-detail {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-4);
+  gap: var(--spacing-4);
 }
 .card-detail__images {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--spacing-2);
 }
 .card-detail__oracle {
   white-space: pre-line;
@@ -148,18 +148,18 @@ img {
 
 .add-form {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--spacing-2);
   max-width: 24rem;
 }
 
 .printing-list {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--spacing-1);
   max-width: 32rem;
 }
 .printing-option {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--spacing-3);
   text-align: left;
 }
 .printing-option__set {
@@ -177,39 +177,39 @@ img {
 }
 /* Coloured mana, from the tokens. */
 .mana-symbol--w {
-  background: var(--mana-w);
+  background: var(--color-mana-w);
 }
 .mana-symbol--u {
-  background: var(--mana-u);
+  background: var(--color-mana-u);
 }
 .mana-symbol--b {
-  background: var(--mana-b);
+  background: var(--color-mana-b);
 }
 .mana-symbol--r {
-  background: var(--mana-r);
+  background: var(--color-mana-r);
 }
 .mana-symbol--g {
-  background: var(--mana-g);
+  background: var(--color-mana-g);
 }
 .mana-symbol--c {
-  background: var(--mana-c);
+  background: var(--color-mana-c);
 }
 
 /* Gallery page */
 .gallery__section {
-  margin-block: var(--space-6);
-  padding-top: var(--space-4);
+  margin-block: var(--spacing-6);
+  padding-top: var(--spacing-4);
   border-top: 1px solid var(--color-border);
 }
 .gallery__toc {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--spacing-3);
 }
 .gallery__row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-4);
+  gap: var(--spacing-4);
   align-items: flex-start;
 }
 .gallery__row .card-image {
@@ -221,23 +221,23 @@ img {
 .gallery__swatch {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--spacing-1);
 }
 .gallery__swatch-colour {
   display: inline-block;
-  width: var(--space-5);
-  height: var(--space-5);
+  width: var(--spacing-5);
+  height: var(--spacing-5);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
 }
 .gallery__space {
   display: inline-block;
-  height: var(--space-3);
+  height: var(--spacing-3);
   background: var(--color-accent);
   vertical-align: middle;
 }
 .gallery__box {
-  padding: var(--space-2);
+  padding: var(--spacing-2);
   border: 1px dashed var(--color-border);
 }
 .gallery__form {

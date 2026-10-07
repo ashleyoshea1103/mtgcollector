@@ -56,7 +56,8 @@ interface ControlWiring {
 
 /**
  * A control's id and ARIA wiring: the caller's own, merged with its Field's. Inside a Field
- * the field's id wins (its label points at it); descriptions from both are read.
+ * the field's id wins (its label points at it), descriptions from both are read, and a
+ * field error always marks it invalid.
  */
 function useFieldControl(own: ControlWiring): ControlWiring {
   const field = useContext(FieldContext);
@@ -64,7 +65,7 @@ function useFieldControl(own: ControlWiring): ControlWiring {
   return {
     id: field.id,
     'aria-describedby': [own['aria-describedby'], field.describedBy].filter(Boolean).join(' ') || undefined,
-    'aria-invalid': own['aria-invalid'] ?? (field.invalid || undefined),
+    'aria-invalid': field.invalid || own['aria-invalid'],
   };
 }
 
@@ -136,6 +137,7 @@ export function SearchInput({ defaultValue = '', onSearch, delay = 300, classNam
   const [text, setText] = useState(defaultValue);
   // The last query reported, so a pause after Enter or a clear doesn't report it again.
   const reported = useRef(defaultValue);
+  const input = useRef<HTMLInputElement>(null);
   const control = useFieldControl(rest);
 
   const report = (query: string) => {
@@ -152,6 +154,8 @@ export function SearchInput({ defaultValue = '', onSearch, delay = 300, classNam
   const clear = () => {
     setText('');
     report('');
+    // The clear button disappears once the box is empty; keep focus in the box, not <body>.
+    input.current?.focus();
   };
 
   return (
@@ -159,11 +163,14 @@ export function SearchInput({ defaultValue = '', onSearch, delay = 300, classNam
       <input
         {...rest}
         {...control}
+        ref={input}
         type="search"
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           onKeyDown?.(e);
+          // Keys while an input method is composing (e.g. Japanese) belong to the composition.
+          if (e.nativeEvent.isComposing) return;
           if (e.key === 'Enter') report(text);
           if (e.key === 'Escape' && text !== '') {
             // The browser would clear it too, without telling us; and an enclosing dialog,

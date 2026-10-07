@@ -53,6 +53,27 @@ describe('Dialog', () => {
     }
   });
 
+  it('closes on a click outside, unless it is an alertdialog', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <Dialog title="Details" trigger={<Button>Open</Button>}>
+        Text
+      </Dialog>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await user.click(document.querySelector('.dialog-overlay')!);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    rerender(
+      <Dialog title="Delete?" role="alertdialog" trigger={<Button>Open</Button>}>
+        Text
+      </Dialog>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await user.click(document.querySelector('.dialog-overlay')!);
+    expect(screen.getByRole('alertdialog', { name: 'Delete?' })).toBeInTheDocument();
+  });
+
   it('can be opened and closed by its parent', async () => {
     const onOpenChange = vi.fn<(open: boolean) => void>();
     const { rerender } = render(

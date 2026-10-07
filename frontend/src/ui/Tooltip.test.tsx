@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Button } from './Button';
@@ -28,7 +28,19 @@ describe('TooltipText', () => {
     await user.hover(screen.getByText('—'));
     expect(screen.getByRole('tooltip')).toHaveTextContent('No price available');
     await user.unhover(screen.getByText('—'));
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    await waitForElementToBeRemoved(() => screen.queryByRole('tooltip'));
+  });
+
+  it('stays open while the pointer moves onto it', async () => {
+    const user = userEvent.setup();
+    render(<TooltipText tooltip="No price available">—</TooltipText>);
+    await user.hover(screen.getByText('—'));
+    await user.unhover(screen.getByText('—'));
+    await user.hover(screen.getByRole('tooltip'));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+    await user.unhover(screen.getByRole('tooltip'));
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
   });
 
   it('closes on Escape without the pointer moving', async () => {

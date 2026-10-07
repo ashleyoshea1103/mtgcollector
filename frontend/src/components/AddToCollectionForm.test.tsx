@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, customGroups } from '../fixtures';
@@ -189,6 +189,8 @@ describe('AddToCollectionForm', () => {
     const button = screen.getByRole('button', { name: 'Adding…' });
     expect(button).toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(button);
+    // Browsers submit a form from Enter in its only text field even with no usable submit button.
+    fireEvent.submit(button.closest('form')!);
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });

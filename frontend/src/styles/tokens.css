@@ -4,7 +4,12 @@
  *
  * PLACEHOLDER VALUES. The names are the contract; the values are neutral stand-ins
  * until the design brief arrives, when only this file should need to change.
- * src/styles/tokens.test.ts checks every rarity and mana colour has a token.
+ * src/styles/tokens.test.ts checks every rarity and mana colour has a token, and that
+ * rarity colours (used for text) are readable on the background.
+ *
+ * The names follow Tailwind v4's theme namespaces (--color-*, --spacing-*, --text-*,
+ * --leading-*, --font-*, --font-weight-*, --radius-*, --shadow-*), so when Tailwind arrives
+ * this can become its @theme block and every token gets utilities (e.g. text-rarity-mythic).
  */
 :root {
   /* Colour: surfaces and text */
@@ -27,44 +32,44 @@
   --color-skeleton: #e0e0e0;
 
   /* Colour: card rarities (set symbols, rarity badges) */
-  --rarity-common: #1a1a1a;
-  --rarity-uncommon: #707883;
-  --rarity-rare: #a58e4a;
-  --rarity-mythic: #bf4427;
-  --rarity-special: #652978;
-  --rarity-bonus: #652978;
+  --color-rarity-common: #1a1a1a;
+  --color-rarity-uncommon: #5f6670;
+  --color-rarity-rare: #7a6420;
+  --color-rarity-mythic: #bf4427;
+  --color-rarity-special: #652978;
+  --color-rarity-bonus: #652978;
 
   /* Colour: mana (W U B R G C), for symbols and colour breakdowns; M is multicolour */
-  --mana-w: #f8f6d8;
-  --mana-u: #c1d7e9;
-  --mana-b: #bab1ab;
-  --mana-r: #e49977;
-  --mana-g: #a3c095;
-  --mana-c: #ccc2c0;
-  --mana-m: #e0c96b;
+  --color-mana-w: #f8f6d8;
+  --color-mana-u: #c1d7e9;
+  --color-mana-b: #bab1ab;
+  --color-mana-r: #e49977;
+  --color-mana-g: #a3c095;
+  --color-mana-c: #ccc2c0;
+  --color-mana-m: #e0c96b;
 
   /* Spacing: a 4px-based scale */
-  --space-0: 0;
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.5rem;
-  --space-6: 2rem;
-  --space-7: 3rem;
+  --spacing-0: 0;
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.5rem;
+  --spacing-6: 2rem;
+  --spacing-7: 3rem;
 
   /* Type */
   --font-body: system-ui, sans-serif;
   --font-mono: ui-monospace, monospace;
-  --font-size-sm: 0.875rem;
-  --font-size-md: 1rem;
-  --font-size-lg: 1.25rem;
-  --font-size-xl: 1.5rem;
-  --font-size-2xl: 2rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
   --font-weight-normal: 400;
   --font-weight-bold: 700;
-  --line-height-tight: 1.2;
-  --line-height-body: 1.4;
+  --leading-tight: 1.2;
+  --leading-body: 1.4;
 
   /* Radius */
   --radius-sm: 2px;

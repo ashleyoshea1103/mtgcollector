@@ -11,7 +11,8 @@ export interface ButtonProps extends SharedProps {
   /**
    * Work started by this button is under way. The button ignores presses and tells screen
    * readers it's busy, but stays focusable so focus isn't lost. Show the progress in the
-   * label too, e.g. "Adding…".
+   * label too, e.g. "Adding…". A busy submit button doesn't stop Enter in a form's only
+   * text field from submitting the form (browsers allow it), so check in onSubmit too.
    */
   busy?: boolean;
   className?: string;
@@ -41,7 +42,17 @@ export interface IconButtonProps extends Omit<ButtonProps, 'children'> {
 export function IconButton({ label, icon, variant = 'ghost', busy = false, className, type = 'button', ...rest }: IconButtonProps) {
   return (
     <Tooltip content={label}>
-      <AriaButton {...rest} type={type} aria-label={label} isPending={busy} className={classes('icon-button', variant, busy, className)}>
+      <AriaButton
+        {...rest}
+        type={type}
+        aria-label={label}
+        // The tooltip repeats the label, so it mustn't also describe the button (React Aria
+        // links them while it's open), or screen readers read the label twice. An empty value
+        // here wins over the tooltip's; a description the caller passes is kept.
+        aria-describedby={rest['aria-describedby'] ?? ''}
+        isPending={busy}
+        className={classes('icon-button', variant, busy, className)}
+      >
         <span aria-hidden>{icon}</span>
       </AriaButton>
     </Tooltip>

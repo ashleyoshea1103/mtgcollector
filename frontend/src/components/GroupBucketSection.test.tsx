@@ -111,7 +111,8 @@ describe('GroupBucketSection', () => {
   });
 
   it('stays where it was when the parent stops controlling it', () => {
-    const { rerender } = render(<GroupBucketSection {...red} open={false} />);
+    const { rerender } = render(<GroupBucketSection {...red} open />);
+    rerender(<GroupBucketSection {...red} open={false} />);
     rerender(<GroupBucketSection {...red} />);
     expect(toggle('Red')).toHaveAttribute('aria-expanded', 'false');
   });

@@ -1,6 +1,6 @@
 import type { CSSProperties, ElementType, ReactNode } from 'react';
 
-/** A step on the spacing scale in src/styles/tokens.css (--space-0 … --space-7). */
+/** A step on the spacing scale in src/styles/tokens.css (--spacing-0 … --spacing-7). */
 export type Space = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 interface LayoutProps {
@@ -11,7 +11,7 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-const space = (step: Space) => `var(--space-${step})`;
+const space = (step: Space) => `var(--spacing-${step})`;
 const join = (...names: (string | undefined)[]) => names.filter(Boolean).join(' ');
 
 /** Children one above the other, evenly spaced. */

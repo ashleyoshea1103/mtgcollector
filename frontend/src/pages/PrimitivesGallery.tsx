@@ -59,14 +59,14 @@ export function PrimitivesGallery() {
     <>
       <Section name="Design tokens" note="Placeholder values until the design brief; the names are the contract (src/styles/tokens.css).">
         <h3>Rarity</h3>
-        <Cluster gap={4}>{Object.keys(RARITIES).map((r) => swatch(`--rarity-${r}`))}</Cluster>
+        <Cluster gap={4}>{Object.keys(RARITIES).map((r) => swatch(`--color-rarity-${r}`))}</Cluster>
         <h3>Mana</h3>
-        <Cluster gap={4}>{Object.keys(COLORS).map((c) => swatch(`--mana-${c.toLowerCase()}`))}</Cluster>
+        <Cluster gap={4}>{Object.keys(COLORS).map((c) => swatch(`--color-mana-${c.toLowerCase()}`))}</Cluster>
         <h3>Spacing</h3>
         <Stack gap={1}>
           {[1, 2, 3, 4, 5, 6, 7].map((n) => (
             <span key={n}>
-              <span className="gallery__space" style={{ width: `var(--space-${n})` }} /> <code>--space-{n}</code>
+              <span className="gallery__space" style={{ width: `var(--spacing-${n})` }} /> <code>--spacing-{n}</code>
             </span>
           ))}
         </Stack>

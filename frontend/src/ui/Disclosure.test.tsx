@@ -67,7 +67,14 @@ describe('Disclosure', () => {
   });
 
   it('stays where it was when the parent stops controlling it', () => {
+    // Starts open, is closed by the parent, then released: it must stay closed, not fall
+    // back to how it started.
     const { rerender } = render(
+      <Disclosure title="Details" open>
+        Body
+      </Disclosure>,
+    );
+    rerender(
       <Disclosure title="Details" open={false}>
         Body
       </Disclosure>,

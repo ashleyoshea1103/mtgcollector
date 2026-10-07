@@ -40,6 +40,8 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    // Enter in the quantity box submits the form even while the button is busy.
+    if (submitting) return;
     onSubmit({ card_id: card.id, quantity: parseQuantity(quantity), finish, condition, language, group_id: groupId });
   }
 

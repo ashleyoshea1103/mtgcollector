@@ -6,7 +6,7 @@ import './styles/tokens.css';
 import './ui/ui.css';
 import './index.css';
 import { Home } from './pages/Home';
-import { Toaster } from './ui';
+import { LazyToaster } from './ui/LazyToaster';
 
 const routes: RouteObject[] = [{ path: '/', element: <Home /> }];
 
@@ -23,6 +23,6 @@ if (import.meta.env.DEV) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <RouterProvider router={createBrowserRouter(routes)} />
-    <Toaster />
+    <LazyToaster />
   </StrictMode>,
 );
