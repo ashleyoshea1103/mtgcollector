@@ -94,7 +94,7 @@ func dropStaleSchemas(t testing.TB, admin *pgx.Conn) {
 	cutoff := time.Now().Add(-staleAfter).Unix()
 	rows, err := admin.Query(t.Context(),
 		`SELECT nspname FROM pg_namespace
-		  WHERE nspname ~ '^test_[0-9]+_[0-9a-f]+$'
+		  WHERE nspname ~ '^test_[0-9]{1,18}_[0-9a-f]+$' -- at most 18 digits, so the cast below can't overflow
 		    AND split_part(nspname, '_', 2)::bigint < $1`, cutoff)
 	if err != nil {
 		t.Fatalf("list stale test schemas: %v", err)

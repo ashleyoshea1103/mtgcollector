@@ -82,12 +82,19 @@ stray_tests=$(git -c core.quotePath=false ls-files |
   grep -vE '^frontend/src/.*\.test\.tsx?$' || true)
 [[ -z "$stray_tests" ]] || fail "test files that would never run (rename to src/**/*.test.ts or *.test.tsx):
 $stray_tests"
-# Go test files must be in backend/ (the only Go module), and each must build either by default
-# or with the integration tag: one with a misspelled build tag would silently never run.
+# Every tracked Go test file must be one `go test` runs: in the backend module, with the
+# integration tag, on Linux, Windows or macOS. Catches misspelled build tags, files Go skips
+# (_x_test.go, testdata/), and nested modules. -e lists packages even when they don't build.
+module=$(go -C backend list -m)
+go_tests_run=$(
+  for goos in linux windows darwin; do
+    GOOS=$goos go -C backend list -e -tags=integration \
+      -f '{{$p := .ImportPath}}{{range .TestGoFiles}}{{$p}}/{{.}}{{"\n"}}{{end}}{{range .XTestGoFiles}}{{$p}}/{{.}}{{"\n"}}{{end}}' ./...
+  done | sed "s|^$module/|backend/|" | LC_ALL=C sort -u
+)
 stray_go_tests=$(
-  git -c core.quotePath=false ls-files | grep -E '_test\.go$' | grep -v '^backend/' || true
-  go -C backend list -tags=integration -f '{{range .IgnoredGoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}' ./... |
-    grep '_test\.go$' || true
+  git -c core.quotePath=false ls-files | grep -E '_test\.go$' | LC_ALL=C sort |
+    LC_ALL=C comm -23 - <(printf '%s\n' "$go_tests_run") || true
 )
 [[ -z "$stray_go_tests" ]] || fail "Go test files that would never run (move them into backend/, or fix their //go:build line):
 $stray_go_tests"
