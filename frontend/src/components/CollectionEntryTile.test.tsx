@@ -12,7 +12,7 @@ describe('CardTile', () => {
     render(<CardTile card={lightningBolt} actions={<button type="button">Add</button>} />);
     const tile = screen.getByRole('article');
     expect(within(tile).getByRole('heading', { name: lightningBolt.name })).toBeInTheDocument();
-    expect(getByTooltip(tile, lightningBolt.set.name)).toHaveTextContent(lightningBolt.set.code.toUpperCase());
+    expect(getByTooltip(tile, lightningBolt.set.name).querySelector('img')).toHaveAttribute('src', lightningBolt.set.icon_svg_uri);
     // The set's name is shown, not only given as the symbol's title.
     expect(within(tile).getByText(lightningBolt.set.name)).toBeVisible();
     expect(tile).toHaveTextContent(`#${lightningBolt.collector_number}`);

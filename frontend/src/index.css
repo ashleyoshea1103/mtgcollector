@@ -176,32 +176,42 @@ img {
   flex: 1;
 }
 
+/* Card symbols are Scryfall's images, sized to the text around them (a mana cost or a line
+   of rules text), with their space held before they load. */
 .mana-symbol {
   text-decoration: none;
 }
-.mana-symbol::before {
+.mana-symbol__icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  max-width: none;
+  margin: 0 0.05em;
+  vertical-align: -0.125em;
+}
+/* A symbol Scryfall has no image for is shown as text, in braces, coloured from the tokens. */
+.mana-symbol--text::before {
   content: '{';
 }
-.mana-symbol::after {
+.mana-symbol--text::after {
   content: '}';
 }
-/* Coloured mana, from the tokens. */
-.mana-symbol--w {
+.mana-symbol--text.mana-symbol--w {
   background: var(--color-mana-w);
 }
-.mana-symbol--u {
+.mana-symbol--text.mana-symbol--u {
   background: var(--color-mana-u);
 }
-.mana-symbol--b {
+.mana-symbol--text.mana-symbol--b {
   background: var(--color-mana-b);
 }
-.mana-symbol--r {
+.mana-symbol--text.mana-symbol--r {
   background: var(--color-mana-r);
 }
-.mana-symbol--g {
+.mana-symbol--text.mana-symbol--g {
   background: var(--color-mana-g);
 }
-.mana-symbol--c {
+.mana-symbol--text.mana-symbol--c {
   background: var(--color-mana-c);
 }
 

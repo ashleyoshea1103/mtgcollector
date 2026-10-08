@@ -1,3 +1,6 @@
+import symbology from './symbology.json';
+import { isOnHost, SYMBOL_HOST } from './urls';
+
 const SYMBOL = /\{([^}]+)\}/g;
 
 /**
@@ -46,4 +49,31 @@ export function describeManaCost(cost: string): string {
   return parseManaCost(cost)
     .map((symbols) => symbols.map(describeManaSymbol).join(', '))
     .join(', then ');
+}
+
+const SYMBOL_IMAGES: Record<string, string> = symbology;
+
+/**
+ * Scryfall's image for a symbol ("G", "W/U", "T"), from src/lib/symbology.json, or null
+ * for one it hasn't got: show the symbol as text then.
+ */
+export function symbolImage(symbol: string): string | null {
+  const url = Object.hasOwn(SYMBOL_IMAGES, symbol) ? SYMBOL_IMAGES[symbol] : null;
+  return url !== null && isOnHost(url, SYMBOL_HOST) ? url : null;
+}
+
+/** A piece of rules text: plain text, or one symbol. */
+export type TextPart = { text: string } | { symbol: string };
+
+/** Splits rules text around its symbols: "{T}: Add {G}." → symbol T, text ": Add ", symbol G, text ".". */
+export function splitSymbols(text: string): TextPart[] {
+  const parts: TextPart[] = [];
+  let last = 0;
+  for (const m of text.matchAll(SYMBOL)) {
+    if (m.index > last) parts.push({ text: text.slice(last, m.index) });
+    parts.push({ symbol: m[1] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last) });
+  return parts;
 }

@@ -15,8 +15,10 @@ describe('AddToCollectionForm', () => {
   it('says exactly which printing is being added', () => {
     const { container } = render(<AddToCollectionForm card={ragavan} onSubmit={vi.fn<(entry: NewEntry) => void>()} />);
     const line = container.querySelector('.add-form__card')!;
-    expect(line).toHaveTextContent(`Adding ${ragavan.name} (MH2 ${ragavan.set.name} #${ragavan.collector_number})`);
+    // The set symbol (an image) sits before the name, after the "(".
+    expect(line).toHaveTextContent(`Adding ${ragavan.name} ( ${ragavan.set.name} #${ragavan.collector_number})`);
     expect(getByTooltip(line as HTMLElement, ragavan.set.name)).toHaveClass('set-symbol');
+    expect(line.querySelector('.set-symbol img')).toHaveAttribute('src', ragavan.set.icon_svg_uri);
   });
 
   it('submits one near-mint English copy by default', async () => {

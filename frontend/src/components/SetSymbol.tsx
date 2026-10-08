@@ -14,18 +14,21 @@ interface Props {
 }
 
 /**
- * The set's symbol and code; screen readers read the set's name instead, and hovering
- * shows it. The symbol is Scryfall's SVG, shown with <img> only (an <img> never runs
- * scripts inside an SVG). The rarity is a modifier class for the code's text; CSS can't
- * recolor an <img>, so coloring the symbol itself by rarity waits for the design (e.g. as
- * a CSS mask).
+ * The set's symbol (its code, as text, only when there's no symbol); screen readers read
+ * the set's name instead, and hovering shows it. The symbol is Scryfall's SVG, shown with
+ * <img> only (an <img> never runs scripts inside an SVG). The rarity is a modifier class for
+ * the code's text; CSS can't recolor an <img>, so coloring the symbol itself by rarity waits
+ * for the design (e.g. as a CSS mask).
  */
 export function SetSymbol({ set, rarity, nameShown = false }: Props) {
   const icon = set.icon_svg_uri !== null && isOnHost(set.icon_svg_uri, SET_ICON_HOST) ? set.icon_svg_uri : null;
   return (
     <TooltipText as="abbr" className={`set-symbol${rarity ? ` set-symbol--${rarity}` : ''}`} tooltip={set.name} announce={!nameShown}>
-      {icon && <img className="set-symbol__icon" src={icon} alt="" loading="lazy" referrerPolicy="no-referrer" />}
-      <span className="set-symbol__code">{set.code.toUpperCase()}</span>
+      {icon ? (
+        <img className="set-symbol__icon" src={icon} alt="" loading="lazy" referrerPolicy="no-referrer" />
+      ) : (
+        <span className="set-symbol__code">{set.code.toUpperCase()}</span>
+      )}
     </TooltipText>
   );
 }

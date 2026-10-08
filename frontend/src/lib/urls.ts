@@ -12,3 +12,4 @@ export function isOnHost(url: string, host: string): boolean {
 }
 
 export const SET_ICON_HOST = 'svgs.scryfall.io';
+export const SYMBOL_HOST = 'svgs.scryfall.io';

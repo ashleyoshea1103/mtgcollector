@@ -130,16 +130,29 @@ describe('ManaCost', () => {
     expect(screen.getByRole('img', { name: '2 generic, red' })).toBeInTheDocument();
   });
 
-  it('renders one symbol per pip, with a slash-free class, and separates split-card halves', () => {
+  it("shows each pip as Scryfall's image, named on hover, and separates split-card halves", () => {
     const { container } = render(<ManaCost cost="{W/U/P}{2} // {1}{U}" />);
     const symbols = [...container.querySelectorAll<HTMLElement>('.mana-symbol')];
-    expect(symbols.map((el) => [el.textContent, el.dataset.tooltip, el.className])).toEqual([
-      ['W/U/P', 'Phyrexian white or blue', 'mana-symbol mana-symbol--wup'],
-      ['2', '2 generic', 'mana-symbol mana-symbol--2'],
-      ['1', '1 generic', 'mana-symbol mana-symbol--1'],
-      ['U', 'blue', 'mana-symbol mana-symbol--u'],
+    const file = (el: HTMLElement) => el.querySelector('img')?.getAttribute('src')?.replace('https://svgs.scryfall.io/card-symbols/', '');
+    expect(symbols.map((el) => [file(el), el.textContent, el.dataset.tooltip, el.className])).toEqual([
+      ['WUP.svg', '', 'Phyrexian white or blue', 'mana-symbol mana-symbol--wup'],
+      ['2.svg', '', '2 generic', 'mana-symbol mana-symbol--2'],
+      ['1.svg', '', '1 generic', 'mana-symbol mana-symbol--1'],
+      ['U.svg', '', 'blue', 'mana-symbol mana-symbol--u'],
     ]);
+    // Decorative inside the cost, which is read as a whole.
+    for (const img of container.querySelectorAll('img')) expect(img).toHaveAttribute('alt', '');
     expect(container.querySelector('.mana-cost__separator')!.textContent).toBe(' // ');
+  });
+
+  it("shows a symbol Scryfall has no image for as text, in braces", () => {
+    const { container } = render(<ManaCost cost="{G}{NEW}" />);
+    const [known, unknown] = container.querySelectorAll<HTMLElement>('.mana-symbol');
+    expect(known.querySelector('img')).toHaveAttribute('src', 'https://svgs.scryfall.io/card-symbols/G.svg');
+    expect(unknown.querySelector('img')).toBeNull();
+    expect(unknown).toHaveTextContent(/^NEW$/);
+    expect(unknown).toHaveClass('mana-symbol--text');
+    expect(screen.getByRole('img', { name: 'green, NEW' })).toBeInTheDocument();
   });
 
   it('renders nothing for an empty cost', () => {
@@ -154,10 +167,11 @@ describe('RarityBadge and SetSymbol', () => {
     expect(getByTooltip(document.body, label)).toHaveTextContent(new RegExp(`^${rarity[0].toUpperCase()}$`));
   });
 
-  it('shows the set code in capitals, titled with the set name and classed by rarity', () => {
+  it('shows the set symbol instead of the code, with the set name on hover, classed by rarity', () => {
     render(<SetSymbol set={unpricedCard.set} rarity={unpricedCard.rarity} />);
     const symbol = getByTooltip(document.body, unpricedCard.set.name);
-    expect(symbol).toHaveTextContent(new RegExp(`^${unpricedCard.set.code.toUpperCase()}$`));
+    expect(symbol.querySelector('img')).toHaveAttribute('src', unpricedCard.set.icon_svg_uri);
+    expect(symbol).toHaveTextContent(/^$/);
     expect(symbol).toHaveClass(`set-symbol--${unpricedCard.rarity}`);
   });
 

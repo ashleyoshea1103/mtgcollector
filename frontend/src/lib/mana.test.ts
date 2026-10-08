@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { describeManaCost, describeManaSymbol, parseManaCost } from './mana';
+import symbology from './symbology.json';
+import { describeManaCost, describeManaSymbol, parseManaCost, splitSymbols, symbolImage } from './mana';
 
 describe('parseManaCost', () => {
   it('splits a cost into symbols', () => {
@@ -58,5 +59,44 @@ describe('describeManaSymbol', () => {
 
   it("doesn't treat inherited object keys as symbol names", () => {
     expect(describeManaSymbol('constructor')).toBe('constructor');
+  });
+});
+
+describe('symbolImage', () => {
+  it.each([
+    ['G', 'G.svg'],
+    ['W/U', 'WU.svg'],
+    ['2/W', '2W.svg'],
+    ['W/U/P', 'WUP.svg'],
+    ['T', 'T.svg'],
+    ['10', '10.svg'],
+    ['½', 'HALF.svg'],
+  ])('finds Scryfall’s image for {%s}', (symbol, file) => {
+    expect(symbolImage(symbol)).toBe(`https://svgs.scryfall.io/card-symbols/${file}`);
+  });
+
+  it.each(['NOPE', 'constructor', '__proto__', ''])('has none for {%s}, so it shows as text', (symbol) => {
+    expect(symbolImage(symbol)).toBeNull();
+  });
+
+  it('only gives images on Scryfall’s symbol host, with plain paths', () => {
+    const urls = Object.values(symbology);
+    expect(urls.length).toBeGreaterThan(50);
+    for (const url of urls) expect(url).toMatch(/^https:\/\/svgs\.scryfall\.io\/card-symbols\/[A-Za-z0-9]+\.svg$/);
+  });
+});
+
+describe('splitSymbols', () => {
+  it('splits rules text around its symbols', () => {
+    expect(splitSymbols('{T}: Add {G}.')).toEqual([{ symbol: 'T' }, { text: ': Add ' }, { symbol: 'G' }, { text: '.' }]);
+  });
+
+  it('keeps text with no symbols whole, line breaks included', () => {
+    expect(splitSymbols('Tap target permanent.\nDraw a card.')).toEqual([{ text: 'Tap target permanent.\nDraw a card.' }]);
+  });
+
+  it('handles adjacent symbols and an empty string', () => {
+    expect(splitSymbols('Dash {1}{R}')).toEqual([{ text: 'Dash ' }, { symbol: '1' }, { symbol: 'R' }]);
+    expect(splitSymbols('')).toEqual([]);
   });
 });

@@ -21,7 +21,7 @@ describe('GroupBucketSection', () => {
     const { container } = render(<GroupBucketSection {...setGroup} />);
     const set = setGroup.group.set!;
     expect(toggle(set.name)).toBeInTheDocument();
-    expect(getByTooltip(toggle(set.name), set.name)).toHaveTextContent(set.code.toUpperCase());
+    expect(getByTooltip(toggle(set.name), set.name).querySelector('img')).toHaveAttribute('src', set.icon_svg_uri);
     expect(container.querySelector('.group-bucket__toggle img')).toHaveAttribute('src', set.icon_svg_uri);
   });
 

@@ -3,6 +3,7 @@ import type { Card, CardFace, CollectionEntry, Finish } from '../types';
 import { DataTable, type Column } from '../ui';
 import { CardImage } from './CardImage';
 import { ManaCost } from './ManaCost';
+import { OracleText } from './OracleText';
 import { Price } from './Price';
 import { RarityBadge } from './RarityBadge';
 import { SetSymbol } from './SetSymbol';
@@ -52,7 +53,7 @@ export function CardDetail({ card, entries = [] }: Props) {
               {face.name} <ManaCost cost={face.mana_cost} />
             </h3>
             <p className="card-detail__type">{face.type_line}</p>
-            {face.oracle_text && <p className="card-detail__oracle">{face.oracle_text}</p>}
+            {face.oracle_text && <OracleText className="card-detail__oracle" text={face.oracle_text} />}
           </section>
         ))}
 
