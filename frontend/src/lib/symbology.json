@@ -91,14 +91,6 @@
     "svg": "https://svgs.scryfall.io/card-symbols/1000000.svg",
     "english": "one million generic mana"
   },
-  "∞": {
-    "svg": "https://svgs.scryfall.io/card-symbols/INFINITY.svg",
-    "english": "infinite generic mana"
-  },
-  "½": {
-    "svg": "https://svgs.scryfall.io/card-symbols/HALF.svg",
-    "english": "one-half generic mana"
-  },
   "2/B": {
     "svg": "https://svgs.scryfall.io/card-symbols/2B.svg",
     "english": "two generic mana or one black mana"
@@ -334,5 +326,13 @@
   "Z": {
     "svg": "https://svgs.scryfall.io/card-symbols/Z.svg",
     "english": "Z generic mana"
+  },
+  "½": {
+    "svg": "https://svgs.scryfall.io/card-symbols/HALF.svg",
+    "english": "one-half generic mana"
+  },
+  "∞": {
+    "svg": "https://svgs.scryfall.io/card-symbols/INFINITY.svg",
+    "english": "infinite generic mana"
   }
 }

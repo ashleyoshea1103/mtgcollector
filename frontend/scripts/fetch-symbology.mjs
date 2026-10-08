@@ -29,6 +29,7 @@ for (const s of data) {
 }
 if (Object.keys(symbols).length < 50) throw new Error(`symbology: only ${Object.keys(symbols).length} symbols`);
 
-const sorted = Object.fromEntries(Object.entries(symbols).sort(([a], [b]) => a.localeCompare(b)));
+// Code-point order, not the machine's locale, so the file is the same wherever it's made.
+const sorted = Object.fromEntries(Object.entries(symbols).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
 await writeFile(new URL('../src/lib/symbology.json', import.meta.url), JSON.stringify(sorted, null, 2) + '\n');
 console.log(`${Object.keys(sorted).length} symbols`);

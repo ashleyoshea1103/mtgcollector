@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { symbolImage, symbolWords } from '../lib/mana';
 import { TooltipText } from '../ui';
 
@@ -16,19 +17,22 @@ const symbolClass = (symbol: string) => symbol.toLowerCase().replace(/[^a-z0-9]/
 
 /**
  * One card symbol as Scryfall's image ({G} as a green mana pip), named in words on hover and
- * to screen readers. A symbol Scryfall has no image for is shown as text, e.g. {G}.
+ * to screen readers. A symbol Scryfall has no image for, or whose image fails to load, is
+ * shown as text instead, e.g. {G}.
  */
 export function ManaSymbol({ symbol, announce = true }: Props) {
   const src = symbolImage(symbol);
+  // The image that failed, if any: a different symbol (a new src) gets its own try.
+  const [failed, setFailed] = useState<string | null>(null);
+  const image = src !== null && src !== failed ? src : null;
   return (
     <TooltipText
       as="abbr"
-      className={`mana-symbol mana-symbol--${symbolClass(symbol)}${src ? '' : ' mana-symbol--text'}`}
+      className={`mana-symbol mana-symbol--${symbolClass(symbol)}${image ? '' : ' mana-symbol--text'}`}
       tooltip={symbolWords(symbol)}
       announce={announce}
     >
-      {/* The symbol in braces as alt text is what shows if the image fails; screen readers get the words. */}
-      {src ? <img className="mana-symbol__icon" src={src} alt={`{${symbol}}`} referrerPolicy="no-referrer" /> : symbol}
+      {image ? <img className="mana-symbol__icon" src={image} alt="" referrerPolicy="no-referrer" onError={() => setFailed(image)} /> : symbol}
     </TooltipText>
   );
 }

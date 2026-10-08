@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { CONDITIONS, FINISHES, labelFor, LANGUAGES } from '../lib/labels';
 import type { Card, CardFace, CollectionEntry, Finish } from '../types';
 import { DataTable, type Column } from '../ui';
@@ -30,7 +31,7 @@ export function CardDetail({ card, entries = [] }: Props) {
 
   return (
     <article className="card-detail">
-      <div className="card-detail__images">
+      <div className="card-detail__images" style={{ '--faces': faceImages > 1 ? card.faces!.length : 1 } as CSSProperties}>
         {faceImages > 1 ? (
           card.faces!.map((_, i) => <CardImage key={i} card={card} face={i} size="large" />)
         ) : (

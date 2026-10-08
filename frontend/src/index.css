@@ -57,16 +57,29 @@ img {
   white-space: nowrap;
   text-decoration: none;
 }
-/* Never squeezed to nothing in a narrow flex row (img { max-width: 100% } would allow it),
-   and holds its space before the lazy image arrives. */
+/* The symbol is Scryfall's SVG as a mask over the text colour, which the rarity sets (below),
+   in a fixed box so it holds its space before it loads and never squeezes to nothing. */
 .set-symbol__icon {
-  width: auto;
-  min-width: 1em;
-  max-width: none;
+  display: inline-block;
   flex-shrink: 0;
+  width: 1.4em;
   height: 1em;
   margin-right: 0.2em;
-  vertical-align: -0.125em;
+  vertical-align: -0.15em;
+  background-color: currentColor;
+  mask: var(--set-icon, none) center / contain no-repeat;
+}
+/* Only there to report a failed load (see SetSymbol). */
+.set-symbol__probe {
+  display: none;
+}
+/* Forced colours (e.g. Windows High Contrast) would repaint the fill as the background,
+   hiding the symbol: draw it in the text colour instead. */
+@media (forced-colors: active) {
+  .set-symbol__icon {
+    forced-color-adjust: none;
+    background-color: CanvasText;
+  }
 }
 
 /* Rarity colours, from the tokens. */
@@ -141,15 +154,17 @@ img {
   align-items: flex-start;
   gap: var(--spacing-4);
 }
+/* The images get a set width: room for each face at full size (--faces, from CardDetail), or
+   the whole row on narrow screens. Shared out between the faces, each image then has its
+   size before it loads; sized by its content instead, an unloaded image would be 0 wide. */
 .card-detail__images {
   display: flex;
   align-items: flex-start;
   gap: var(--spacing-2);
+  width: min(100%, calc(var(--faces, 1) * 336px + (var(--faces, 1) - 1) * var(--spacing-2)));
 }
-/* A set width to start from, so the image has its size before it loads (width: 100% of a
-   container sized by its content resolves to nothing), shrinking on narrow screens. */
 .card-detail__images > .card-image {
-  flex: 0 1 336px;
+  flex: 1 1 0;
   min-width: 0;
 }
 .card-detail__oracle {

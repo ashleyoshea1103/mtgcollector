@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, customGroups, stats, unpricedCard } from '../fixtures';
@@ -140,11 +140,20 @@ describe('ManaCost', () => {
       ['1.svg', '', 'one generic mana', 'mana-symbol mana-symbol--1'],
       ['U.svg', '', 'one blue mana', 'mana-symbol mana-symbol--u'],
     ]);
-    // If an image fails, its alt text shows the symbol in braces. Screen readers skip the
-    // images and read the cost as a whole.
-    expect([...container.querySelectorAll('img')].map((img) => img.getAttribute('alt'))).toEqual(['{W/U/P}', '{2}', '{1}', '{U}']);
+    // Screen readers skip the images and read the cost as a whole.
+    for (const img of container.querySelectorAll('img')) expect(img).toHaveAttribute('alt', '');
     for (const symbol of symbols) expect(symbol).toHaveAttribute('aria-hidden', 'true');
     expect(container.querySelector('.mana-cost__separator')!.textContent).toBe(' // ');
+  });
+
+  it('shows a symbol whose image fails to load as text instead', () => {
+    const { container } = render(<ManaCost cost="{G}{U}" />);
+    fireEvent.error(container.querySelector('img')!);
+    const [green, blue] = container.querySelectorAll<HTMLElement>('.mana-symbol');
+    expect(green.querySelector('img')).toBeNull();
+    expect(green).toHaveTextContent(/^G$/);
+    expect(green).toHaveClass('mana-symbol--text');
+    expect(blue.querySelector('img')).not.toBeNull(); // only the one that failed
   });
 
   it("shows a symbol Scryfall has no image for as text, in braces", () => {
@@ -182,14 +191,25 @@ describe('RarityBadge and SetSymbol', () => {
     expect(getByTooltip(document.body, cards.ragavan.set.name)).toHaveAttribute('class', 'set-symbol');
   });
 
-  it("shows the set's symbol, with the code as the visible fallback", () => {
-    const { container } = render(<SetSymbol set={cards.ragavan.set} rarity={cards.ragavan.rarity} />);
-    const icon = container.querySelector('img');
-    expect(icon).toHaveAttribute('src', cards.ragavan.set.icon_svg_uri);
-    // If the image fails, its alt text shows the code; screen readers read the set name
-    // instead and skip the image.
-    expect(icon).toHaveAttribute('alt', 'MH2');
+  it("draws the set's symbol in the rarity's colour, as a mask of Scryfall's SVG", () => {
+    const { container } = render(<SetSymbol set={cards.ragavan.set} rarity="mythic" />);
+    const icon = container.querySelector<HTMLElement>('.set-symbol__icon')!;
+    expect(icon.style.getPropertyValue('--set-icon')).toBe(`url("${cards.ragavan.set.icon_svg_uri}")`);
+    // The colour comes from the rarity class on the symbol (CSS: currentColor).
+    expect(icon.closest('.set-symbol')).toHaveClass('set-symbol--mythic');
+    expect(container.querySelector('.set-symbol__code')).toBeNull();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('shows the code instead when the symbol fails to load', () => {
+    const { container } = render(<SetSymbol set={cards.ragavan.set} rarity="mythic" />);
+    // A hidden probe image of the same URL reports the failure the mask can't.
+    const probe = container.querySelector('img.set-symbol__probe')!;
+    expect(probe).toHaveAttribute('src', cards.ragavan.set.icon_svg_uri);
+    expect(probe).toHaveAttribute('crossorigin', 'anonymous'); // fetched as the mask is, so once
+    fireEvent.error(probe);
+    expect(container.querySelector('.set-symbol__icon')).toBeNull();
+    expect(container.querySelector('.set-symbol__code')).toHaveTextContent(/^MH2$/);
   });
 
   it("doesn't tell Scryfall which page loaded the symbol", () => {

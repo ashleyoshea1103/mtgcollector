@@ -1,7 +1,8 @@
 import symbology from './symbology.json';
 import { isOnHost, SCRYFALL_SVG_HOST } from './urls';
 
-const SYMBOL = /\{([^}]+)\}/g;
+// One symbol: braces around anything but braces, so stray braces stay text.
+const SYMBOL = /\{([^{}]+)\}/g;
 
 /**
  * Splits a Scryfall mana cost into symbols, one array per half of a split card.
@@ -26,19 +27,23 @@ const SYMBOL_NAMES: Record<string, string> = {
   T: 'tap',
   Q: 'untap',
   E: 'energy',
-  P: 'Phyrexian',
-  H: 'half',
 };
 
-/** One symbol in words: "2" → "2 generic", "W/U" → "white or blue", "B/P" → "Phyrexian black". */
+/**
+ * One symbol in words, short for reading whole costs: "2" → "2 generic", "W/U" → "white or
+ * blue", "B/P" → "Phyrexian black". A symbol this doesn't know the parts of ({HW}, {P}) uses
+ * Scryfall's words for it, or its letters if Scryfall hasn't got it either.
+ */
 export function describeManaSymbol(symbol: string): string {
   if (/^\d+$/.test(symbol)) return `${symbol} generic`;
   const parts = symbol.split('/');
+  // A trailing P is the Phyrexian half of a symbol like B/P (a lone {P} is something else).
   const phyrexian = parts.at(-1) === 'P' && parts.length > 1;
-  const words = (phyrexian ? parts.slice(0, -1) : parts).map((p) =>
-    Object.hasOwn(SYMBOL_NAMES, p) ? SYMBOL_NAMES[p] : /^\d+$/.test(p) ? `${p} generic` : p,
+  const named = (phyrexian ? parts.slice(0, -1) : parts).map((p) =>
+    Object.hasOwn(SYMBOL_NAMES, p) ? SYMBOL_NAMES[p] : /^\d+$/.test(p) ? `${p} generic` : null,
   );
-  return `${phyrexian ? 'Phyrexian ' : ''}${words.join(' or ')}`;
+  if (named.includes(null)) return known(symbol)?.english ?? symbol;
+  return `${phyrexian ? 'Phyrexian ' : ''}${named.join(' or ')}`;
 }
 
 /**

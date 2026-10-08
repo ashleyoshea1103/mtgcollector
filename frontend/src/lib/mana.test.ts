@@ -38,8 +38,14 @@ describe('describeManaCost', () => {
     expect(describeManaCost('{1}{R} // {1}{U}')).toBe('1 generic, red, then 1 generic, blue');
   });
 
-  it('passes unknown symbols through', () => {
-    expect(describeManaCost('{½}{∞}')).toBe('½, ∞');
+  it("uses Scryfall's words for symbols it can't build from parts", () => {
+    expect(describeManaCost('{½}{∞}')).toBe('one-half generic mana, infinite generic mana');
+    // {HW} (half a white) and a lone {P} (Bloomburrow's pawprint) aren't H/W or Phyrexian.
+    expect(describeManaCost('{HW}{P}')).toBe('one-half white mana, modal budget pawprint');
+  });
+
+  it("passes symbols nobody knows through as their letters", () => {
+    expect(describeManaCost('{NEW}{2/NEW}')).toBe('NEW, 2/NEW');
   });
 });
 
@@ -96,7 +102,8 @@ describe('symbolWords', () => {
   });
 
   it('falls back to the short form for a symbol Scryfall hasn’t got', () => {
-    expect(symbolWords('2/NEW')).toBe('2 generic or NEW');
+    expect(symbolWords('2/NEW')).toBe('2/NEW');
+    expect(symbolWords('B/P')).toBe('one black mana or two life');
     expect(symbolWords('constructor')).toBe('constructor');
   });
 });
@@ -108,6 +115,11 @@ describe('splitSymbols', () => {
 
   it('keeps text with no symbols whole, line breaks included', () => {
     expect(splitSymbols('Tap target permanent.\nDraw a card.')).toEqual([{ text: 'Tap target permanent.\nDraw a card.' }]);
+  });
+
+  it('leaves stray braces as text', () => {
+    expect(splitSymbols('{{G}}')).toEqual([{ text: '{' }, { symbol: 'G' }, { text: '}' }]);
+    expect(splitSymbols('a {} b {G')).toEqual([{ text: 'a {} b {G' }]);
   });
 
   it('handles adjacent symbols and an empty string', () => {
