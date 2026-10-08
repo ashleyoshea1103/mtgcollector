@@ -9,6 +9,19 @@ const { delver, fireIce, lightningBolt, propaganda, ragavan } = cards;
 const priceRow = (finish: string) => cellsByColumn(within(screen.getByRole('table')).getByRole('rowheader', { name: finish }).closest('tr')!);
 
 describe('CardDetail', () => {
+  // The image row is sized from the number of faces, so images have their size before they
+  // load (the CSS reads --faces).
+  it.each([
+    ['a transforming card', delver, '2'],
+    ['a single-faced card', lightningBolt, '1'],
+    ['a split card, which has one image', fireIce, '1'],
+  ])('sizes the image row for %s', (_, card, faces) => {
+    const { container } = render(<CardDetail card={card} />);
+    const row = container.querySelector<HTMLElement>('.card-detail__images')!;
+    expect(row.style.getPropertyValue('--faces')).toBe(faces);
+    expect(row.querySelectorAll('.card-image')).toHaveLength(Number(faces));
+  });
+
   it('names the printing: set, number, rarity and release date', () => {
     render(<CardDetail card={ragavan} />);
     const printing = screen.getByRole('heading', { level: 2, name: ragavan.name }).nextElementSibling!;
