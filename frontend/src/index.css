@@ -133,14 +133,24 @@ img {
   font-size: var(--text-lg);
 }
 
+/* Top-aligned, not stretched: a stretched image would take the height of a taller info
+   column and lose the card's proportions. */
 .card-detail {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: var(--spacing-4);
 }
 .card-detail__images {
   display: flex;
+  align-items: flex-start;
   gap: var(--spacing-2);
+}
+/* A set width to start from, so the image has its size before it loads (width: 100% of a
+   container sized by its content resolves to nothing), shrinking on narrow screens. */
+.card-detail__images > .card-image {
+  flex: 0 1 336px;
+  min-width: 0;
 }
 .card-detail__oracle {
   white-space: pre-line;
