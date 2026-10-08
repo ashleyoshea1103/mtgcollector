@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import symbology from './symbology.json';
-import { describeManaCost, describeManaSymbol, parseManaCost, splitSymbols, symbolImage } from './mana';
+import { describeManaCost, describeManaSymbol, parseManaCost, splitSymbols, symbolImage, symbolWords } from './mana';
 
 describe('parseManaCost', () => {
   it('splits a cost into symbols', () => {
@@ -80,9 +80,24 @@ describe('symbolImage', () => {
   });
 
   it('only gives images on Scryfall’s symbol host, with plain paths', () => {
-    const urls = Object.values(symbology);
+    const urls = Object.values(symbology).map((s) => s.svg);
     expect(urls.length).toBeGreaterThan(50);
     for (const url of urls) expect(url).toMatch(/^https:\/\/svgs\.scryfall\.io\/card-symbols\/[A-Za-z0-9]+\.svg$/);
+  });
+});
+
+describe('symbolWords', () => {
+  it.each([
+    ['G', 'one green mana'],
+    ['T', 'tap this permanent'],
+    ['2', 'two generic mana'],
+  ])('reads {%s} as Scryfall writes it: "%s"', (symbol, words) => {
+    expect(symbolWords(symbol)).toBe(words);
+  });
+
+  it('falls back to the short form for a symbol Scryfall hasn’t got', () => {
+    expect(symbolWords('2/NEW')).toBe('2 generic or NEW');
+    expect(symbolWords('constructor')).toBe('constructor');
   });
 });
 

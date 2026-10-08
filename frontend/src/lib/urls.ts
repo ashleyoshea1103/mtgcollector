@@ -11,5 +11,5 @@ export function isOnHost(url: string, host: string): boolean {
   return url.startsWith(prefix) && SAFE_REST.test(url.slice(prefix.length));
 }
 
-export const SET_ICON_HOST = 'svgs.scryfall.io';
-export const SYMBOL_HOST = 'svgs.scryfall.io';
+/** Where Scryfall serves its SVGs: set symbols and card symbols. */
+export const SCRYFALL_SVG_HOST = 'svgs.scryfall.io';

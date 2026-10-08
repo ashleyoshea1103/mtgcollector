@@ -1,11 +1,11 @@
-import { describeManaSymbol, symbolImage } from '../lib/mana';
+import { symbolImage, symbolWords } from '../lib/mana';
 import { TooltipText } from '../ui';
 
 interface Props {
   /** The symbol without braces, e.g. "G", "W/U", "T". */
   symbol: string;
   /**
-   * Whether screen readers read it ("green", "tap"): yes in rules text; no inside a ManaCost,
+   * Whether screen readers read it ("one green mana"): yes in rules text; no inside a ManaCost,
    * which reads the whole cost at once.
    */
   announce?: boolean;
@@ -24,10 +24,11 @@ export function ManaSymbol({ symbol, announce = true }: Props) {
     <TooltipText
       as="abbr"
       className={`mana-symbol mana-symbol--${symbolClass(symbol)}${src ? '' : ' mana-symbol--text'}`}
-      tooltip={describeManaSymbol(symbol)}
+      tooltip={symbolWords(symbol)}
       announce={announce}
     >
-      {src ? <img className="mana-symbol__icon" src={src} alt="" referrerPolicy="no-referrer" /> : symbol}
+      {/* The symbol in braces as alt text is what shows if the image fails; screen readers get the words. */}
+      {src ? <img className="mana-symbol__icon" src={src} alt={`{${symbol}}`} referrerPolicy="no-referrer" /> : symbol}
     </TooltipText>
   );
 }

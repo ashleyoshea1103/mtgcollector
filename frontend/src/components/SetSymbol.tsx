@@ -1,4 +1,4 @@
-import { isOnHost, SET_ICON_HOST } from '../lib/urls';
+import { isOnHost, SCRYFALL_SVG_HOST } from '../lib/urls';
 import type { CardSet, Rarity } from '../types';
 import { TooltipText } from '../ui';
 
@@ -21,11 +21,13 @@ interface Props {
  * for the design (e.g. as a CSS mask).
  */
 export function SetSymbol({ set, rarity, nameShown = false }: Props) {
-  const icon = set.icon_svg_uri !== null && isOnHost(set.icon_svg_uri, SET_ICON_HOST) ? set.icon_svg_uri : null;
+  const icon = set.icon_svg_uri !== null && isOnHost(set.icon_svg_uri, SCRYFALL_SVG_HOST) ? set.icon_svg_uri : null;
   return (
     <TooltipText as="abbr" className={`set-symbol${rarity ? ` set-symbol--${rarity}` : ''}`} tooltip={set.name} announce={!nameShown}>
       {icon ? (
-        <img className="set-symbol__icon" src={icon} alt="" loading="lazy" referrerPolicy="no-referrer" />
+        // The code as alt text is what shows if the image fails; screen readers read the set
+        // name instead (the whole symbol is hidden from them).
+        <img className="set-symbol__icon" src={icon} alt={set.code.toUpperCase()} loading="lazy" referrerPolicy="no-referrer" />
       ) : (
         <span className="set-symbol__code">{set.code.toUpperCase()}</span>
       )}

@@ -1,5 +1,5 @@
 import symbology from './symbology.json';
-import { isOnHost, SYMBOL_HOST } from './urls';
+import { isOnHost, SCRYFALL_SVG_HOST } from './urls';
 
 const SYMBOL = /\{([^}]+)\}/g;
 
@@ -51,15 +51,25 @@ export function describeManaCost(cost: string): string {
     .join(', then ');
 }
 
-const SYMBOL_IMAGES: Record<string, string> = symbology;
+/** Scryfall's symbols (src/lib/symbology.json): each one's image and its name in words. */
+const SYMBOLS: Record<string, { svg: string; english: string }> = symbology;
+const known = (symbol: string) => (Object.hasOwn(SYMBOLS, symbol) ? SYMBOLS[symbol] : null);
 
 /**
- * Scryfall's image for a symbol ("G", "W/U", "T"), from src/lib/symbology.json, or null
- * for one it hasn't got: show the symbol as text then.
+ * Scryfall's image for a symbol ("G", "W/U", "T"), or null for one it hasn't got: show the
+ * symbol as text then.
  */
 export function symbolImage(symbol: string): string | null {
-  const url = Object.hasOwn(SYMBOL_IMAGES, symbol) ? SYMBOL_IMAGES[symbol] : null;
-  return url !== null && isOnHost(url, SYMBOL_HOST) ? url : null;
+  const url = known(symbol)?.svg;
+  return url !== undefined && isOnHost(url, SCRYFALL_SVG_HOST) ? url : null;
+}
+
+/**
+ * A symbol in words, as Scryfall writes it ("one green mana", "tap this permanent"), for
+ * hearing or hovering one symbol on its own; describeManaSymbol's shorter form otherwise.
+ */
+export function symbolWords(symbol: string): string {
+  return known(symbol)?.english ?? describeManaSymbol(symbol);
 }
 
 /** A piece of rules text: plain text, or one symbol. */

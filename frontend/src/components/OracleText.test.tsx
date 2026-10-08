@@ -15,8 +15,8 @@ describe('OracleText', () => {
       'https://svgs.scryfall.io/card-symbols/G.svg',
     ]);
     // Screen readers hear the words in place of the images.
-    expect(p).toHaveTextContent(/^tap: Add green\.$/);
-    expect(getByTooltip(p, 'tap')).toHaveAttribute('aria-hidden', 'true');
+    expect(p).toHaveTextContent(/^tap this permanent: Add one green mana\.$/);
+    expect(getByTooltip(p, 'tap this permanent')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('keeps text without symbols as it is, line breaks included', () => {
@@ -45,6 +45,6 @@ describe('ManaSymbol', () => {
 
   it('can be left to a parent to announce', () => {
     render(<ManaSymbol symbol="G" announce={false} />);
-    expect(screen.queryByText('green')).not.toBeInTheDocument();
+    expect(screen.queryByText('one green mana')).not.toBeInTheDocument();
   });
 });

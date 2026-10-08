@@ -21,7 +21,7 @@ describe('CollectionEntryTable', () => {
     expect(cells.Qty).toHaveTextContent(new RegExp(`^${entry.quantity}$`));
     expect(cells.Type).toHaveTextContent(entry.card.type_line);
     expect(cells.Set).toHaveTextContent(`${entry.card.set.name} #${entry.card.collector_number}`);
-    expect(cells.Set).not.toHaveTextContent(entry.card.set.code.toUpperCase()); // the symbol stands in for the code
+    expect(cells.Set.querySelector('.set-symbol__code')).toBeNull(); // the symbol stands in for the code
     expect(cells.Set.querySelector('.set-symbol img')).toHaveAttribute('src', entry.card.set.icon_svg_uri);
     expect(getByTooltip(cells.Condition, CONDITIONS[entry.condition])).toHaveTextContent(entry.condition);
     expect(cells.Finish).toHaveTextContent(new RegExp(`^${FINISHES[entry.finish]}$`));

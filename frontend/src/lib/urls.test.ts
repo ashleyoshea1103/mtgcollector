@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isOnHost, SET_ICON_HOST } from './urls';
+import { isOnHost, SCRYFALL_SVG_HOST } from './urls';
 
 describe('isOnHost', () => {
   it.each([
@@ -7,7 +7,7 @@ describe('isOnHost', () => {
     'https://svgs.scryfall.io/sets/star.svg',
     'https://svgs.scryfall.io',
   ])('accepts %s', (url) => {
-    expect(isOnHost(url, SET_ICON_HOST)).toBe(true);
+    expect(isOnHost(url, SCRYFALL_SVG_HOST)).toBe(true);
   });
 
   it.each([
@@ -22,6 +22,6 @@ describe('isOnHost', () => {
     'javascript:alert(1)//https://svgs.scryfall.io/',
     '',
   ])('refuses %s', (url) => {
-    expect(isOnHost(url, SET_ICON_HOST)).toBe(false);
+    expect(isOnHost(url, SCRYFALL_SVG_HOST)).toBe(false);
   });
 });

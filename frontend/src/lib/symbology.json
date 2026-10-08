@@ -1,86 +1,338 @@
 {
-  "0": "https://svgs.scryfall.io/card-symbols/0.svg",
-  "1": "https://svgs.scryfall.io/card-symbols/1.svg",
-  "2": "https://svgs.scryfall.io/card-symbols/2.svg",
-  "3": "https://svgs.scryfall.io/card-symbols/3.svg",
-  "4": "https://svgs.scryfall.io/card-symbols/4.svg",
-  "5": "https://svgs.scryfall.io/card-symbols/5.svg",
-  "6": "https://svgs.scryfall.io/card-symbols/6.svg",
-  "7": "https://svgs.scryfall.io/card-symbols/7.svg",
-  "8": "https://svgs.scryfall.io/card-symbols/8.svg",
-  "9": "https://svgs.scryfall.io/card-symbols/9.svg",
-  "10": "https://svgs.scryfall.io/card-symbols/10.svg",
-  "11": "https://svgs.scryfall.io/card-symbols/11.svg",
-  "12": "https://svgs.scryfall.io/card-symbols/12.svg",
-  "13": "https://svgs.scryfall.io/card-symbols/13.svg",
-  "14": "https://svgs.scryfall.io/card-symbols/14.svg",
-  "15": "https://svgs.scryfall.io/card-symbols/15.svg",
-  "16": "https://svgs.scryfall.io/card-symbols/16.svg",
-  "17": "https://svgs.scryfall.io/card-symbols/17.svg",
-  "18": "https://svgs.scryfall.io/card-symbols/18.svg",
-  "19": "https://svgs.scryfall.io/card-symbols/19.svg",
-  "20": "https://svgs.scryfall.io/card-symbols/20.svg",
-  "100": "https://svgs.scryfall.io/card-symbols/100.svg",
-  "1000000": "https://svgs.scryfall.io/card-symbols/1000000.svg",
-  "∞": "https://svgs.scryfall.io/card-symbols/INFINITY.svg",
-  "½": "https://svgs.scryfall.io/card-symbols/HALF.svg",
-  "2/B": "https://svgs.scryfall.io/card-symbols/2B.svg",
-  "2/G": "https://svgs.scryfall.io/card-symbols/2G.svg",
-  "2/R": "https://svgs.scryfall.io/card-symbols/2R.svg",
-  "2/U": "https://svgs.scryfall.io/card-symbols/2U.svg",
-  "2/W": "https://svgs.scryfall.io/card-symbols/2W.svg",
-  "A": "https://svgs.scryfall.io/card-symbols/A.svg",
-  "B": "https://svgs.scryfall.io/card-symbols/B.svg",
-  "B/G": "https://svgs.scryfall.io/card-symbols/BG.svg",
-  "B/G/P": "https://svgs.scryfall.io/card-symbols/BGP.svg",
-  "B/P": "https://svgs.scryfall.io/card-symbols/BP.svg",
-  "B/R": "https://svgs.scryfall.io/card-symbols/BR.svg",
-  "B/R/P": "https://svgs.scryfall.io/card-symbols/BRP.svg",
-  "C": "https://svgs.scryfall.io/card-symbols/C.svg",
-  "C/B": "https://svgs.scryfall.io/card-symbols/CB.svg",
-  "C/G": "https://svgs.scryfall.io/card-symbols/CG.svg",
-  "C/P": "https://svgs.scryfall.io/card-symbols/CP.svg",
-  "C/R": "https://svgs.scryfall.io/card-symbols/CR.svg",
-  "C/U": "https://svgs.scryfall.io/card-symbols/CU.svg",
-  "C/W": "https://svgs.scryfall.io/card-symbols/CW.svg",
-  "CHAOS": "https://svgs.scryfall.io/card-symbols/CHAOS.svg",
-  "D": "https://svgs.scryfall.io/card-symbols/D.svg",
-  "E": "https://svgs.scryfall.io/card-symbols/E.svg",
-  "G": "https://svgs.scryfall.io/card-symbols/G.svg",
-  "G/P": "https://svgs.scryfall.io/card-symbols/GP.svg",
-  "G/U": "https://svgs.scryfall.io/card-symbols/GU.svg",
-  "G/U/P": "https://svgs.scryfall.io/card-symbols/GUP.svg",
-  "G/W": "https://svgs.scryfall.io/card-symbols/GW.svg",
-  "G/W/P": "https://svgs.scryfall.io/card-symbols/GWP.svg",
-  "H": "https://svgs.scryfall.io/card-symbols/H.svg",
-  "HR": "https://svgs.scryfall.io/card-symbols/HR.svg",
-  "HW": "https://svgs.scryfall.io/card-symbols/HW.svg",
-  "L": "https://svgs.scryfall.io/card-symbols/L.svg",
-  "P": "https://svgs.scryfall.io/card-symbols/P.svg",
-  "PW": "https://svgs.scryfall.io/card-symbols/PW.svg",
-  "Q": "https://svgs.scryfall.io/card-symbols/Q.svg",
-  "R": "https://svgs.scryfall.io/card-symbols/R.svg",
-  "R/G": "https://svgs.scryfall.io/card-symbols/RG.svg",
-  "R/G/P": "https://svgs.scryfall.io/card-symbols/RGP.svg",
-  "R/P": "https://svgs.scryfall.io/card-symbols/RP.svg",
-  "R/W": "https://svgs.scryfall.io/card-symbols/RW.svg",
-  "R/W/P": "https://svgs.scryfall.io/card-symbols/RWP.svg",
-  "S": "https://svgs.scryfall.io/card-symbols/S.svg",
-  "T": "https://svgs.scryfall.io/card-symbols/T.svg",
-  "TK": "https://svgs.scryfall.io/card-symbols/TK.svg",
-  "U": "https://svgs.scryfall.io/card-symbols/U.svg",
-  "U/B": "https://svgs.scryfall.io/card-symbols/UB.svg",
-  "U/B/P": "https://svgs.scryfall.io/card-symbols/UBP.svg",
-  "U/P": "https://svgs.scryfall.io/card-symbols/UP.svg",
-  "U/R": "https://svgs.scryfall.io/card-symbols/UR.svg",
-  "U/R/P": "https://svgs.scryfall.io/card-symbols/URP.svg",
-  "W": "https://svgs.scryfall.io/card-symbols/W.svg",
-  "W/B": "https://svgs.scryfall.io/card-symbols/WB.svg",
-  "W/B/P": "https://svgs.scryfall.io/card-symbols/WBP.svg",
-  "W/P": "https://svgs.scryfall.io/card-symbols/WP.svg",
-  "W/U": "https://svgs.scryfall.io/card-symbols/WU.svg",
-  "W/U/P": "https://svgs.scryfall.io/card-symbols/WUP.svg",
-  "X": "https://svgs.scryfall.io/card-symbols/X.svg",
-  "Y": "https://svgs.scryfall.io/card-symbols/Y.svg",
-  "Z": "https://svgs.scryfall.io/card-symbols/Z.svg"
+  "0": {
+    "svg": "https://svgs.scryfall.io/card-symbols/0.svg",
+    "english": "zero mana"
+  },
+  "1": {
+    "svg": "https://svgs.scryfall.io/card-symbols/1.svg",
+    "english": "one generic mana"
+  },
+  "2": {
+    "svg": "https://svgs.scryfall.io/card-symbols/2.svg",
+    "english": "two generic mana"
+  },
+  "3": {
+    "svg": "https://svgs.scryfall.io/card-symbols/3.svg",
+    "english": "three generic mana"
+  },
+  "4": {
+    "svg": "https://svgs.scryfall.io/card-symbols/4.svg",
+    "english": "four generic mana"
+  },
+  "5": {
+    "svg": "https://svgs.scryfall.io/card-symbols/5.svg",
+    "english": "five generic mana"
+  },
+  "6": {
+    "svg": "https://svgs.scryfall.io/card-symbols/6.svg",
+    "english": "six generic mana"
+  },
+  "7": {
+    "svg": "https://svgs.scryfall.io/card-symbols/7.svg",
+    "english": "seven generic mana"
+  },
+  "8": {
+    "svg": "https://svgs.scryfall.io/card-symbols/8.svg",
+    "english": "eight generic mana"
+  },
+  "9": {
+    "svg": "https://svgs.scryfall.io/card-symbols/9.svg",
+    "english": "nine generic mana"
+  },
+  "10": {
+    "svg": "https://svgs.scryfall.io/card-symbols/10.svg",
+    "english": "ten generic mana"
+  },
+  "11": {
+    "svg": "https://svgs.scryfall.io/card-symbols/11.svg",
+    "english": "eleven generic mana"
+  },
+  "12": {
+    "svg": "https://svgs.scryfall.io/card-symbols/12.svg",
+    "english": "twelve generic mana"
+  },
+  "13": {
+    "svg": "https://svgs.scryfall.io/card-symbols/13.svg",
+    "english": "thirteen generic mana"
+  },
+  "14": {
+    "svg": "https://svgs.scryfall.io/card-symbols/14.svg",
+    "english": "fourteen generic mana"
+  },
+  "15": {
+    "svg": "https://svgs.scryfall.io/card-symbols/15.svg",
+    "english": "fifteen generic mana"
+  },
+  "16": {
+    "svg": "https://svgs.scryfall.io/card-symbols/16.svg",
+    "english": "sixteen generic mana"
+  },
+  "17": {
+    "svg": "https://svgs.scryfall.io/card-symbols/17.svg",
+    "english": "seventeen generic mana"
+  },
+  "18": {
+    "svg": "https://svgs.scryfall.io/card-symbols/18.svg",
+    "english": "eighteen generic mana"
+  },
+  "19": {
+    "svg": "https://svgs.scryfall.io/card-symbols/19.svg",
+    "english": "nineteen generic mana"
+  },
+  "20": {
+    "svg": "https://svgs.scryfall.io/card-symbols/20.svg",
+    "english": "twenty generic mana"
+  },
+  "100": {
+    "svg": "https://svgs.scryfall.io/card-symbols/100.svg",
+    "english": "one hundred generic mana"
+  },
+  "1000000": {
+    "svg": "https://svgs.scryfall.io/card-symbols/1000000.svg",
+    "english": "one million generic mana"
+  },
+  "∞": {
+    "svg": "https://svgs.scryfall.io/card-symbols/INFINITY.svg",
+    "english": "infinite generic mana"
+  },
+  "½": {
+    "svg": "https://svgs.scryfall.io/card-symbols/HALF.svg",
+    "english": "one-half generic mana"
+  },
+  "2/B": {
+    "svg": "https://svgs.scryfall.io/card-symbols/2B.svg",
+    "english": "two generic mana or one black mana"
+  },
+  "2/G": {
+    "svg": "https://svgs.scryfall.io/card-symbols/2G.svg",
+    "english": "two generic mana or one green mana"
+  },
+  "2/R": {
+    "svg": "https://svgs.scryfall.io/card-symbols/2R.svg",
+    "english": "two generic mana or one red mana"
+  },
+  "2/U": {
+    "svg": "https://svgs.scryfall.io/card-symbols/2U.svg",
+    "english": "two generic mana or one blue mana"
+  },
+  "2/W": {
+    "svg": "https://svgs.scryfall.io/card-symbols/2W.svg",
+    "english": "two generic mana or one white mana"
+  },
+  "A": {
+    "svg": "https://svgs.scryfall.io/card-symbols/A.svg",
+    "english": "an acorn counter"
+  },
+  "B": {
+    "svg": "https://svgs.scryfall.io/card-symbols/B.svg",
+    "english": "one black mana"
+  },
+  "B/G": {
+    "svg": "https://svgs.scryfall.io/card-symbols/BG.svg",
+    "english": "one black or green mana"
+  },
+  "B/G/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/BGP.svg",
+    "english": "one black mana, one green mana, or 2 life"
+  },
+  "B/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/BP.svg",
+    "english": "one black mana or two life"
+  },
+  "B/R": {
+    "svg": "https://svgs.scryfall.io/card-symbols/BR.svg",
+    "english": "one black or red mana"
+  },
+  "B/R/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/BRP.svg",
+    "english": "one black mana, one red mana, or 2 life"
+  },
+  "C": {
+    "svg": "https://svgs.scryfall.io/card-symbols/C.svg",
+    "english": "one colorless mana"
+  },
+  "C/B": {
+    "svg": "https://svgs.scryfall.io/card-symbols/CB.svg",
+    "english": "one colorless mana or one black mana"
+  },
+  "C/G": {
+    "svg": "https://svgs.scryfall.io/card-symbols/CG.svg",
+    "english": "one colorless mana or one green mana"
+  },
+  "C/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/CP.svg",
+    "english": "one colorless mana or two life"
+  },
+  "C/R": {
+    "svg": "https://svgs.scryfall.io/card-symbols/CR.svg",
+    "english": "one colorless mana or one red mana"
+  },
+  "C/U": {
+    "svg": "https://svgs.scryfall.io/card-symbols/CU.svg",
+    "english": "one colorless mana or one blue mana"
+  },
+  "C/W": {
+    "svg": "https://svgs.scryfall.io/card-symbols/CW.svg",
+    "english": "one colorless mana or one white mana"
+  },
+  "CHAOS": {
+    "svg": "https://svgs.scryfall.io/card-symbols/CHAOS.svg",
+    "english": "chaos"
+  },
+  "D": {
+    "svg": "https://svgs.scryfall.io/card-symbols/D.svg",
+    "english": "one potential land drop"
+  },
+  "E": {
+    "svg": "https://svgs.scryfall.io/card-symbols/E.svg",
+    "english": "an energy counter"
+  },
+  "G": {
+    "svg": "https://svgs.scryfall.io/card-symbols/G.svg",
+    "english": "one green mana"
+  },
+  "G/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/GP.svg",
+    "english": "one green mana or two life"
+  },
+  "G/U": {
+    "svg": "https://svgs.scryfall.io/card-symbols/GU.svg",
+    "english": "one green or blue mana"
+  },
+  "G/U/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/GUP.svg",
+    "english": "one green mana, one blue mana, or 2 life"
+  },
+  "G/W": {
+    "svg": "https://svgs.scryfall.io/card-symbols/GW.svg",
+    "english": "one green or white mana"
+  },
+  "G/W/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/GWP.svg",
+    "english": "one green mana, one white mana, or 2 life"
+  },
+  "H": {
+    "svg": "https://svgs.scryfall.io/card-symbols/H.svg",
+    "english": "one colored mana or two life"
+  },
+  "HR": {
+    "svg": "https://svgs.scryfall.io/card-symbols/HR.svg",
+    "english": "one-half red mana"
+  },
+  "HW": {
+    "svg": "https://svgs.scryfall.io/card-symbols/HW.svg",
+    "english": "one-half white mana"
+  },
+  "L": {
+    "svg": "https://svgs.scryfall.io/card-symbols/L.svg",
+    "english": "one mana from a legendary source"
+  },
+  "P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/P.svg",
+    "english": "modal budget pawprint"
+  },
+  "PW": {
+    "svg": "https://svgs.scryfall.io/card-symbols/PW.svg",
+    "english": "planeswalker"
+  },
+  "Q": {
+    "svg": "https://svgs.scryfall.io/card-symbols/Q.svg",
+    "english": "untap this permanent"
+  },
+  "R": {
+    "svg": "https://svgs.scryfall.io/card-symbols/R.svg",
+    "english": "one red mana"
+  },
+  "R/G": {
+    "svg": "https://svgs.scryfall.io/card-symbols/RG.svg",
+    "english": "one red or green mana"
+  },
+  "R/G/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/RGP.svg",
+    "english": "one red mana, one green mana, or 2 life"
+  },
+  "R/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/RP.svg",
+    "english": "one red mana or two life"
+  },
+  "R/W": {
+    "svg": "https://svgs.scryfall.io/card-symbols/RW.svg",
+    "english": "one red or white mana"
+  },
+  "R/W/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/RWP.svg",
+    "english": "one red mana, one white mana, or 2 life"
+  },
+  "S": {
+    "svg": "https://svgs.scryfall.io/card-symbols/S.svg",
+    "english": "one snow mana"
+  },
+  "T": {
+    "svg": "https://svgs.scryfall.io/card-symbols/T.svg",
+    "english": "tap this permanent"
+  },
+  "TK": {
+    "svg": "https://svgs.scryfall.io/card-symbols/TK.svg",
+    "english": "a ticket counter"
+  },
+  "U": {
+    "svg": "https://svgs.scryfall.io/card-symbols/U.svg",
+    "english": "one blue mana"
+  },
+  "U/B": {
+    "svg": "https://svgs.scryfall.io/card-symbols/UB.svg",
+    "english": "one blue or black mana"
+  },
+  "U/B/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/UBP.svg",
+    "english": "one blue mana, one black mana, or 2 life"
+  },
+  "U/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/UP.svg",
+    "english": "one blue mana or two life"
+  },
+  "U/R": {
+    "svg": "https://svgs.scryfall.io/card-symbols/UR.svg",
+    "english": "one blue or red mana"
+  },
+  "U/R/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/URP.svg",
+    "english": "one blue mana, one red mana, or 2 life"
+  },
+  "W": {
+    "svg": "https://svgs.scryfall.io/card-symbols/W.svg",
+    "english": "one white mana"
+  },
+  "W/B": {
+    "svg": "https://svgs.scryfall.io/card-symbols/WB.svg",
+    "english": "one white or black mana"
+  },
+  "W/B/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/WBP.svg",
+    "english": "one white mana, one black mana, or 2 life"
+  },
+  "W/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/WP.svg",
+    "english": "one white mana or two life"
+  },
+  "W/U": {
+    "svg": "https://svgs.scryfall.io/card-symbols/WU.svg",
+    "english": "one white or blue mana"
+  },
+  "W/U/P": {
+    "svg": "https://svgs.scryfall.io/card-symbols/WUP.svg",
+    "english": "one white mana, one blue mana, or 2 life"
+  },
+  "X": {
+    "svg": "https://svgs.scryfall.io/card-symbols/X.svg",
+    "english": "X generic mana"
+  },
+  "Y": {
+    "svg": "https://svgs.scryfall.io/card-symbols/Y.svg",
+    "english": "Y generic mana"
+  },
+  "Z": {
+    "svg": "https://svgs.scryfall.io/card-symbols/Z.svg",
+    "english": "Z generic mana"
+  }
 }

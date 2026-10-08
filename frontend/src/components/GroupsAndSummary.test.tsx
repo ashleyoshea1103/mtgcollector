@@ -135,13 +135,15 @@ describe('ManaCost', () => {
     const symbols = [...container.querySelectorAll<HTMLElement>('.mana-symbol')];
     const file = (el: HTMLElement) => el.querySelector('img')?.getAttribute('src')?.replace('https://svgs.scryfall.io/card-symbols/', '');
     expect(symbols.map((el) => [file(el), el.textContent, el.dataset.tooltip, el.className])).toEqual([
-      ['WUP.svg', '', 'Phyrexian white or blue', 'mana-symbol mana-symbol--wup'],
-      ['2.svg', '', '2 generic', 'mana-symbol mana-symbol--2'],
-      ['1.svg', '', '1 generic', 'mana-symbol mana-symbol--1'],
-      ['U.svg', '', 'blue', 'mana-symbol mana-symbol--u'],
+      ['WUP.svg', '', 'one white mana, one blue mana, or 2 life', 'mana-symbol mana-symbol--wup'],
+      ['2.svg', '', 'two generic mana', 'mana-symbol mana-symbol--2'],
+      ['1.svg', '', 'one generic mana', 'mana-symbol mana-symbol--1'],
+      ['U.svg', '', 'one blue mana', 'mana-symbol mana-symbol--u'],
     ]);
-    // Decorative inside the cost, which is read as a whole.
-    for (const img of container.querySelectorAll('img')) expect(img).toHaveAttribute('alt', '');
+    // If an image fails, its alt text shows the symbol in braces. Screen readers skip the
+    // images and read the cost as a whole.
+    expect([...container.querySelectorAll('img')].map((img) => img.getAttribute('alt'))).toEqual(['{W/U/P}', '{2}', '{1}', '{U}']);
+    for (const symbol of symbols) expect(symbol).toHaveAttribute('aria-hidden', 'true');
     expect(container.querySelector('.mana-cost__separator')!.textContent).toBe(' // ');
   });
 
@@ -180,12 +182,13 @@ describe('RarityBadge and SetSymbol', () => {
     expect(getByTooltip(document.body, cards.ragavan.set.name)).toHaveAttribute('class', 'set-symbol');
   });
 
-  it("shows the set's symbol as a decorative image, beside the code that names it", () => {
+  it("shows the set's symbol, with the code as the visible fallback", () => {
     const { container } = render(<SetSymbol set={cards.ragavan.set} rarity={cards.ragavan.rarity} />);
     const icon = container.querySelector('img');
     expect(icon).toHaveAttribute('src', cards.ragavan.set.icon_svg_uri);
-    // The code and the title already say which set it is, so screen readers skip the image.
-    expect(icon).toHaveAttribute('alt', '');
+    // If the image fails, its alt text shows the code; screen readers read the set name
+    // instead and skip the image.
+    expect(icon).toHaveAttribute('alt', 'MH2');
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
