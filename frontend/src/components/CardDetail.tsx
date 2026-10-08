@@ -1,7 +1,10 @@
+import type { CSSProperties } from 'react';
 import { CONDITIONS, FINISHES, labelFor, LANGUAGES } from '../lib/labels';
-import type { Card, CardFace, CollectionEntry } from '../types';
+import type { Card, CardFace, CollectionEntry, Finish } from '../types';
+import { DataTable, type Column } from '../ui';
 import { CardImage } from './CardImage';
 import { ManaCost } from './ManaCost';
+import { OracleText } from './OracleText';
 import { Price } from './Price';
 import { RarityBadge } from './RarityBadge';
 import { SetSymbol } from './SetSymbol';
@@ -11,6 +14,12 @@ interface Props {
   /** The user's copies of this printing, if any. */
   entries?: CollectionEntry[];
 }
+
+const priceColumns = (card: Card): Column<Finish>[] => [
+  { key: 'finish', header: 'Finish', hideHeader: true, rowHeader: true, cell: (f) => labelFor(FINISHES, f) },
+  { key: 'eur', header: 'EUR (Cardmarket)', cell: (f) => <Price prices={card.prices} finish={f} /> },
+  { key: 'usd', header: 'USD', cell: (f) => <Price prices={card.prices} finish={f} currency="usd" /> },
+];
 
 /** Everything about one printing: images, rules text, prices and owned copies. */
 export function CardDetail({ card, entries = [] }: Props) {
@@ -22,7 +31,7 @@ export function CardDetail({ card, entries = [] }: Props) {
 
   return (
     <article className="card-detail">
-      <div className="card-detail__images">
+      <div className="card-detail__images" style={{ '--faces': faceImages > 1 ? card.faces!.length : 1 } as CSSProperties}>
         {faceImages > 1 ? (
           card.faces!.map((_, i) => <CardImage key={i} card={card} face={i} size="large" />)
         ) : (
@@ -45,34 +54,13 @@ export function CardDetail({ card, entries = [] }: Props) {
               {face.name} <ManaCost cost={face.mana_cost} />
             </h3>
             <p className="card-detail__type">{face.type_line}</p>
-            {face.oracle_text && <p className="card-detail__oracle">{face.oracle_text}</p>}
+            {face.oracle_text && <OracleText className="card-detail__oracle" text={face.oracle_text} />}
           </section>
         ))}
 
         <section className="card-detail__prices">
           <h3>Prices</h3>
-          <table>
-            <thead>
-              <tr>
-                <th scope="col" />
-                <th scope="col">EUR (Cardmarket)</th>
-                <th scope="col">USD</th>
-              </tr>
-            </thead>
-            <tbody>
-              {card.finishes.map((finish) => (
-                <tr key={finish}>
-                  <th scope="row">{labelFor(FINISHES, finish)}</th>
-                  <td>
-                    <Price prices={card.prices} finish={finish} />
-                  </td>
-                  <td>
-                    <Price prices={card.prices} finish={finish} currency="usd" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable className="card-detail__price-table" columns={priceColumns(card)} rows={card.finishes} rowKey={(f) => f} />
           {card.cardmarket_url && (
             <a className="card-detail__cardmarket" href={card.cardmarket_url} target="_blank" rel="noopener noreferrer">
               View on Cardmarket

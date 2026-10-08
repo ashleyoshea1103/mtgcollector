@@ -9,11 +9,7 @@
 //
 // Usage: node scripts/fetch-fixtures.mjs
 import { writeFile } from 'node:fs/promises';
-
-const HEADERS = {
-  'User-Agent': 'mtgcollector/0.1 (https://github.com/ashleyoshea1103/mtgcollector)',
-  Accept: 'application/json',
-};
+import { get } from './scryfall.mjs';
 
 // key -> Scryfall API path for one exact printing. Each covers a different display case.
 const CARDS = {
@@ -29,7 +25,6 @@ const IMAGE_HOST = 'https://cards.scryfall.io/';
 const SET_ICON_HOST = 'https://svgs.scryfall.io/';
 const CARDMARKET_HOST = 'https://www.cardmarket.com/';
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const num = (s) => (s == null ? null : Number(s));
 
 /**
@@ -104,13 +99,6 @@ function toCard(c, set) {
     if (card[field] === undefined) throw new Error(`${c.set}/${c.collector_number}: missing ${field}`);
   }
   return card;
-}
-
-async function get(path) {
-  const res = await fetch('https://api.scryfall.com' + path, { headers: HEADERS, signal: AbortSignal.timeout(15_000) });
-  if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
-  await sleep(150); // Scryfall asks for 50–100 ms between requests
-  return res.json();
 }
 
 const out = {};

@@ -1,9 +1,10 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, customGroups, stats, unpricedCard } from '../fixtures';
 import { COLORS, RARITIES } from '../lib/labels';
-import { eur } from '../test/helpers';
+import { eur, getByTooltip } from '../test/helpers';
+import { corsIconUrl } from '../lib/urls';
 import type { CardSummary, CustomGroup } from '../types';
 import { CollectionSummary } from './CollectionSummary';
 import { CustomGroupCard } from './CustomGroupCard';
@@ -91,7 +92,7 @@ describe('PrintingOption', () => {
     const button = screen.getByRole('button');
     expect(button).toHaveTextContent(`${ragavan.set.name}#${ragavan.collector_number}${ragavan.released_at.slice(0, 4)}`);
     expect(within(button).getByText(eur(ragavan.prices.eur))).toBeInTheDocument();
-    expect(within(button).getByTitle(ragavan.set.name)).toHaveClass('set-symbol');
+    expect(getByTooltip(button, ragavan.set.name)).toHaveClass('set-symbol');
   });
 
   it('is named by the set once: the symbol beside the name is skipped', () => {
@@ -116,6 +117,11 @@ describe('PrintingOption', () => {
 
     rerender(<PrintingOption card={cards.ragavan} selected onSelect={onSelect} />);
     expect(button).toHaveAttribute('aria-pressed', 'true');
+
+    // Picking the selected one again reports it again (and it stays selected).
+    await user.click(button);
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(button).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
@@ -125,16 +131,40 @@ describe('ManaCost', () => {
     expect(screen.getByRole('img', { name: '2 generic, red' })).toBeInTheDocument();
   });
 
-  it('renders one symbol per pip, with a slash-free class, and separates split-card halves', () => {
+  it("shows each pip as Scryfall's image, named on hover, and separates split-card halves", () => {
     const { container } = render(<ManaCost cost="{W/U/P}{2} // {1}{U}" />);
-    const symbols = [...container.querySelectorAll('.mana-symbol')];
-    expect(symbols.map((el) => [el.textContent, el.getAttribute('title'), el.className])).toEqual([
-      ['W/U/P', '{W/U/P}', 'mana-symbol mana-symbol--wup'],
-      ['2', '{2}', 'mana-symbol mana-symbol--2'],
-      ['1', '{1}', 'mana-symbol mana-symbol--1'],
-      ['U', '{U}', 'mana-symbol mana-symbol--u'],
+    const symbols = [...container.querySelectorAll<HTMLElement>('.mana-symbol')];
+    const file = (el: HTMLElement) => el.querySelector('img')?.getAttribute('src')?.replace('https://svgs.scryfall.io/card-symbols/', '');
+    expect(symbols.map((el) => [file(el), el.textContent, el.dataset.tooltip, el.className])).toEqual([
+      ['WUP.svg', '', 'one white mana, one blue mana, or 2 life', 'mana-symbol mana-symbol--wup'],
+      ['2.svg', '', 'two generic mana', 'mana-symbol mana-symbol--2'],
+      ['1.svg', '', 'one generic mana', 'mana-symbol mana-symbol--1'],
+      ['U.svg', '', 'one blue mana', 'mana-symbol mana-symbol--u'],
     ]);
+    // Screen readers skip the images and read the cost as a whole.
+    for (const img of container.querySelectorAll('img')) expect(img).toHaveAttribute('alt', '');
+    for (const symbol of symbols) expect(symbol).toHaveAttribute('aria-hidden', 'true');
     expect(container.querySelector('.mana-cost__separator')!.textContent).toBe(' // ');
+  });
+
+  it('shows a symbol whose image fails to load as text instead', () => {
+    const { container } = render(<ManaCost cost="{G}{U}" />);
+    fireEvent.error(container.querySelector('img')!);
+    const [green, blue] = container.querySelectorAll<HTMLElement>('.mana-symbol');
+    expect(green.querySelector('img')).toBeNull();
+    expect(green).toHaveTextContent(/^G$/);
+    expect(green).toHaveClass('mana-symbol--text');
+    expect(blue.querySelector('img')).not.toBeNull(); // only the one that failed
+  });
+
+  it("shows a symbol Scryfall has no image for as text, in braces", () => {
+    const { container } = render(<ManaCost cost="{G}{NEW}" />);
+    const [known, unknown] = container.querySelectorAll<HTMLElement>('.mana-symbol');
+    expect(known.querySelector('img')).toHaveAttribute('src', 'https://svgs.scryfall.io/card-symbols/G.svg');
+    expect(unknown.querySelector('img')).toBeNull();
+    expect(unknown).toHaveTextContent(/^NEW$/);
+    expect(unknown).toHaveClass('mana-symbol--text');
+    expect(screen.getByRole('img', { name: 'green, NEW' })).toBeInTheDocument();
   });
 
   it('renders nothing for an empty cost', () => {
@@ -146,28 +176,65 @@ describe('ManaCost', () => {
 describe('RarityBadge and SetSymbol', () => {
   it.each(Object.entries(RARITIES))('abbreviates %s with its full name as the title', (rarity, label) => {
     render(<RarityBadge rarity={rarity as keyof typeof RARITIES} />);
-    expect(screen.getByTitle(label)).toHaveTextContent(new RegExp(`^${rarity[0].toUpperCase()}$`));
+    expect(getByTooltip(document.body, label)).toHaveTextContent(new RegExp(`^${rarity[0].toUpperCase()}$`));
   });
 
-  it('shows the set code in capitals, titled with the set name and classed by rarity', () => {
+  it('shows the set symbol instead of the code, with the set name on hover, classed by rarity', () => {
     render(<SetSymbol set={unpricedCard.set} rarity={unpricedCard.rarity} />);
-    const symbol = screen.getByTitle(unpricedCard.set.name);
-    expect(symbol).toHaveTextContent(new RegExp(`^${unpricedCard.set.code.toUpperCase()}$`));
+    const symbol = getByTooltip(document.body, unpricedCard.set.name);
+    expect(symbol.querySelector('img')).toHaveAttribute('src', corsIconUrl(unpricedCard.set.icon_svg_uri!));
+    expect(symbol).toHaveTextContent(/^$/);
     expect(symbol).toHaveClass(`set-symbol--${unpricedCard.rarity}`);
   });
 
   it('has no rarity class when no rarity is given', () => {
     render(<SetSymbol set={cards.ragavan.set} />);
-    expect(screen.getByTitle(cards.ragavan.set.name)).toHaveAttribute('class', 'set-symbol');
+    expect(getByTooltip(document.body, cards.ragavan.set.name)).toHaveAttribute('class', 'set-symbol');
   });
 
-  it("shows the set's symbol as a decorative image, beside the code that names it", () => {
-    const { container } = render(<SetSymbol set={cards.ragavan.set} rarity={cards.ragavan.rarity} />);
-    const icon = container.querySelector('img');
-    expect(icon).toHaveAttribute('src', cards.ragavan.set.icon_svg_uri);
-    // The code and the title already say which set it is, so screen readers skip the image.
-    expect(icon).toHaveAttribute('alt', '');
+  it("draws the set's symbol in the rarity's colour, as a mask of Scryfall's SVG", () => {
+    const { container } = render(<SetSymbol set={cards.ragavan.set} rarity="mythic" />);
+    const icon = container.querySelector<HTMLElement>('.set-symbol__icon')!;
+    // Its own URL for the CORS fetch, so a copy cached by a plain <img> can't break it.
+    expect(icon.style.getPropertyValue('--set-icon')).toBe(`url("${corsIconUrl(cards.ragavan.set.icon_svg_uri!)}")`);
+    // The colour comes from the rarity class on the symbol (CSS: currentColor).
+    expect(icon.closest('.set-symbol')).toHaveClass('set-symbol--mythic');
+    expect(container.querySelector('.set-symbol__code')).toBeNull();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('shows the code instead when the symbol fails to load', () => {
+    const { container } = render(<SetSymbol set={cards.ragavan.set} rarity="mythic" />);
+    // A hidden probe image of the same URL reports the failure the mask can't.
+    const probe = container.querySelector('img.set-symbol__probe')!;
+    expect(probe).toHaveAttribute('src', corsIconUrl(cards.ragavan.set.icon_svg_uri!));
+    expect(probe).toHaveAttribute('crossorigin', 'anonymous'); // fetched as the mask is, so once
+    // Hidden, a lazy image would never load, so a failure would go unseen.
+    expect(probe).not.toHaveAttribute('loading');
+    fireEvent.error(probe);
+    expect(container.querySelector('.set-symbol__icon')).toBeNull();
+    expect(container.querySelector('.set-symbol__code')).toHaveTextContent(/^MH2$/);
+  });
+
+  it("gives another set's symbol its own try after one failed", () => {
+    const { container, rerender } = render(<SetSymbol set={cards.ragavan.set} />);
+    fireEvent.error(container.querySelector('img.set-symbol__probe')!);
+    rerender(<SetSymbol set={cards.lightningBolt.set} />);
+    expect(container.querySelector('.set-symbol__icon')).not.toBeNull();
+    expect(container.querySelector('.set-symbol__code')).toBeNull();
+  });
+
+  it("takes the symbol's own proportions once it has loaded", () => {
+    const { container, rerender } = render(<SetSymbol set={cards.ragavan.set} />);
+    const icon = () => container.querySelector<HTMLElement>('.set-symbol__icon')!;
+    expect(icon().style.getPropertyValue('--set-icon-ratio')).toBe(''); // CSS default until then
+    const probe = container.querySelector<HTMLImageElement>('img.set-symbol__probe')!;
+    Object.defineProperties(probe, { naturalWidth: { value: 232 }, naturalHeight: { value: 150 } });
+    fireEvent.load(probe);
+    expect(Number(icon().style.getPropertyValue('--set-icon-ratio'))).toBeCloseTo(232 / 150);
+    // A different set doesn't keep the old proportions.
+    rerender(<SetSymbol set={cards.lightningBolt.set} />);
+    expect(icon().style.getPropertyValue('--set-icon-ratio')).toBe('');
   });
 
   it("doesn't tell Scryfall which page loaded the symbol", () => {
@@ -181,21 +248,23 @@ describe('RarityBadge and SetSymbol', () => {
       const card = { ...cards.ragavan, set: { ...cards.ragavan.set, icon_svg_uri: url } };
       const { container } = render(<SetSymbol set={card.set} rarity={card.rarity} />);
       expect(container.querySelector('img')).toBeNull();
-      expect(screen.getByTitle(card.set.name)).toHaveTextContent('MH2');
+      expect(getByTooltip(document.body, card.set.name)).toHaveTextContent('MH2');
     },
   );
 
-  it("is hidden from screen readers when the set's name is shown beside it", () => {
+  it("is read as the set's name, or skipped when the name is shown beside it", () => {
     const { rerender } = render(<SetSymbol set={cards.ragavan.set} rarity={cards.ragavan.rarity} />);
-    expect(screen.getByTitle(cards.ragavan.set.name)).not.toHaveAttribute('aria-hidden');
+    expect(getByTooltip(document.body, cards.ragavan.set.name)).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText(cards.ragavan.set.name)).toHaveClass('visually-hidden');
     rerender(<SetSymbol set={cards.ragavan.set} rarity={cards.ragavan.rarity} nameShown />);
-    expect(screen.getByTitle(cards.ragavan.set.name)).toHaveAttribute('aria-hidden', 'true');
+    expect(getByTooltip(document.body, cards.ragavan.set.name)).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByText(cards.ragavan.set.name)).not.toBeInTheDocument();
   });
 
   it('shows just the code when the set has no symbol', () => {
     const card = { ...cards.ragavan, set: { ...cards.ragavan.set, icon_svg_uri: null } };
     const { container } = render(<SetSymbol set={card.set} rarity={card.rarity} />);
     expect(container.querySelector('img')).toBeNull();
-    expect(screen.getByTitle(card.set.name)).toHaveTextContent('MH2');
+    expect(getByTooltip(document.body, card.set.name)).toHaveTextContent('MH2');
   });
 });

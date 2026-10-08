@@ -1,7 +1,8 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { cards, entries, serverPricedBolts } from '../fixtures';
-import { eur } from '../test/helpers';
+import { eur, getAllByTooltip, getByTooltip, queryByTooltip } from '../test/helpers';
+import { corsIconUrl } from '../lib/urls';
 import { CardTile } from './CardTile';
 import { CollectionEntryTile } from './CollectionEntryTile';
 
@@ -12,7 +13,7 @@ describe('CardTile', () => {
     render(<CardTile card={lightningBolt} actions={<button type="button">Add</button>} />);
     const tile = screen.getByRole('article');
     expect(within(tile).getByRole('heading', { name: lightningBolt.name })).toBeInTheDocument();
-    expect(within(tile).getByTitle(lightningBolt.set.name)).toHaveTextContent(lightningBolt.set.code.toUpperCase());
+    expect(getByTooltip(tile, lightningBolt.set.name).querySelector('img')).toHaveAttribute('src', corsIconUrl(lightningBolt.set.icon_svg_uri!));
     // The set's name is shown, not only given as the symbol's title.
     expect(within(tile).getByText(lightningBolt.set.name)).toBeVisible();
     expect(tile).toHaveTextContent(`#${lightningBolt.collector_number}`);
@@ -23,12 +24,12 @@ describe('CardTile', () => {
   it('prices a foil-only printing at its foil price', () => {
     render(<CardTile card={propaganda} />);
     expect(screen.getByText(eur(propaganda.prices.eur_foil))).toBeInTheDocument();
-    expect(screen.queryByTitle('No price available')).not.toBeInTheDocument();
+    expect(queryByTooltip(document.body, 'No price available')).not.toBeInTheDocument();
   });
 
   it('shows a dash for a null given price rather than working one out', () => {
     render(<CardTile card={lightningBolt} unitPrice={null} />);
-    expect(screen.getByTitle('No price available')).toBeInTheDocument();
+    expect(getByTooltip(document.body, 'No price available')).toBeInTheDocument();
     expect(screen.queryByText(eur(lightningBolt.prices.eur))).not.toBeInTheDocument();
   });
 
@@ -45,7 +46,7 @@ describe('CollectionEntryTile', () => {
     render(<CollectionEntryTile entry={bolts} />);
     const tile = screen.getByRole('article');
     expect(within(tile).getByText(`${bolts.quantity}×`)).toBeInTheDocument();
-    expect(within(tile).getByTitle('Near Mint')).toHaveTextContent(/^NM$/);
+    expect(getByTooltip(tile, 'Near Mint')).toHaveTextContent(/^NM$/);
     expect(within(tile).getByText(eur(bolts.unit_price_eur))).toBeInTheDocument();
     expect(within(tile).getByText(/^Value/)).toHaveTextContent(eur(bolts.value_eur));
   });
@@ -69,14 +70,14 @@ describe('CollectionEntryTile', () => {
 
   it('shows the language only when it is not English', () => {
     const { rerender } = render(<CollectionEntryTile entry={entries.germanDelver} />);
-    expect(screen.getByTitle('German')).toHaveTextContent(/^DE$/);
+    expect(getByTooltip(document.body, 'German')).toHaveTextContent(/^DE$/);
     rerender(<CollectionEntryTile entry={entries.bolts} />);
-    expect(screen.queryByTitle('English')).not.toBeInTheDocument();
+    expect(queryByTooltip(document.body, 'English')).not.toBeInTheDocument();
   });
 
   it('shows dashes for the price and value of an unpriced card', () => {
     render(<CollectionEntryTile entry={entries.unpricedElves} />);
-    expect(screen.getAllByTitle('No price available')).toHaveLength(2);
+    expect(getAllByTooltip(document.body, 'No price available')).toHaveLength(2);
   });
 
   it('renders its actions', () => {

@@ -1,9 +1,10 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, customGroups } from '../fixtures';
 import { LANGUAGES } from '../lib/labels';
-import { eur } from '../test/helpers';
+import { eur, getByTooltip } from '../test/helpers';
+import { corsIconUrl } from '../lib/urls';
 import type { NewEntry } from '../types';
 import { AddToCollectionForm } from './AddToCollectionForm';
 
@@ -15,8 +16,10 @@ describe('AddToCollectionForm', () => {
   it('says exactly which printing is being added', () => {
     const { container } = render(<AddToCollectionForm card={ragavan} onSubmit={vi.fn<(entry: NewEntry) => void>()} />);
     const line = container.querySelector('.add-form__card')!;
-    expect(line).toHaveTextContent(`Adding ${ragavan.name} (MH2 ${ragavan.set.name} #${ragavan.collector_number})`);
-    expect(within(line as HTMLElement).getByTitle(ragavan.set.name)).toHaveClass('set-symbol');
+    // The set symbol (an image) sits before the name, after the "(".
+    expect(line).toHaveTextContent(`Adding ${ragavan.name} ( ${ragavan.set.name} #${ragavan.collector_number})`);
+    expect(getByTooltip(line as HTMLElement, ragavan.set.name)).toHaveClass('set-symbol');
+    expect(line.querySelector('.set-symbol img')).toHaveAttribute('src', corsIconUrl(ragavan.set.icon_svg_uri!));
   });
 
   it('submits one near-mint English copy by default', async () => {
@@ -183,8 +186,14 @@ describe('AddToCollectionForm', () => {
     expect(screen.queryByRole('combobox', { name: 'Add to group' })).not.toBeInTheDocument();
   });
 
-  it('disables the button while submitting', () => {
-    render(<AddToCollectionForm card={lightningBolt} onSubmit={() => {}} submitting />);
-    expect(screen.getByRole('button', { name: 'Adding…' })).toBeDisabled();
+  it("won't submit twice: the button is busy while submitting", async () => {
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
+    render(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} submitting />);
+    const button = screen.getByRole('button', { name: 'Adding…' });
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(button);
+    // Browsers submit a form from Enter in its only text field even with no usable submit button.
+    fireEvent.submit(button.closest('form')!);
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

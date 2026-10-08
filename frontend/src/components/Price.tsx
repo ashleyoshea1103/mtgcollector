@@ -1,5 +1,6 @@
 import { formatPrice, priceFor, type Currency } from '../lib/price';
 import type { Finish, Prices } from '../types';
+import { TooltipText } from '../ui';
 
 type Props =
   | { prices: Prices; finish?: Finish; currency?: Currency; value?: never }
@@ -12,9 +13,9 @@ export function Price({ prices, finish, value, currency = 'eur' }: Props) {
 
   if (amount == null) {
     return (
-      <span className="price price--none" title="No price available">
+      <TooltipText className="price price--none" tooltip="No price available">
         —
-      </span>
+      </TooltipText>
     );
   }
 

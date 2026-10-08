@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { defaultFinish } from '../lib/price';
 import type { CardSummary, Finish } from '../types';
+import { Cluster } from '../ui';
 import { CardImage } from './CardImage';
 import { Price } from './Price';
 import { SetSymbol } from './SetSymbol';
@@ -39,7 +40,11 @@ export function CardTile({ card, finish = defaultFinish(card), unitPrice, overla
         </p>
         {children}
       </div>
-      {actions && <footer className="card-tile__actions">{actions}</footer>}
+      {actions && (
+        <Cluster as="footer" className="card-tile__actions">
+          {actions}
+        </Cluster>
+      )}
     </article>
   );
 }

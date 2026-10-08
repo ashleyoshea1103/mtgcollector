@@ -1,5 +1,6 @@
 import { COLORS, labelFor, RARITIES } from '../lib/labels';
 import type { CollectionStats } from '../types';
+import { Cluster, Stack } from '../ui';
 import { TotalValue } from './TotalValue';
 
 interface Props {
@@ -10,7 +11,7 @@ interface Props {
 export function CollectionSummary({ stats }: Props) {
   return (
     <section className="collection-summary" aria-label="Collection summary">
-      <dl className="collection-summary__totals">
+      <Cluster as="dl" gap={5} className="collection-summary__totals">
         <div>
           <dt>Cards</dt>
           <dd>{stats.card_count}</dd>
@@ -25,7 +26,7 @@ export function CollectionSummary({ stats }: Props) {
             <TotalValue total={stats} />
           </dd>
         </div>
-      </dl>
+      </Cluster>
 
       <Breakdown
         title="By color"
@@ -45,14 +46,14 @@ function Breakdown({ title, modifier, rows }: { title: string; modifier: string;
   return (
     <section className={`collection-summary__breakdown collection-summary__breakdown--${modifier}`}>
       <h3>{title}</h3>
-      <ul>
+      <Stack as="ul" gap={1}>
         {rows.map(([key, label, count]) => (
           <li key={key} className={`breakdown-item breakdown-item--${key.toLowerCase()}`}>
             <span className="breakdown-item__label">{label}</span>{' '}
             <span className="breakdown-item__count">{count}</span>
           </li>
         ))}
-      </ul>
+      </Stack>
     </section>
   );
 }

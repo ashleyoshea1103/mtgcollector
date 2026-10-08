@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { cards, unpricedCard } from '../fixtures';
-import { eur, usd } from '../test/helpers';
+import { eur, getByTooltip, usd } from '../test/helpers';
 import { Price } from './Price';
 import { TotalValue } from './TotalValue';
 
@@ -33,7 +33,7 @@ describe('Price', () => {
 
   it('shows a dash when the card has no price', () => {
     render(<Price prices={unpricedCard.prices} />);
-    expect(screen.getByTitle('No price available')).toHaveTextContent(/^—$/);
+    expect(getByTooltip(document.body, 'No price available')).toHaveTextContent(/^—$/);
   });
 
   it('shows a precomputed value, zero as an amount, and null as a dash', () => {
@@ -42,7 +42,7 @@ describe('Price', () => {
     rerender(<Price value={0} />);
     expect(screen.getByText(eur(0))).toBeInTheDocument();
     rerender(<Price value={null} />);
-    expect(screen.getByTitle('No price available')).toBeInTheDocument();
+    expect(getByTooltip(document.body, 'No price available')).toBeInTheDocument();
   });
 });
 
@@ -60,12 +60,14 @@ describe('TotalValue', () => {
 
   it('shows a dash, not a zero total, when no card has a price', () => {
     const { container } = render(<TotalValue total={{ card_count: 3, value_eur: 0, unpriced_count: 3 }} />);
-    expect(container).toHaveTextContent(/^—$/);
+    expect(getByTooltip(container, 'No price available')).toHaveTextContent(/^—$/);
+    expect(container).not.toHaveTextContent(/d/);
   });
 
   it('shows a dash for inconsistent totals that claim unpriced cards but no cards', () => {
     const { container } = render(<TotalValue total={{ card_count: 0, value_eur: 0, unpriced_count: 2 }} />);
-    expect(container).toHaveTextContent(/^—$/);
+    expect(getByTooltip(container, 'No price available')).toHaveTextContent(/^—$/);
+    expect(container).not.toHaveTextContent(/d/);
   });
 
   it('shows zero for an empty group', () => {

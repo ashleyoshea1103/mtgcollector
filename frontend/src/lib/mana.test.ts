@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { describeManaCost, parseManaCost } from './mana';
+import symbology from './symbology.json';
+import { describeManaCost, describeManaSymbol, parseManaCost, splitSymbols, symbolImage, symbolWords } from './mana';
 
 describe('parseManaCost', () => {
   it('splits a cost into symbols', () => {
@@ -37,7 +38,96 @@ describe('describeManaCost', () => {
     expect(describeManaCost('{1}{R} // {1}{U}')).toBe('1 generic, red, then 1 generic, blue');
   });
 
-  it('passes unknown symbols through', () => {
-    expect(describeManaCost('{½}{∞}')).toBe('½, ∞');
+  it("uses Scryfall's words for symbols it can't build from parts", () => {
+    expect(describeManaCost('{½}{∞}')).toBe('one-half generic mana, infinite generic mana');
+    // {HW} (half a white) and a lone {P} (Bloomburrow's pawprint) aren't H/W or Phyrexian.
+    expect(describeManaCost('{HW}{P}')).toBe('one-half white mana, modal budget pawprint');
+  });
+
+  it('reads a zero cost as zero, not "0 generic"', () => {
+    expect(describeManaCost('{0}')).toBe('zero');
+  });
+
+  it("passes symbols nobody knows through as their letters", () => {
+    expect(describeManaCost('{NEW}{2/NEW}')).toBe('NEW, 2/NEW');
+  });
+});
+
+describe('describeManaSymbol', () => {
+  it.each([
+    ['2', '2 generic'],
+    ['R', 'red'],
+    ['W/U', 'white or blue'],
+    ['B/P', 'Phyrexian black'],
+    ['W/U/P', 'Phyrexian white or blue'],
+    ['2/W', '2 generic or white'],
+    ['T', 'tap'],
+    ['?', '?'],
+  ])('names {%s} as "%s"', (symbol, words) => {
+    expect(describeManaSymbol(symbol)).toBe(words);
+  });
+
+  it("doesn't treat inherited object keys as symbol names", () => {
+    expect(describeManaSymbol('constructor')).toBe('constructor');
+  });
+});
+
+describe('symbolImage', () => {
+  it.each([
+    ['G', 'G.svg'],
+    ['W/U', 'WU.svg'],
+    ['2/W', '2W.svg'],
+    ['W/U/P', 'WUP.svg'],
+    ['T', 'T.svg'],
+    ['10', '10.svg'],
+    ['½', 'HALF.svg'],
+  ])('finds Scryfall’s image for {%s}', (symbol, file) => {
+    expect(symbolImage(symbol)).toBe(`https://svgs.scryfall.io/card-symbols/${file}`);
+  });
+
+  it.each(['NOPE', 'constructor', '__proto__', ''])('has none for {%s}, so it shows as text', (symbol) => {
+    expect(symbolImage(symbol)).toBeNull();
+  });
+
+  it('only gives images on Scryfall’s symbol host, with plain paths', () => {
+    const urls = Object.values(symbology).map((s) => s.svg);
+    expect(urls.length).toBeGreaterThan(50);
+    for (const url of urls) expect(url).toMatch(/^https:\/\/svgs\.scryfall\.io\/card-symbols\/[A-Za-z0-9]+\.svg$/);
+  });
+});
+
+describe('symbolWords', () => {
+  it.each([
+    ['G', 'one green mana'],
+    ['T', 'tap this permanent'],
+    ['2', 'two generic mana'],
+  ])('reads {%s} as Scryfall writes it: "%s"', (symbol, words) => {
+    expect(symbolWords(symbol)).toBe(words);
+  });
+
+  it('falls back to the short form for a symbol Scryfall hasn’t got', () => {
+    expect(symbolWords('2/NEW')).toBe('2/NEW');
+    expect(symbolWords('B/P')).toBe('one black mana or two life');
+    expect(symbolWords('constructor')).toBe('constructor');
+  });
+});
+
+describe('splitSymbols', () => {
+  it('splits rules text around its symbols', () => {
+    expect(splitSymbols('{T}: Add {G}.')).toEqual([{ symbol: 'T' }, { text: ': Add ' }, { symbol: 'G' }, { text: '.' }]);
+  });
+
+  it('keeps text with no symbols whole, line breaks included', () => {
+    expect(splitSymbols('Tap target permanent.\nDraw a card.')).toEqual([{ text: 'Tap target permanent.\nDraw a card.' }]);
+  });
+
+  it('leaves stray braces as text', () => {
+    expect(splitSymbols('{{G}}')).toEqual([{ text: '{' }, { symbol: 'G' }, { text: '}' }]);
+    expect(splitSymbols('a {} b {G')).toEqual([{ text: 'a {} b {G' }]);
+  });
+
+  it('handles adjacent symbols and an empty string', () => {
+    expect(splitSymbols('Dash {1}{R}')).toEqual([{ text: 'Dash ' }, { symbol: '1' }, { symbol: 'R' }]);
+    expect(splitSymbols('')).toEqual([]);
   });
 });

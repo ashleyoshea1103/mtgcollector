@@ -2,19 +2,33 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, entries, serverPricedBolts } from '../fixtures';
 import { describeManaCost } from '../lib/mana';
-import { cellsByColumn, eur, usd } from '../test/helpers';
+import { cellsByColumn, eur, getByTooltip, usd } from '../test/helpers';
+import { corsIconUrl } from '../lib/urls';
 import { CardDetail } from './CardDetail';
 
 const { delver, fireIce, lightningBolt, propaganda, ragavan } = cards;
 const priceRow = (finish: string) => cellsByColumn(within(screen.getByRole('table')).getByRole('rowheader', { name: finish }).closest('tr')!);
 
 describe('CardDetail', () => {
+  // The image row is sized from the number of faces, so images have their size before they
+  // load (the CSS reads --faces).
+  it.each([
+    ['a transforming card', delver, '2'],
+    ['a single-faced card', lightningBolt, '1'],
+    ['a split card, which has one image', fireIce, '1'],
+  ])('sizes the image row for %s', (_, card, faces) => {
+    const { container } = render(<CardDetail card={card} />);
+    const row = container.querySelector<HTMLElement>('.card-detail__images')!;
+    expect(row.style.getPropertyValue('--faces')).toBe(faces);
+    expect(row.querySelectorAll('.card-image')).toHaveLength(Number(faces));
+  });
+
   it('names the printing: set, number, rarity and release date', () => {
     render(<CardDetail card={ragavan} />);
     const printing = screen.getByRole('heading', { level: 2, name: ragavan.name }).nextElementSibling!;
     expect(printing).toHaveTextContent(`${ragavan.set.name} #${ragavan.collector_number}`);
-    expect(within(printing as HTMLElement).getByTitle(ragavan.set.name)).toHaveTextContent('MH2');
-    expect(within(printing as HTMLElement).getByTitle('Mythic rare')).toHaveTextContent('M');
+    expect(getByTooltip(printing as HTMLElement, ragavan.set.name).querySelector('img')).toHaveAttribute('src', corsIconUrl(ragavan.set.icon_svg_uri!));
+    expect(getByTooltip(printing as HTMLElement, 'Mythic rare')).toHaveTextContent('M');
     expect(within(printing as HTMLElement).getByText(ragavan.released_at)).toHaveAttribute('datetime', ragavan.released_at);
   });
 

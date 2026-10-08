@@ -3,6 +3,7 @@ import { CONDITIONS, FINISHES, labelFor, LANGUAGES } from '../lib/labels';
 import { defaultFinish } from '../lib/price';
 import { MAX_QUANTITY, parseQuantity } from '../lib/quantity';
 import type { CardSummary, Condition, CustomGroup, Finish, NewEntry } from '../types';
+import { Button, Field, NumberInput, Select } from '../ui';
 import { Price } from './Price';
 import { SetSymbol } from './SetSymbol';
 
@@ -12,6 +13,9 @@ interface Props {
   onSubmit: (entry: NewEntry) => void;
   submitting?: boolean;
 }
+
+const CONDITION_OPTIONS = Object.entries(CONDITIONS).map(([code, label]) => ({ value: code as Condition, label: `${code}: ${label}` }));
+const LANGUAGE_OPTIONS = Object.entries(LANGUAGES).map(([code, label]) => ({ value: code, label }));
 
 /** Collects quantity, finish, condition, language and an optional group for one printing. */
 export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = false }: Props) {
@@ -36,6 +40,8 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    // Enter in the quantity box submits the form even while the button is busy.
+    if (submitting) return;
     onSubmit({ card_id: card.id, quantity: parseQuantity(quantity), finish, condition, language, group_id: groupId });
   }
 
@@ -46,71 +52,35 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
         <Price prices={card.prices} finish={finish} /> each
       </p>
 
-      <label className="add-form__field">
-        Quantity
-        <input
-          type="number"
-          min={1}
-          max={MAX_QUANTITY}
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-        />
-      </label>
+      <Field label="Quantity" className="add-form__field">
+        <NumberInput min={1} max={MAX_QUANTITY} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+      </Field>
 
-      <label className="add-form__field">
-        Finish
-        <select value={finish} onChange={(e) => setFinish(e.target.value as Finish)}>
-          {card.finishes.map((f) => (
-            <option key={f} value={f}>
-              {labelFor(FINISHES, f)}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Field label="Finish" className="add-form__field">
+        <Select options={card.finishes.map((f) => ({ value: f, label: labelFor(FINISHES, f) }))} value={finish} onChange={setFinish} />
+      </Field>
 
-      <label className="add-form__field">
-        Condition
-        <select value={condition} onChange={(e) => setCondition(e.target.value as Condition)}>
-          {Object.entries(CONDITIONS).map(([code, label]) => (
-            <option key={code} value={code}>
-              {code}: {label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Field label="Condition" className="add-form__field">
+        <Select options={CONDITION_OPTIONS} value={condition} onChange={setCondition} />
+      </Field>
 
-      <label className="add-form__field">
-        Language
-        <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-          {Object.entries(LANGUAGES).map(([code, label]) => (
-            <option key={code} value={code}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Field label="Language" className="add-form__field">
+        <Select options={LANGUAGE_OPTIONS} value={language} onChange={setLanguage} />
+      </Field>
 
       {groups.length > 0 && (
-        <label className="add-form__field">
-          Add to group
-          <select
-            value={groupId ?? ''}
-            onChange={(e) => setGroupId(e.target.value === '' ? null : Number(e.target.value))}
-          >
-            <option value="">None</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Field label="Add to group" className="add-form__field">
+          <Select
+            options={[{ value: '', label: 'None' }, ...groups.map((g) => ({ value: String(g.id), label: g.name }))]}
+            value={groupId === null ? '' : String(groupId)}
+            onChange={(v) => setGroupId(v === '' ? null : Number(v))}
+          />
+        </Field>
       )}
 
-      <button type="submit" className="add-form__submit" disabled={submitting}>
+      <Button type="submit" variant="primary" className="add-form__submit" busy={submitting}>
         {submitting ? 'Adding…' : 'Add to collection'}
-      </button>
+      </Button>
     </form>
   );
 }
-

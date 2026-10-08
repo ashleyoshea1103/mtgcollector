@@ -2,7 +2,8 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { entries, serverPricedBolts } from '../fixtures';
 import { CONDITIONS, FINISHES, LANGUAGES } from '../lib/labels';
-import { cellsByColumn, eur } from '../test/helpers';
+import { cellsByColumn, eur, getByTooltip } from '../test/helpers';
+import { corsIconUrl } from '../lib/urls';
 import { CollectionEntryTable } from './CollectionEntryTable';
 
 const all = Object.values(entries);
@@ -20,8 +21,10 @@ describe('CollectionEntryTable', () => {
     const cells = cellsByColumn(rowFor(name));
     expect(cells.Qty).toHaveTextContent(new RegExp(`^${entry.quantity}$`));
     expect(cells.Type).toHaveTextContent(entry.card.type_line);
-    expect(cells.Set).toHaveTextContent(`${entry.card.set.code.toUpperCase()} ${entry.card.set.name} #${entry.card.collector_number}`);
-    expect(within(cells.Condition).getByTitle(CONDITIONS[entry.condition])).toHaveTextContent(entry.condition);
+    expect(cells.Set).toHaveTextContent(`${entry.card.set.name} #${entry.card.collector_number}`);
+    expect(cells.Set.querySelector('.set-symbol__code')).toBeNull(); // the symbol stands in for the code
+    expect(cells.Set.querySelector('.set-symbol img')).toHaveAttribute('src', corsIconUrl(entry.card.set.icon_svg_uri!));
+    expect(getByTooltip(cells.Condition, CONDITIONS[entry.condition])).toHaveTextContent(entry.condition);
     expect(cells.Finish).toHaveTextContent(new RegExp(`^${FINISHES[entry.finish]}$`));
     expect(cells.Language).toHaveTextContent(new RegExp(`^${LANGUAGES[entry.language]}$`));
     expect(cells.Price).toHaveTextContent(eur(entry.unit_price_eur));
@@ -48,7 +51,7 @@ describe('CollectionEntryTable', () => {
     render(<CollectionEntryTable entries={[odd]} />);
     const cells = cellsByColumn(rowFor(odd.card.name));
     expect(cells.Language).toHaveTextContent('__proto__');
-    expect(within(cells.Condition).getByTitle('constructor')).toBeInTheDocument();
+    expect(getByTooltip(cells.Condition, 'constructor')).toBeInTheDocument();
   });
 
   it('has no actions column unless actions are provided', () => {

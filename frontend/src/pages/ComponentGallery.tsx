@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { AddToCollectionForm } from '../components/AddToCollectionForm';
 import { CardDetail } from '../components/CardDetail';
 import { CardImage } from '../components/CardImage';
@@ -16,12 +16,15 @@ import { SetSymbol } from '../components/SetSymbol';
 import { DEV_ONLY_MARKER } from '../devOnly';
 import { cards, colorGroups, customGroups, entries, setGroup, stats, unpricedCard } from '../fixtures';
 import type { Card, NewEntry } from '../types';
+import { Field, Grid, SegmentedControl, Select } from '../ui';
+import { PRIMITIVE_SECTIONS, slug } from './gallerySections';
+import { PrimitivesGallery, Section } from './PrimitivesGallery';
 
 const allCards = [...Object.values(cards), unpricedCard];
 const allEntries = Object.values(entries);
 const imageless: Card = { ...cards.lightningBolt, id: 'imageless', images: null };
 
-/** Every presentational component rendered with fixture data, for review before styling. */
+/** Every presentational component rendered with fixture data, then every src/ui primitive, for review before styling. */
 export function ComponentGallery() {
   const [view, setView] = useState<CollectionView>('grid');
   const [printing, setPrinting] = useState(allCards[0].id);
@@ -32,8 +35,8 @@ export function ComponentGallery() {
     <main className="gallery" data-dev-only={DEV_ONLY_MARKER}>
       <h1>Component gallery</h1>
       <p>Each component shown with real Scryfall fixture data. Styling is intentionally minimal.</p>
-      <nav className="gallery__toc">
-        {SECTIONS.map((s) => (
+      <nav className="gallery__toc" aria-label="Sections">
+        {[...SECTIONS, ...PRIMITIVE_SECTIONS].map((s) => (
           <a key={s} href={`#${slug(s)}`}>
             {s}
           </a>
@@ -84,11 +87,11 @@ export function ComponentGallery() {
       </Section>
 
       <Section name="CardTile" note="Search result shape, with an action slot. Foil-only Propaganda is priced at its foil price.">
-        <div className="entry-grid">
+        <Grid minItemWidth="180px" className="entry-grid">
           {allCards.map((c) => (
             <CardTile key={c.id} card={c} actions={<button type="button">Add</button>} />
           ))}
-        </div>
+        </Grid>
       </Section>
 
       <Section name="PrintingOption" note="Click to select.">
@@ -100,11 +103,11 @@ export function ComponentGallery() {
       </Section>
 
       <Section name="CollectionEntryTile" note="4× Bolt, foil Ragavan, German EX Delver, etched LP Fire // Ice, foil-only Propaganda, 3× unpriced Llanowar Elves.">
-        <div className="entry-grid">
+        <Grid minItemWidth="180px" className="entry-grid">
           {allEntries.map((e) => (
             <CollectionEntryTile key={e.id} entry={e} />
           ))}
-        </div>
+        </Grid>
       </Section>
 
       <Section name="CollectionEntryTable">
@@ -112,14 +115,15 @@ export function ComponentGallery() {
       </Section>
 
       <Section name="GroupBucketSection" note="The collection grouped by color. Green has only unpriced cards; Trade binder below is partly unpriced. The last color group starts closed; after them, a group from grouping by set.">
-        <fieldset className="gallery__controls">
-          <legend>View</legend>
-          {(['grid', 'list'] as const).map((v) => (
-            <label key={v}>
-              <input type="radio" name="view" value={v} checked={view === v} onChange={() => setView(v)} /> {v}
-            </label>
-          ))}
-        </fieldset>
+        <SegmentedControl
+          label="View"
+          options={[
+            { value: 'grid', label: 'Grid' },
+            { value: 'list', label: 'List' },
+          ]}
+          value={view}
+          onChange={setView}
+        />
         {colorGroups.map(({ group, entries }, i) => (
           <GroupBucketSection key={group.key} group={group} entries={entries} view={view} defaultOpen={i < colorGroups.length - 1} />
         ))}
@@ -127,11 +131,11 @@ export function ComponentGallery() {
       </Section>
 
       <Section name="CustomGroupCard" note="A binder, a deck and an empty box.">
-        <div className="group-grid">
+        <Grid minItemWidth="260px" className="group-grid">
           {customGroups.map((g) => (
             <CustomGroupCard key={g.id} group={g} actions={<button type="button">Open</button>} />
           ))}
-        </div>
+        </Grid>
       </Section>
 
       <Section name="CollectionSummary">
@@ -139,16 +143,9 @@ export function ComponentGallery() {
       </Section>
 
       <Section name="CardDetail">
-        <label>
-          Card{' '}
-          <select value={detailKey} onChange={(e) => setDetailKey(e.target.value as keyof typeof cards)}>
-            {Object.entries(cards).map(([key, c]) => (
-              <option key={key} value={key}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Field label="Card">
+          <Select options={Object.entries(cards).map(([key, c]) => ({ value: key as keyof typeof cards, label: c.name }))} value={detailKey} onChange={setDetailKey} />
+        </Field>
         <CardDetail card={cards[detailKey]} entries={allEntries.filter((e) => e.card.id === cards[detailKey].id)} />
       </Section>
 
@@ -156,6 +153,8 @@ export function ComponentGallery() {
         <AddToCollectionForm card={cards.fireIce} groups={customGroups} onSubmit={setSubmitted} />
         {submitted && <pre className="gallery__output">{JSON.stringify(submitted, null, 2)}</pre>}
       </Section>
+
+      <PrimitivesGallery />
     </main>
   );
 }
@@ -174,15 +173,3 @@ const SECTIONS = [
   'CardDetail',
   'AddToCollectionForm',
 ];
-
-function Section({ name, note, children }: { name: string; note?: string; children: ReactNode }) {
-  return (
-    <section id={slug(name)} className="gallery__section">
-      <h2>{name}</h2>
-      {note && <p className="gallery__note">{note}</p>}
-      {children}
-    </section>
-  );
-}
-
-const slug = (s: string) => s.replace(/\W+/g, '-').toLowerCase();

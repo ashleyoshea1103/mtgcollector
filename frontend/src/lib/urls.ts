@@ -11,4 +11,15 @@ export function isOnHost(url: string, host: string): boolean {
   return url.startsWith(prefix) && SAFE_REST.test(url.slice(prefix.length));
 }
 
-export const SET_ICON_HOST = 'svgs.scryfall.io';
+/** Where Scryfall serves its SVGs: set symbols and card symbols. */
+export const SCRYFALL_SVG_HOST = 'svgs.scryfall.io';
+
+/**
+ * The URL a set icon is drawn from as a CSS mask, which browsers fetch with CORS. Scryfall
+ * sends its CORS header only to requests that carry an Origin, without Vary, so a copy cached
+ * by a plain <img> (e.g. from an older build of the app) would make the mask fail. Its own
+ * variant of the URL can't have been cached that way.
+ */
+export function corsIconUrl(url: string): string {
+  return `${url}${url.includes('?') ? '&' : '?'}cors`;
+}

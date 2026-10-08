@@ -1,0 +1,89 @@
+/*
+ * Design tokens: the one place colours, spacing, type, radii and shadows are set.
+ * Components and the base stylesheet use only these custom properties.
+ *
+ * PLACEHOLDER VALUES. The names are the contract; the values are neutral stand-ins
+ * until the design brief arrives, when only this file should need to change.
+ * src/styles/tokens.test.ts checks every rarity and mana colour has a token, and that
+ * rarity colours (used for text) are readable on the background.
+ *
+ * The names follow Tailwind v4's theme namespaces (--color-*, --spacing-*, --text-*,
+ * --leading-*, --font-*, --font-weight-*, --radius-*, --shadow-*), so when Tailwind arrives
+ * this can become its @theme block and every token gets utilities (e.g. text-rarity-mythic).
+ */
+:root {
+  /* Colour: surfaces and text */
+  --color-bg: #ffffff;
+  --color-surface: #f5f5f5;
+  --color-surface-raised: #ffffff;
+  --color-text: #1a1a1a;
+  --color-text-muted: #5c5c5c;
+  --color-border: #c8c8c8;
+  --color-focus: #1a5fb4;
+  --color-overlay: rgb(0 0 0 / 40%);
+
+  /* Colour: actions and feedback */
+  --color-accent: #1a5fb4;
+  --color-accent-text: #ffffff;
+  --color-danger: #a51d2d;
+  --color-danger-text: #ffffff;
+  --color-success: #26a269;
+  --color-warning: #c64600;
+  --color-skeleton: #e0e0e0;
+
+  /* Colour: card rarities (set symbols, rarity badges) */
+  --color-rarity-common: #1a1a1a;
+  --color-rarity-uncommon: #5f6670;
+  --color-rarity-rare: #7a6420;
+  --color-rarity-mythic: #bf4427;
+  --color-rarity-special: #652978;
+  --color-rarity-bonus: #652978;
+
+  /* Colour: mana (W U B R G C), for symbols and colour breakdowns; M is multicolour */
+  --color-mana-w: #f8f6d8;
+  --color-mana-u: #c1d7e9;
+  --color-mana-b: #bab1ab;
+  --color-mana-r: #e49977;
+  --color-mana-g: #a3c095;
+  --color-mana-c: #ccc2c0;
+  --color-mana-m: #e0c96b;
+
+  /* Spacing: a 4px-based scale */
+  --spacing-0: 0;
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.5rem;
+  --spacing-6: 2rem;
+  --spacing-7: 3rem;
+
+  /* Type */
+  --font-body: system-ui, sans-serif;
+  --font-mono: ui-monospace, monospace;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --font-weight-normal: 400;
+  --font-weight-bold: 700;
+  --leading-tight: 1.2;
+  --leading-body: 1.4;
+
+  /* Radius */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 15%);
+  --shadow-md: 0 2px 8px rgb(0 0 0 / 20%);
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 25%);
+
+  /* Layering */
+  --z-overlay: 100;
+  --z-toast: 200;
+  --z-tooltip: 300;
+}
