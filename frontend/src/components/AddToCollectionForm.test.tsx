@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { cards, customGroups } from '../fixtures';
 import { LANGUAGES } from '../lib/labels';
 import { eur, getByTooltip } from '../test/helpers';
+import { corsIconUrl } from '../lib/urls';
 import type { NewEntry } from '../types';
 import { AddToCollectionForm } from './AddToCollectionForm';
 
@@ -18,7 +19,7 @@ describe('AddToCollectionForm', () => {
     // The set symbol (an image) sits before the name, after the "(".
     expect(line).toHaveTextContent(`Adding ${ragavan.name} ( ${ragavan.set.name} #${ragavan.collector_number})`);
     expect(getByTooltip(line as HTMLElement, ragavan.set.name)).toHaveClass('set-symbol');
-    expect(line.querySelector('.set-symbol img')).toHaveAttribute('src', ragavan.set.icon_svg_uri);
+    expect(line.querySelector('.set-symbol img')).toHaveAttribute('src', corsIconUrl(ragavan.set.icon_svg_uri!));
   });
 
   it('submits one near-mint English copy by default', async () => {

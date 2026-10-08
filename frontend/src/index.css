@@ -57,28 +57,29 @@ img {
   white-space: nowrap;
   text-decoration: none;
 }
-/* The symbol is Scryfall's SVG as a mask over the text colour, which the rarity sets (below),
-   in a fixed box so it holds its space before it loads and never squeezes to nothing. */
+/* The symbol is Scryfall's SVG as a mask over the text colour, which the rarity sets (below).
+   It's the text's height, at the symbol's own proportions once known (--set-icon-ratio, from
+   SetSymbol) and a typical 1.4 until then, so it holds its space before it loads. */
 .set-symbol__icon {
   display: inline-block;
-  flex-shrink: 0;
-  width: 1.4em;
   height: 1em;
+  aspect-ratio: var(--set-icon-ratio, 1.4);
   margin-right: 0.2em;
   vertical-align: -0.15em;
   background-color: currentColor;
   mask: var(--set-icon, none) center / contain no-repeat;
 }
-/* Only there to report a failed load (see SetSymbol). */
+/* Only there to report the symbol's load or failure (see SetSymbol). */
 .set-symbol__probe {
   display: none;
 }
 /* Forced colours (e.g. Windows High Contrast) would repaint the fill as the background,
-   hiding the symbol: draw it in the text colour instead. */
+   hiding the symbol: draw it in the text colour around it instead, which is already forced
+   (CanvasText, ButtonText in a button, LinkText in a link). */
 @media (forced-colors: active) {
   .set-symbol__icon {
     forced-color-adjust: none;
-    background-color: CanvasText;
+    background-color: currentColor;
   }
 }
 

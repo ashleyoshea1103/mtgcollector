@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { entries, serverPricedBolts } from '../fixtures';
 import { CONDITIONS, FINISHES, LANGUAGES } from '../lib/labels';
 import { cellsByColumn, eur, getByTooltip } from '../test/helpers';
+import { corsIconUrl } from '../lib/urls';
 import { CollectionEntryTable } from './CollectionEntryTable';
 
 const all = Object.values(entries);
@@ -22,7 +23,7 @@ describe('CollectionEntryTable', () => {
     expect(cells.Type).toHaveTextContent(entry.card.type_line);
     expect(cells.Set).toHaveTextContent(`${entry.card.set.name} #${entry.card.collector_number}`);
     expect(cells.Set.querySelector('.set-symbol__code')).toBeNull(); // the symbol stands in for the code
-    expect(cells.Set.querySelector('.set-symbol img')).toHaveAttribute('src', entry.card.set.icon_svg_uri);
+    expect(cells.Set.querySelector('.set-symbol img')).toHaveAttribute('src', corsIconUrl(entry.card.set.icon_svg_uri!));
     expect(getByTooltip(cells.Condition, CONDITIONS[entry.condition])).toHaveTextContent(entry.condition);
     expect(cells.Finish).toHaveTextContent(new RegExp(`^${FINISHES[entry.finish]}$`));
     expect(cells.Language).toHaveTextContent(new RegExp(`^${LANGUAGES[entry.language]}$`));

@@ -74,8 +74,8 @@ export interface CardSet {
   code: string;
   name: string;
   /**
-   * The set's symbol: an SVG on svgs.scryfall.io, or null. Only ever show it with <img>,
-   * which doesn't run scripts inside an SVG.
+   * The set's symbol: an SVG on svgs.scryfall.io, or null. Only ever draw it as an image
+   * (an <img> or a CSS mask), which doesn't run scripts inside an SVG: never inline it.
    */
   icon_svg_uri: string | null;
 }

@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { isOnHost, SCRYFALL_SVG_HOST } from '../lib/urls';
+import { corsIconUrl, isOnHost, SCRYFALL_SVG_HOST } from '../lib/urls';
 import type { CardSet, Rarity } from '../types';
 import { TooltipText } from '../ui';
 
@@ -25,22 +25,35 @@ interface Props {
  * can't close the string.
  */
 export function SetSymbol({ set, rarity, nameShown = false }: Props) {
-  const icon = set.icon_svg_uri !== null && isOnHost(set.icon_svg_uri, SCRYFALL_SVG_HOST) ? set.icon_svg_uri : null;
-  // A mask has no error event, so a hidden <img> of the same URL (fetched the same way, so
-  // the browser loads it once) tells us if it failed. A new icon gets its own try.
-  //
-  // Masks are fetched with CORS. Scryfall only sends its CORS header (and Vary: Origin) to
-  // requests that carry an Origin, so a plain <img> of a set icon anywhere in the app would
-  // leave a cached copy without it, and the mask would then fail (falling back to the code)
-  // in that browser. Load set icons only through this component.
+  const icon = set.icon_svg_uri !== null && isOnHost(set.icon_svg_uri, SCRYFALL_SVG_HOST) ? corsIconUrl(set.icon_svg_uri) : null;
+  // A mask has no load or error events, so a hidden <img> of the same URL, fetched the same
+  // way (CORS, so the browser fetches it once), reports them: a failure shows the code, and
+  // a load gives the symbol's proportions. Both are kept per URL, so a new icon starts over.
   const [failed, setFailed] = useState<string | null>(null);
+  const [ratio, setRatio] = useState<{ url: string; value: number } | null>(null);
   const shown = icon !== null && icon !== failed ? icon : null;
+  const style = {
+    '--set-icon': `url("${shown}")`,
+    ...(ratio?.url === shown && { '--set-icon-ratio': ratio.value }),
+  } as CSSProperties;
   return (
     <TooltipText as="abbr" className={`set-symbol${rarity ? ` set-symbol--${rarity}` : ''}`} tooltip={set.name} announce={!nameShown}>
       {shown ? (
         <>
-          <span className="set-symbol__icon" style={{ '--set-icon': `url("${shown}")` } as CSSProperties} />
-          <img className="set-symbol__probe" src={shown} alt="" crossOrigin="anonymous" referrerPolicy="no-referrer" onError={() => setFailed(shown)} />
+          <span className="set-symbol__icon" style={style} />
+          {/* Not lazy: hidden, a lazy image would never load, and a failure would go unseen. */}
+          <img
+            className="set-symbol__probe"
+            src={shown}
+            alt=""
+            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
+            onError={() => setFailed(shown)}
+            onLoad={(e) => {
+              const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+              if (w > 0 && h > 0) setRatio({ url: shown, value: w / h });
+            }}
+          />
         </>
       ) : (
         <span className="set-symbol__code">{set.code.toUpperCase()}</span>

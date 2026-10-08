@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { cards } from '../fixtures';
 import { getByTooltip } from '../test/helpers';
@@ -41,6 +41,14 @@ describe('ManaSymbol', () => {
   it("doesn't tell Scryfall which page loaded it", () => {
     const { container } = render(<ManaSymbol symbol="G" />);
     expect(container.querySelector('img')).toHaveAttribute('referrerpolicy', 'no-referrer');
+  });
+
+  it("gives another symbol's image its own try after one failed", () => {
+    const { container, rerender } = render(<ManaSymbol symbol="G" />);
+    fireEvent.error(container.querySelector('img')!);
+    expect(container.querySelector('img')).toBeNull();
+    rerender(<ManaSymbol symbol="U" />);
+    expect(container.querySelector('img')).toHaveAttribute('src', 'https://svgs.scryfall.io/card-symbols/U.svg');
   });
 
   it('can be left to a parent to announce', () => {

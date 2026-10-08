@@ -44,6 +44,10 @@ describe('describeManaCost', () => {
     expect(describeManaCost('{HW}{P}')).toBe('one-half white mana, modal budget pawprint');
   });
 
+  it('reads a zero cost as zero, not "0 generic"', () => {
+    expect(describeManaCost('{0}')).toBe('zero');
+  });
+
   it("passes symbols nobody knows through as their letters", () => {
     expect(describeManaCost('{NEW}{2/NEW}')).toBe('NEW, 2/NEW');
   });

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { cards, customGroups, stats, unpricedCard } from '../fixtures';
 import { COLORS, RARITIES } from '../lib/labels';
 import { eur, getByTooltip } from '../test/helpers';
+import { corsIconUrl } from '../lib/urls';
 import type { CardSummary, CustomGroup } from '../types';
 import { CollectionSummary } from './CollectionSummary';
 import { CustomGroupCard } from './CustomGroupCard';
@@ -181,7 +182,7 @@ describe('RarityBadge and SetSymbol', () => {
   it('shows the set symbol instead of the code, with the set name on hover, classed by rarity', () => {
     render(<SetSymbol set={unpricedCard.set} rarity={unpricedCard.rarity} />);
     const symbol = getByTooltip(document.body, unpricedCard.set.name);
-    expect(symbol.querySelector('img')).toHaveAttribute('src', unpricedCard.set.icon_svg_uri);
+    expect(symbol.querySelector('img')).toHaveAttribute('src', corsIconUrl(unpricedCard.set.icon_svg_uri!));
     expect(symbol).toHaveTextContent(/^$/);
     expect(symbol).toHaveClass(`set-symbol--${unpricedCard.rarity}`);
   });
@@ -194,7 +195,8 @@ describe('RarityBadge and SetSymbol', () => {
   it("draws the set's symbol in the rarity's colour, as a mask of Scryfall's SVG", () => {
     const { container } = render(<SetSymbol set={cards.ragavan.set} rarity="mythic" />);
     const icon = container.querySelector<HTMLElement>('.set-symbol__icon')!;
-    expect(icon.style.getPropertyValue('--set-icon')).toBe(`url("${cards.ragavan.set.icon_svg_uri}")`);
+    // Its own URL for the CORS fetch, so a copy cached by a plain <img> can't break it.
+    expect(icon.style.getPropertyValue('--set-icon')).toBe(`url("${corsIconUrl(cards.ragavan.set.icon_svg_uri!)}")`);
     // The colour comes from the rarity class on the symbol (CSS: currentColor).
     expect(icon.closest('.set-symbol')).toHaveClass('set-symbol--mythic');
     expect(container.querySelector('.set-symbol__code')).toBeNull();
@@ -205,11 +207,34 @@ describe('RarityBadge and SetSymbol', () => {
     const { container } = render(<SetSymbol set={cards.ragavan.set} rarity="mythic" />);
     // A hidden probe image of the same URL reports the failure the mask can't.
     const probe = container.querySelector('img.set-symbol__probe')!;
-    expect(probe).toHaveAttribute('src', cards.ragavan.set.icon_svg_uri);
+    expect(probe).toHaveAttribute('src', corsIconUrl(cards.ragavan.set.icon_svg_uri!));
     expect(probe).toHaveAttribute('crossorigin', 'anonymous'); // fetched as the mask is, so once
+    // Hidden, a lazy image would never load, so a failure would go unseen.
+    expect(probe).not.toHaveAttribute('loading');
     fireEvent.error(probe);
     expect(container.querySelector('.set-symbol__icon')).toBeNull();
     expect(container.querySelector('.set-symbol__code')).toHaveTextContent(/^MH2$/);
+  });
+
+  it("gives another set's symbol its own try after one failed", () => {
+    const { container, rerender } = render(<SetSymbol set={cards.ragavan.set} />);
+    fireEvent.error(container.querySelector('img.set-symbol__probe')!);
+    rerender(<SetSymbol set={cards.lightningBolt.set} />);
+    expect(container.querySelector('.set-symbol__icon')).not.toBeNull();
+    expect(container.querySelector('.set-symbol__code')).toBeNull();
+  });
+
+  it("takes the symbol's own proportions once it has loaded", () => {
+    const { container, rerender } = render(<SetSymbol set={cards.ragavan.set} />);
+    const icon = () => container.querySelector<HTMLElement>('.set-symbol__icon')!;
+    expect(icon().style.getPropertyValue('--set-icon-ratio')).toBe(''); // CSS default until then
+    const probe = container.querySelector<HTMLImageElement>('img.set-symbol__probe')!;
+    Object.defineProperties(probe, { naturalWidth: { value: 232 }, naturalHeight: { value: 150 } });
+    fireEvent.load(probe);
+    expect(Number(icon().style.getPropertyValue('--set-icon-ratio'))).toBeCloseTo(232 / 150);
+    // A different set doesn't keep the old proportions.
+    rerender(<SetSymbol set={cards.lightningBolt.set} />);
+    expect(icon().style.getPropertyValue('--set-icon-ratio')).toBe('');
   });
 
   it("doesn't tell Scryfall which page loaded the symbol", () => {

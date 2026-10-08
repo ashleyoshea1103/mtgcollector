@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { cards, entries, serverPricedBolts } from '../fixtures';
 import { describeManaCost } from '../lib/mana';
 import { cellsByColumn, eur, getByTooltip, usd } from '../test/helpers';
+import { corsIconUrl } from '../lib/urls';
 import { CardDetail } from './CardDetail';
 
 const { delver, fireIce, lightningBolt, propaganda, ragavan } = cards;
@@ -26,7 +27,7 @@ describe('CardDetail', () => {
     render(<CardDetail card={ragavan} />);
     const printing = screen.getByRole('heading', { level: 2, name: ragavan.name }).nextElementSibling!;
     expect(printing).toHaveTextContent(`${ragavan.set.name} #${ragavan.collector_number}`);
-    expect(getByTooltip(printing as HTMLElement, ragavan.set.name).querySelector('img')).toHaveAttribute('src', ragavan.set.icon_svg_uri);
+    expect(getByTooltip(printing as HTMLElement, ragavan.set.name).querySelector('img')).toHaveAttribute('src', corsIconUrl(ragavan.set.icon_svg_uri!));
     expect(getByTooltip(printing as HTMLElement, 'Mythic rare')).toHaveTextContent('M');
     expect(within(printing as HTMLElement).getByText(ragavan.released_at)).toHaveAttribute('datetime', ragavan.released_at);
   });

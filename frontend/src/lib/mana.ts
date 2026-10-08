@@ -35,6 +35,7 @@ const SYMBOL_NAMES: Record<string, string> = {
  * Scryfall's words for it, or its letters if Scryfall hasn't got it either.
  */
 export function describeManaSymbol(symbol: string): string {
+  if (symbol === '0') return 'zero';
   if (/^\d+$/.test(symbol)) return `${symbol} generic`;
   const parts = symbol.split('/');
   // A trailing P is the Phyrexian half of a symbol like B/P (a lone {P} is something else).

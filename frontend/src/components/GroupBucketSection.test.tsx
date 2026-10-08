@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { colorGroups, makeGroup, setGroup } from '../fixtures';
 import { eur, getByTooltip } from '../test/helpers';
+import { corsIconUrl } from '../lib/urls';
 import { GroupBucketSection } from './GroupBucketSection';
 
 const red = colorGroups.find(({ group }) => group.key === 'R')!;
@@ -21,8 +22,8 @@ describe('GroupBucketSection', () => {
     const { container } = render(<GroupBucketSection {...setGroup} />);
     const set = setGroup.group.set!;
     expect(toggle(set.name)).toBeInTheDocument();
-    expect(getByTooltip(toggle(set.name), set.name).querySelector('img')).toHaveAttribute('src', set.icon_svg_uri);
-    expect(container.querySelector('.group-bucket__toggle img')).toHaveAttribute('src', set.icon_svg_uri);
+    expect(getByTooltip(toggle(set.name), set.name).querySelector('img')).toHaveAttribute('src', corsIconUrl(set.icon_svg_uri!));
+    expect(container.querySelector('.group-bucket__toggle img')).toHaveAttribute('src', corsIconUrl(set.icon_svg_uri!));
   });
 
   it("shows no set symbol in a group that isn't a set", () => {

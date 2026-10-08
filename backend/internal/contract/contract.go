@@ -75,8 +75,8 @@ type CardSet struct {
 	// Scryfall's set code, e.g. "mh2".
 	Code string `json:"code"`
 	Name string `json:"name"`
-	// The set's symbol: an SVG on svgs.scryfall.io, or null. Only ever show it with <img>,
-	// which doesn't run scripts inside an SVG.
+	// The set's symbol: an SVG on svgs.scryfall.io, or null. Only ever draw it as an image
+	// (an <img> or a CSS mask), which doesn't run scripts inside an SVG: never inline it.
 	IconSVGURI *string `json:"icon_svg_uri" tstype:"string | null,required"`
 }
 
