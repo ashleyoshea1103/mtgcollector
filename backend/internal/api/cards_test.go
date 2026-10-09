@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 )
@@ -100,6 +102,8 @@ func TestErrorsBecomeTheRightStatus(t *testing.T) {
 		{"a wrapped mistake", fmt.Errorf("parse: %w", &cards.QueryError{Reason: "page must be from 1 to 50"}), 400, "page must be from 1 to 50"},
 		{"an unknown card", cards.ErrNotFound, 404, "no card with that id"},
 		{"a slow query", fmt.Errorf("search: %w", context.DeadlineExceeded), 503, "that took too long; try a narrower search"},
+		// What Postgres says when pgx cancels a query whose time ran out.
+		{"a query Postgres cancelled", fmt.Errorf("search: %w", &pgconn.PgError{Code: "57014", Message: "canceling statement due to user request"}), 503, "that took too long; try a narrower search"},
 		{"anything else", errors.New(`ERROR: relation "secret_table" does not exist`), 500, "something went wrong"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 )
 
 func TestNameWords(t *testing.T) {
@@ -117,4 +118,44 @@ func TestQueryErrorsSayWhatWasWrong(t *testing.T) {
 func isQueryError(err error) bool {
 	var q *QueryError
 	return errors.As(err, &q)
+}
+
+func TestLongestRun(t *testing.T) {
+	for s, want := range map[string]int{"bolt": 4, "---": 0, "ab-c": 2, "Lim-Dûl's": 3, "a1b2c3": 6, "": 0, "%%%": 0} {
+		if got := longestRun(s); got != want {
+			t.Errorf("longestRun(%q) = %d, want %d", s, got, want)
+		}
+	}
+}
+
+// pg_trgm finds no trigrams without three letters or digits in a row, so such searches
+// would scan every card: refused, however long the words are.
+func TestSearchNeedsThreeLettersInARow(t *testing.T) {
+	s := &Searcher{} // no database: refused before any query
+	for _, name := range []string{"---", "''' ---", "ab-c de-f", "%%% ___"} {
+		if _, err := s.Search(t.Context(), Search{Name: name, Page: 1}); !isQueryError(err) {
+			t.Errorf("Search(%q) err = %v, want a QueryError", name, err)
+		}
+	}
+	// A word without a run of three can still narrow a search led by one with it.
+	if words, err := nameWords("ab-c lightning"); err != nil || len(words) != 2 {
+		t.Errorf("nameWords = %q, %v", words, err)
+	}
+	for _, typed := range []string{"'''", "l-i-g", "ab cd"} {
+		got, err := s.Autocomplete(t.Context(), typed)
+		if err != nil || len(got.Names) != 0 {
+			t.Errorf("Autocomplete(%q) = %q, %v; want nothing, without a query", typed, got.Names, err)
+		}
+	}
+}
+
+func TestTheLastPageNeverSaysThereIsMore(t *testing.T) {
+	full := make([]store.CardListing, PageSize+1) // one more than a page: there is more
+	if p, err := page(full, 1); err != nil || !p.HasMore || len(p.Cards) != PageSize {
+		t.Errorf("page 1: has_more %v, %d cards, %v", p.HasMore, len(p.Cards), err)
+	}
+	// Page MaxPage+1 would be refused, so the last page doesn't offer it.
+	if p, err := page(full, MaxPage); err != nil || p.HasMore {
+		t.Errorf("page %d: has_more %v, %v; want false", MaxPage, p.HasMore, err)
+	}
 }

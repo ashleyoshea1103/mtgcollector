@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
@@ -116,7 +117,7 @@ func (s *Searcher) Search(ctx context.Context, q Search) (contract.CardPage, err
 	var rows []store.CardListing
 	if len(words) > 0 {
 		// The longest word leads (it's the most selective for the index); all must match.
-		lead := slices.MaxFunc(words, func(a, b string) int { return utf8.RuneCountInString(a) - utf8.RuneCountInString(b) })
+		lead := slices.MaxFunc(words, func(a, b string) int { return longestRun(a) - longestRun(b) })
 		more := make([]string, len(words))
 		for i, w := range words {
 			more[i] = "%" + likeEscape(w) + "%"
@@ -160,8 +161,8 @@ func (s *Searcher) Autocomplete(ctx context.Context, typed string) (contract.Car
 	if utf8.RuneCountInString(typed) > MaxQueryLength {
 		return contract.CardNames{}, invalid("too long")
 	}
-	// Letters, not spaces: "l i" is too little to look up by index.
-	if utf8.RuneCountInString(strings.ReplaceAll(typed, " ", "")) < MinAutocomplete {
+	// Three letters or digits in a row, which the index can look up: "l i" or "'''" can't be.
+	if longestRun(typed) < MinAutocomplete {
 		return contract.CardNames{Names: []string{}}, nil
 	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
@@ -208,15 +209,15 @@ func (s *Searcher) Printings(ctx context.Context, id string, pageNo int) (contra
 	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	card, err := s.Q.GetCard(ctx, uuid)
+	oracleID, err := s.Q.CardOracleID(ctx, uuid)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return contract.CardPage{}, ErrNotFound
 	}
 	if err != nil {
-		return contract.CardPage{}, fmt.Errorf("get card: %w", err)
+		return contract.CardPage{}, fmt.Errorf("card oracle id: %w", err)
 	}
 	limit, offset := pageWindow(pageNo)
-	res, err := s.Q.CardPrintings(ctx, store.CardPrintingsParams{OracleID: card.CardListing.OracleID, RowLimit: limit, RowOffset: offset})
+	res, err := s.Q.CardPrintings(ctx, store.CardPrintingsParams{OracleID: oracleID, RowLimit: limit, RowOffset: offset})
 	if err != nil {
 		return contract.CardPage{}, fmt.Errorf("card printings: %w", err)
 	}
@@ -240,7 +241,8 @@ func pageWindow(n int) (limit, offset int32) {
 }
 
 func page(rows []store.CardListing, n int) (contract.CardPage, error) {
-	p := contract.CardPage{Cards: make([]contract.CardSummary, 0, min(len(rows), PageSize)), Page: n, HasMore: len(rows) > PageSize}
+	// Never more after MaxPage, as the next page would be refused.
+	p := contract.CardPage{Cards: make([]contract.CardSummary, 0, min(len(rows), PageSize)), Page: n, HasMore: len(rows) > PageSize && n < MaxPage}
 	for _, r := range rows[:min(len(rows), PageSize)] {
 		c, err := toSummary(r)
 		if err != nil {
@@ -268,17 +270,32 @@ func nameWords(name string) ([]string, error) {
 	var words []string
 	long := false
 	for _, w := range strings.Fields(name) {
-		n := utf8.RuneCountInString(w)
-		if n < 2 {
+		if utf8.RuneCountInString(w) < 2 {
 			continue
 		}
 		words = append(words, w)
-		long = long || n >= MinSearchWord
+		long = long || longestRun(w) >= MinSearchWord
 	}
 	if len(words) > 0 && !long {
-		return nil, invalid("the name needs a word of at least %d letters", MinSearchWord)
+		return nil, invalid("the name needs a word with at least %d letters in a row", MinSearchWord)
 	}
 	return words, nil
+}
+
+// longestRun is the most letters and digits in a row in s. pg_trgm only finds trigrams in
+// such runs, so a pattern without a run of three ("---", "ab-c") can't use the name index
+// and would scan every card.
+func longestRun(s string) int {
+	best, run := 0, 0
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			run++
+			best = max(best, run)
+		} else {
+			run = 0
+		}
+	}
+	return best
 }
 
 // parseColors reads a colour filter: some of W U B R G (in any order, any case), or C for

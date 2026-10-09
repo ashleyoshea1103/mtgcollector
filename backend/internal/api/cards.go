@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 )
@@ -96,7 +98,7 @@ func respond(w http.ResponseWriter, r *http.Request, res any, err error) {
 		writeError(w, http.StatusBadRequest, bad.Reason)
 	case errors.Is(err, cards.ErrNotFound):
 		writeError(w, http.StatusNotFound, "no card with that id")
-	case errors.Is(err, context.DeadlineExceeded):
+	case errors.Is(err, context.DeadlineExceeded) || isQueryCanceled(err):
 		slog.WarnContext(r.Context(), "card query timed out", "path", r.URL.Path, "error", err)
 		writeError(w, http.StatusServiceUnavailable, "that took too long; try a narrower search")
 	case errors.Is(err, context.Canceled):
@@ -105,6 +107,14 @@ func respond(w http.ResponseWriter, r *http.Request, res any, err error) {
 		slog.ErrorContext(r.Context(), "card query failed", "path", r.URL.Path, "error", err)
 		writeError(w, http.StatusInternalServerError, "something went wrong")
 	}
+}
+
+// isQueryCanceled reports a query Postgres stopped because it was asked to (SQLSTATE 57014,
+// query_canceled): pgx asks when a query's context runs out, and the error that comes back
+// may be Postgres's rather than the context's.
+func isQueryCanceled(err error) bool {
+	var pg *pgconn.PgError
+	return errors.As(err, &pg) && pg.Code == "57014"
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {

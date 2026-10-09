@@ -198,8 +198,9 @@ func TestSearchPutsTheExactNameFirstThenNamesStartingWithIt(t *testing.T) {
 
 func TestSearchMatchesNameTextLiterally(t *testing.T) {
 	s, _, _ := searchDB(t)
-	// Unescaped, _ and % are wildcards and these would match Bolt.
-	for _, q := range []string{"b_lt", "bo%t", `bo\lt`} {
+	// Unescaped, these would match Bolt: _ and % are wildcards, and \ escapes the next
+	// letter. (Each has three letters in a row, so it gets past the index check.)
+	for _, q := range []string{"bol_", "bol%", `bol\t`} {
 		if got := names(search(t, s, Search{Name: q})); len(got) != 0 {
 			t.Errorf("%q found %q, want nothing", q, got)
 		}

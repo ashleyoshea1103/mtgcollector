@@ -62,6 +62,17 @@ func (q *Queries) AutocompleteNames(ctx context.Context, arg AutocompleteNamesPa
 	return items, nil
 }
 
+const cardOracleID = `-- name: CardOracleID :one
+SELECT oracle_id FROM cards WHERE id = $1
+`
+
+func (q *Queries) CardOracleID(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, cardOracleID, id)
+	var oracle_id pgtype.UUID
+	err := row.Scan(&oracle_id)
+	return oracle_id, err
+}
+
 const cardPrintings = `-- name: CardPrintings :many
 SELECT v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
   FROM card_listing v
@@ -191,7 +202,7 @@ SELECT v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rari
           AND c.type_line ILIKE ALL ($7::text[])
           AND c.colors @> $8::text[]
           AND (NOT $9::boolean OR c.colors = '{}')
-        ORDER BY c.oracle_id, (c.lang = 'en') DESC, c.released_at DESC, c.set_code, c.collector_number)
+        ORDER BY c.oracle_id, (c.lang = 'en') DESC, c.released_at DESC, c.set_code, c.collector_number, c.id)
  -- The exact name first, then names that start with it.
  ORDER BY (lower(v.name) = lower($10::text)) DESC, (v.name ILIKE $11::text) DESC, v.name, v.oracle_id
  LIMIT $13 OFFSET $12
@@ -297,7 +308,7 @@ SELECT v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rari
           AND c.type_line ILIKE ALL ($5::text[])
           AND c.colors @> $6::text[]
           AND (NOT $7::boolean OR c.colors = '{}')
-        ORDER BY c.oracle_id, (c.lang = 'en') DESC, c.released_at DESC, c.collector_number)
+        ORDER BY c.oracle_id, (c.lang = 'en') DESC, c.released_at DESC, c.collector_number, c.id)
  ORDER BY v.name, v.oracle_id
  LIMIT $9 OFFSET $8
 `

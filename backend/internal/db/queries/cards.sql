@@ -19,7 +19,7 @@ SELECT sqlc.embed(v)
           AND c.type_line ILIKE ALL (@type_patterns::text[])
           AND c.colors @> @colors::text[]
           AND (NOT @colorless::boolean OR c.colors = '{}')
-        ORDER BY c.oracle_id, (c.lang = 'en') DESC, c.released_at DESC, c.set_code, c.collector_number)
+        ORDER BY c.oracle_id, (c.lang = 'en') DESC, c.released_at DESC, c.set_code, c.collector_number, c.id)
  -- The exact name first, then names that start with it.
  ORDER BY (lower(v.name) = lower(@exact_name::text)) DESC, (v.name ILIKE @prefix_pattern::text) DESC, v.name, v.oracle_id
  LIMIT @row_limit OFFSET @row_offset;
@@ -37,7 +37,7 @@ SELECT sqlc.embed(v)
           AND c.type_line ILIKE ALL (@type_patterns::text[])
           AND c.colors @> @colors::text[]
           AND (NOT @colorless::boolean OR c.colors = '{}')
-        ORDER BY c.oracle_id, (c.lang = 'en') DESC, c.released_at DESC, c.collector_number)
+        ORDER BY c.oracle_id, (c.lang = 'en') DESC, c.released_at DESC, c.collector_number, c.id)
  ORDER BY v.name, v.oracle_id
  LIMIT @row_limit OFFSET @row_offset;
 
@@ -61,6 +61,9 @@ SELECT name
 SELECT sqlc.embed(v)
   FROM card_listing v
  WHERE v.id = @id;
+
+-- name: CardOracleID :one
+SELECT oracle_id FROM cards WHERE id = @id;
 
 -- name: CardPrintings :many
 -- Every printing of the card with this oracle id, newest first, gone ones included (a
