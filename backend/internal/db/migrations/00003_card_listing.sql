@@ -1,6 +1,8 @@
 -- +goose Up
 -- What the card API reads: every printing with its set's name and symbol. One shape for
--- search results, printings and card details (internal/cards search.go).
+-- search results, printings and card details (internal/cards search.go). Postgres won't
+-- change the type of a column a view uses: a later migration that does must drop this view
+-- and create it again.
 CREATE VIEW card_listing AS
 SELECT c.id, c.oracle_id, c.name, c.lang, c.set_code, c.collector_number, c.rarity, c.layout,
        c.mana_cost, c.cmc, c.type_line, c.oracle_text, c.colors, c.color_identity, c.finishes,

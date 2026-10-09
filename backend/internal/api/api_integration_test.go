@@ -46,7 +46,7 @@ func TestCardRoutesAgainstARealDatabase(t *testing.T) {
 		{"/api/cards/autocomplete?q=light", 200, `{"names":[]}`},
 		{"/api/cards/00000000-0000-4000-8000-000000000000", 404, `{"error":"no card with that id"}`},
 		{"/api/cards/00000000-0000-4000-8000-000000000000/printings", 404, `{"error":"no card with that id"}`},
-		{"/api/cards/search?q=a", 400, `{"error":"give a card name (with a word of at least 3 letters) or a set"}`},
+		{"/api/cards/search?q=a", 400, `{"error":"give a name with at least 3 letters in a row, or a set"}`},
 	} {
 		res, err := http.Get(srv.URL + tc.path)
 		if err != nil {

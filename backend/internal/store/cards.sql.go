@@ -17,17 +17,19 @@ SELECT name
  WHERE name ILIKE $1::text
    AND gone_since IS NULL
    AND layout <> ALL ($2::text[])
+   AND NOT type_line ILIKE ANY ($3::text[])
  GROUP BY name
- ORDER BY (name ILIKE $3::text) DESC,
-          ((' ' || name) ILIKE $4::text) DESC,
+ ORDER BY (name ILIKE $4::text) DESC,
+          ((' ' || name) ILIKE $5::text) DESC,
           count(*) DESC,
           name
- LIMIT $5
+ LIMIT $6
 `
 
 type AutocompleteNamesParams struct {
 	NamePattern       string
 	ExtraLayouts      []string
+	ExtraTypes        []string
 	PrefixPattern     string
 	WordPrefixPattern string
 	RowLimit          int32
@@ -40,6 +42,7 @@ func (q *Queries) AutocompleteNames(ctx context.Context, arg AutocompleteNamesPa
 	rows, err := q.db.Query(ctx, autocompleteNames,
 		arg.NamePattern,
 		arg.ExtraLayouts,
+		arg.ExtraTypes,
 		arg.PrefixPattern,
 		arg.WordPrefixPattern,
 		arg.RowLimit,
@@ -188,40 +191,53 @@ func (q *Queries) GetCard(ctx context.Context, id pgtype.UUID) (GetCardRow, erro
 
 const searchCardsByName = `-- name: SearchCardsByName :many
 
+WITH picked AS (
+    SELECT DISTINCT ON (c.oracle_id) c.id, c.name, c.oracle_id
+      FROM cards c
+      JOIN sets s ON s.code = c.set_code
+     WHERE c.name ILIKE $1::text
+       AND c.name ILIKE ALL ($2::text[])
+       AND c.gone_since IS NULL
+       AND ($3::boolean
+            OR (c.layout <> ALL ($4::text[]) AND NOT c.type_line ILIKE ANY ($5::text[])))
+       AND ($6::text IS NULL OR c.set_code = $6::text)
+       AND ($7::text IS NULL OR c.rarity = $7::text)
+       AND c.type_line ILIKE ALL ($8::text[])
+       AND c.colors @> $9::text[]
+       AND (NOT $10::boolean OR c.colors = '{}')
+     ORDER BY c.oracle_id,
+              (c.lang = 'en') DESC,
+              (c.released_at <= current_date) DESC,
+              (s.set_type = ANY ($11::text[])) DESC,
+              c.released_at DESC, c.set_code, length(c.collector_number), c.collector_number, c.id
+), page AS (
+    -- Names that start with what was typed first (the exact name among them, as it's shortest).
+    SELECT p.id, p.name, p.oracle_id, (p.name ILIKE $12::text) AS starts_with
+      FROM picked p
+     ORDER BY starts_with DESC, p.name, p.oracle_id
+     LIMIT $14 OFFSET $13
+)
 SELECT v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
-  FROM card_listing v
- WHERE v.id = ANY (
-       SELECT DISTINCT ON (c.oracle_id) c.id
-         FROM cards c
-        WHERE c.name ILIKE $1::text
-          AND c.name ILIKE ALL ($2::text[])
-          AND c.gone_since IS NULL
-          AND ($3::boolean OR c.layout <> ALL ($4::text[]))
-          AND ($5::text IS NULL OR c.set_code = $5::text)
-          AND ($6::text IS NULL OR c.rarity = $6::text)
-          AND c.type_line ILIKE ALL ($7::text[])
-          AND c.colors @> $8::text[]
-          AND (NOT $9::boolean OR c.colors = '{}')
-        ORDER BY c.oracle_id, (c.lang = 'en') DESC, c.released_at DESC, c.set_code, c.collector_number, c.id)
- -- The exact name first, then names that start with it.
- ORDER BY (lower(v.name) = lower($10::text)) DESC, (v.name ILIKE $11::text) DESC, v.name, v.oracle_id
- LIMIT $13 OFFSET $12
+  FROM page
+  JOIN card_listing v ON v.id = page.id
+ ORDER BY page.starts_with DESC, page.name, page.oracle_id
 `
 
 type SearchCardsByNameParams struct {
-	NamePattern      string
-	MoreNamePatterns []string
-	IncludeExtras    bool
-	ExtraLayouts     []string
-	SetCode          pgtype.Text
-	Rarity           pgtype.Text
-	TypePatterns     []string
-	Colors           []string
-	Colorless        bool
-	ExactName        string
-	PrefixPattern    string
-	RowOffset        int32
-	RowLimit         int32
+	LeadPattern     string
+	NamePatterns    []string
+	IncludeExtras   bool
+	ExtraLayouts    []string
+	ExtraTypes      []string
+	SetCode         pgtype.Text
+	Rarity          pgtype.Text
+	TypePatterns    []string
+	Colors          []string
+	Colorless       bool
+	RegularSetTypes []string
+	PrefixPattern   string
+	RowOffset       int32
+	RowLimit        int32
 }
 
 type SearchCardsByNameRow struct {
@@ -229,22 +245,23 @@ type SearchCardsByNameRow struct {
 }
 
 // Queries for the card API (internal/cards search.go). Patterns are ILIKE patterns built there, with the user's % _ \ escaped.
-// One printing per card (oracle_id) whose name matches: an English one if there is, the
-// newest. Name searches and set browsing are separate queries, each led by a condition its
-// index can serve (the name's trigram index; the set's index): a combined "pattern is null
-// or name matches" would leave a cached generic plan unable to use either.
+// A page of cards whose name matches, one printing each (see search.go for which). The
+// search is led by a name pattern the trigram index can serve; set browsing is a separate
+// query led by the set's index. The ranking and paging are done on narrow rows, and only
+// the page's cards are then read in full.
 func (q *Queries) SearchCardsByName(ctx context.Context, arg SearchCardsByNameParams) ([]SearchCardsByNameRow, error) {
 	rows, err := q.db.Query(ctx, searchCardsByName,
-		arg.NamePattern,
-		arg.MoreNamePatterns,
+		arg.LeadPattern,
+		arg.NamePatterns,
 		arg.IncludeExtras,
 		arg.ExtraLayouts,
+		arg.ExtraTypes,
 		arg.SetCode,
 		arg.Rarity,
 		arg.TypePatterns,
 		arg.Colors,
 		arg.Colorless,
-		arg.ExactName,
+		arg.RegularSetTypes,
 		arg.PrefixPattern,
 		arg.RowOffset,
 		arg.RowLimit,
@@ -296,27 +313,40 @@ func (q *Queries) SearchCardsByName(ctx context.Context, arg SearchCardsByNamePa
 }
 
 const searchCardsInSet = `-- name: SearchCardsInSet :many
+WITH picked AS (
+    SELECT DISTINCT ON (c.oracle_id) c.id, c.name, c.oracle_id
+      FROM cards c
+     WHERE c.set_code = $1::text
+       AND c.name ILIKE ALL ($2::text[])
+       AND c.gone_since IS NULL
+       AND ($3::boolean
+            OR (c.layout <> ALL ($4::text[]) AND NOT c.type_line ILIKE ANY ($5::text[])))
+       AND ($6::text IS NULL OR c.rarity = $6::text)
+       AND c.type_line ILIKE ALL ($7::text[])
+       AND c.colors @> $8::text[]
+       AND (NOT $9::boolean OR c.colors = '{}')
+     ORDER BY c.oracle_id,
+              (c.lang = 'en') DESC,
+              (c.released_at <= current_date) DESC,
+              c.released_at DESC, length(c.collector_number), c.collector_number, c.id
+), page AS (
+    SELECT p.id, p.name, p.oracle_id
+      FROM picked p
+     ORDER BY p.name, p.oracle_id
+     LIMIT $11 OFFSET $10
+)
 SELECT v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
-  FROM card_listing v
- WHERE v.id = ANY (
-       SELECT DISTINCT ON (c.oracle_id) c.id
-         FROM cards c
-        WHERE c.set_code = $1::text
-          AND c.gone_since IS NULL
-          AND ($2::boolean OR c.layout <> ALL ($3::text[]))
-          AND ($4::text IS NULL OR c.rarity = $4::text)
-          AND c.type_line ILIKE ALL ($5::text[])
-          AND c.colors @> $6::text[]
-          AND (NOT $7::boolean OR c.colors = '{}')
-        ORDER BY c.oracle_id, (c.lang = 'en') DESC, c.released_at DESC, c.collector_number, c.id)
- ORDER BY v.name, v.oracle_id
- LIMIT $9 OFFSET $8
+  FROM page
+  JOIN card_listing v ON v.id = page.id
+ ORDER BY page.name, page.oracle_id
 `
 
 type SearchCardsInSetParams struct {
 	SetCode       string
+	NamePatterns  []string
 	IncludeExtras bool
 	ExtraLayouts  []string
+	ExtraTypes    []string
 	Rarity        pgtype.Text
 	TypePatterns  []string
 	Colors        []string
@@ -329,11 +359,15 @@ type SearchCardsInSetRow struct {
 	CardListing CardListing
 }
 
+// A page of the cards in a set, by name, one printing each (the set's own), optionally
+// narrowed by name words too short to lead a name search.
 func (q *Queries) SearchCardsInSet(ctx context.Context, arg SearchCardsInSetParams) ([]SearchCardsInSetRow, error) {
 	rows, err := q.db.Query(ctx, searchCardsInSet,
 		arg.SetCode,
+		arg.NamePatterns,
 		arg.IncludeExtras,
 		arg.ExtraLayouts,
+		arg.ExtraTypes,
 		arg.Rarity,
 		arg.TypePatterns,
 		arg.Colors,
