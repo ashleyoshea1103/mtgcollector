@@ -108,6 +108,40 @@ export interface CardSummary {
    */
   finishes: Finish[];
   released_at: string;
+  /**
+   * Scryfall no longer lists this printing (deleted, merged or made digital-only). It's
+   * kept because collections may hold it, but it has no prices and isn't in search results.
+   */
+  no_longer_listed: boolean;
+}
+/**
+ * One page of cards: search results (one printing per card) or one card's printings.
+ */
+export interface CardPage {
+  cards: CardSummary[];
+  /**
+   * This page's number, from 1.
+   */
+  page: number /* int */;
+  /**
+   * Whether there's a next page.
+   */
+  has_more: boolean;
+}
+/**
+ * GET /api/cards/autocomplete: card names matching what's been typed, best first.
+ */
+export interface CardNames {
+  names: string[];
+}
+/**
+ * The body of every 4xx and 5xx API response.
+ */
+export interface APIError {
+  /**
+   * What went wrong, safe to show: never internal details.
+   */
+  error: string;
 }
 /**
  * One Scryfall printing with everything the detail view shows.

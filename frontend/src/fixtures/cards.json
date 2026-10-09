@@ -38,6 +38,7 @@
       "foil"
     ],
     "released_at": "2009-07-17",
+    "no_longer_listed": false,
     "faces": null,
     "oracle_text": "Lightning Bolt deals 3 damage to any target.",
     "cardmarket_url": "https://www.cardmarket.com/en/Magic/Products?idProduct=21192&referrer=scryfall&utm_campaign=card_prices&utm_medium=text&utm_source=scryfall"
@@ -81,6 +82,7 @@
       "foil"
     ],
     "released_at": "2021-06-18",
+    "no_longer_listed": false,
     "faces": null,
     "oracle_text": "Whenever Ragavan deals combat damage to a player, create a Treasure token and exile the top card of that player's library. Until end of turn, you may cast that card.\nDash {1}{R} (You may cast this spell for its dash cost. If you do, it gains haste, and it's returned from the battlefield to its owner's hand at the beginning of the next end step.)",
     "cardmarket_url": "https://www.cardmarket.com/en/Magic/Products?idProduct=566480&referrer=scryfall&utm_campaign=card_prices&utm_medium=text&utm_source=scryfall"
@@ -124,6 +126,7 @@
       "foil"
     ],
     "released_at": "2011-09-30",
+    "no_longer_listed": false,
     "faces": [
       {
         "name": "Delver of Secrets",
@@ -195,6 +198,7 @@
       "etched"
     ],
     "released_at": "2021-06-18",
+    "no_longer_listed": false,
     "faces": [
       {
         "name": "Fire",
@@ -252,6 +256,7 @@
       "foil"
     ],
     "released_at": "2022-04-22",
+    "no_longer_listed": false,
     "faces": [
       {
         "name": "Propaganda",
@@ -319,6 +324,7 @@
       "nonfoil"
     ],
     "released_at": "2018-07-13",
+    "no_longer_listed": false,
     "faces": null,
     "oracle_text": "{T}: Add {G}.",
     "cardmarket_url": "https://www.cardmarket.com/en/Magic/Products?idProduct=359654&referrer=scryfall&utm_campaign=card_prices&utm_medium=text&utm_source=scryfall"
