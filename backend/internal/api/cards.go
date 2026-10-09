@@ -98,15 +98,34 @@ func respond(w http.ResponseWriter, r *http.Request, res any, err error) {
 		writeError(w, http.StatusBadRequest, bad.Reason)
 	case errors.Is(err, cards.ErrNotFound):
 		writeError(w, http.StatusNotFound, "no card with that id")
-	case errors.Is(err, context.DeadlineExceeded) || isQueryCanceled(err):
+	case isTimeout(err):
 		slog.WarnContext(r.Context(), "card query timed out", "path", r.URL.Path, "error", err)
 		writeError(w, http.StatusServiceUnavailable, "that took too long; try a narrower search")
+	default:
+		serverError(w, r, err)
+	}
+}
+
+// serverError answers for a failure that isn't the caller's: a query that ran out of time
+// (503), a client that went away (nothing), or anything else (500), logged with no details
+// in the response.
+func serverError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case isTimeout(err):
+		slog.WarnContext(r.Context(), "query timed out", "path", r.URL.Path, "error", err)
+		writeError(w, http.StatusServiceUnavailable, "that took too long; try again")
 	case errors.Is(err, context.Canceled):
 		// The client went away; there's no one to answer.
 	default:
-		slog.ErrorContext(r.Context(), "card query failed", "path", r.URL.Path, "error", err)
+		slog.ErrorContext(r.Context(), "request failed", "path", r.URL.Path, "error", err)
 		writeError(w, http.StatusInternalServerError, "something went wrong")
 	}
+}
+
+// isTimeout reports a query that ran out of time. A query whose client went away is cancelled
+// too, but that isn't a timeout: the searcher adds the context's reason to Postgres's error.
+func isTimeout(err error) bool {
+	return !errors.Is(err, context.Canceled) && (errors.Is(err, context.DeadlineExceeded) || isQueryCanceled(err))
 }
 
 // isQueryCanceled reports a query Postgres stopped because it was asked to (SQLSTATE 57014,

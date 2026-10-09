@@ -10,12 +10,17 @@
 //	SCRYFALL_SYNC  "daily" (the default) or "off"; `go run ./cmd/sync` imports on demand.
 //	               With several server instances, leave it on for one: the others would
 //	               only find the import lock taken.
+//	ALLOWED_HOSTS  the host names the site is reached by, comma-separated (default:
+//	               localhost,127.0.0.1,::1). Requests for any other Host are refused.
+//	STATIC_DIR     the built frontend (frontend/dist) to serve at /, with its
+//	               Content-Security-Policy; unset in development, where Vite serves it.
 package main
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -25,26 +30,34 @@ import (
 	"time"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/api"
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/auth"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/scryfall"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/web"
 )
 
 type config struct {
-	DatabaseURL string
-	Addr        string
-	DailySync   bool
+	DatabaseURL  string
+	Addr         string
+	DailySync    bool
+	AllowedHosts []string
+	StaticDir    string
 }
 
 const (
 	defaultAddr     = "127.0.0.1:8080"
 	shutdownTimeout = 10 * time.Second
 	syncCheckEvery  = time.Hour // how often to check whether the daily import is due
+	sessionSweep    = time.Hour // how often expired sessions are deleted
 )
 
+// The host names the site answers to by default: this machine's.
+var defaultHosts = []string{"localhost", "127.0.0.1", "::1"}
+
 func loadConfig(getenv func(string) string) (config, error) {
-	cfg := config{DatabaseURL: getenv("DATABASE_URL"), Addr: getenv("ADDR")}
+	cfg := config{DatabaseURL: getenv("DATABASE_URL"), Addr: getenv("ADDR"), AllowedHosts: defaultHosts, StaticDir: getenv("STATIC_DIR")}
 	if cfg.DatabaseURL == "" {
 		cfg.DatabaseURL = db.DefaultURL
 	}
@@ -57,6 +70,13 @@ func loadConfig(getenv func(string) string) (config, error) {
 	case "off":
 	default:
 		return cfg, fmt.Errorf("SCRYFALL_SYNC=%q: want daily or off", v)
+	}
+	if v := getenv("ALLOWED_HOSTS"); v != "" {
+		hosts, err := web.ParseHosts(v)
+		if err != nil {
+			return cfg, fmt.Errorf("ALLOWED_HOSTS: %w", err)
+		}
+		cfg.AllowedHosts = hosts
 	}
 	return cfg, nil
 }
@@ -88,12 +108,33 @@ func run(ctx context.Context, cfg config) error {
 		return err
 	}
 
-	var background func(context.Context)
-	if cfg.DailySync {
-		importer := &cards.Importer{Pool: pool, Source: scryfall.New(), LockKey: cards.DefaultLockKey, Log: slog.Default()}
-		background = func(ctx context.Context) { importer.RunDaily(ctx, syncCheckEvery) }
+	var static fs.FS
+	if cfg.StaticDir != "" {
+		// os.Root: no path, by .. or a symbolic link, leads out of the directory.
+		root, err := os.OpenRoot(cfg.StaticDir)
+		if err != nil {
+			return fmt.Errorf("STATIC_DIR: %w", err)
+		}
+		defer root.Close()
+		static = root.FS()
 	}
-	return serve(ctx, cfg.Addr, api.NewHandler(pool, &cards.Searcher{Q: store.New(pool)}), background)
+
+	q := store.New(pool)
+	accounts := auth.NewService(q)
+	handler := web.AllowHosts(cfg.AllowedHosts, web.New(api.NewHandler(api.Services{
+		DB: pool, Cards: &cards.Searcher{Q: q}, Auth: accounts,
+	}), static))
+
+	background := func(ctx context.Context) {
+		var wg sync.WaitGroup
+		wg.Go(func() { accounts.RunCleanup(ctx, sessionSweep) })
+		if cfg.DailySync {
+			importer := &cards.Importer{Pool: pool, Source: scryfall.New(), LockKey: cards.DefaultLockKey, Log: slog.Default()}
+			wg.Go(func() { importer.RunDaily(ctx, syncCheckEvery) })
+		}
+		wg.Wait()
+	}
+	return serve(ctx, cfg.Addr, handler, background)
 }
 
 // serve runs handler on addr, with background (if not nil) running alongside it, until ctx

@@ -111,6 +111,13 @@ type ScryfallSync struct {
 	Error         pgtype.Text
 }
 
+type Session struct {
+	TokenHash []byte
+	UserID    int64
+	CreatedAt pgtype.Timestamptz
+	ExpiresAt pgtype.Timestamptz
+}
+
 type Set struct {
 	Code          string
 	ScryfallID    pgtype.UUID
@@ -120,4 +127,11 @@ type Set struct {
 	IconSvgUri    pgtype.Text
 	ParentSetCode pgtype.Text
 	UpdatedAt     pgtype.Timestamptz
+}
+
+type User struct {
+	ID           int64
+	Email        string
+	PasswordHash string
+	CreatedAt    pgtype.Timestamptz
 }
