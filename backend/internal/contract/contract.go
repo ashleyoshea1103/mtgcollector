@@ -101,6 +101,29 @@ type CardSummary struct {
 	// Finishes this printing exists in.
 	Finishes   []Finish `json:"finishes"`
 	ReleasedAt string   `json:"released_at"`
+	// Scryfall no longer lists this printing (deleted, merged or made digital-only). It's
+	// kept because collections may hold it, but it has no prices and isn't in search results.
+	NoLongerListed bool `json:"no_longer_listed"`
+}
+
+// One page of cards: search results (one printing per card) or one card's printings.
+type CardPage struct {
+	Cards []CardSummary `json:"cards"`
+	// This page's number, from 1.
+	Page int `json:"page"`
+	// Whether there's a next page.
+	HasMore bool `json:"has_more"`
+}
+
+// GET /api/cards/autocomplete: card names matching what's been typed, best first.
+type CardNames struct {
+	Names []string `json:"names"`
+}
+
+// The body of every 4xx and 5xx API response.
+type APIError struct {
+	// What went wrong, safe to show: never internal details.
+	Error string `json:"error"`
 }
 
 // One Scryfall printing with everything the detail view shows.

@@ -82,6 +82,8 @@ function toCard(c, set) {
     },
     finishes: c.finishes,
     released_at: c.released_at,
+    // Fixtures are cards Scryfall lists now; the API sets this for ones it no longer does.
+    no_longer_listed: false,
     faces: faces
       ? faces.map((f) => ({
           name: f.name,

@@ -18,6 +18,15 @@ export const unpricedCard: Card = {
   prices: { eur: null, eur_foil: null, usd: null, usd_foil: null, usd_etched: null },
 };
 
+/** A printing Scryfall no longer lists: kept for collections that hold it, with no prices. */
+export const unlistedCard: Card = {
+  ...cards.ragavan,
+  id: `${DEV_ONLY_MARKER}:unlisted-ragavan`,
+  collector_number: '900',
+  prices: { eur: null, eur_foil: null, usd: null, usd_foil: null, usd_etched: null },
+  no_longer_listed: true,
+};
+
 /** A collection entry priced the way the server prices it. */
 export function makeEntry(
   id: number,

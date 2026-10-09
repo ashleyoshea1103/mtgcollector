@@ -14,13 +14,13 @@ import { PrintingOption } from '../components/PrintingOption';
 import { RarityBadge } from '../components/RarityBadge';
 import { SetSymbol } from '../components/SetSymbol';
 import { DEV_ONLY_MARKER } from '../devOnly';
-import { cards, colorGroups, customGroups, entries, setGroup, stats, unpricedCard } from '../fixtures';
+import { cards, colorGroups, customGroups, entries, setGroup, stats, unlistedCard, unpricedCard } from '../fixtures';
 import type { Card, NewEntry } from '../types';
 import { Field, Grid, SegmentedControl, Select } from '../ui';
 import { PRIMITIVE_SECTIONS, slug } from './gallerySections';
 import { PrimitivesGallery, Section } from './PrimitivesGallery';
 
-const allCards = [...Object.values(cards), unpricedCard];
+const allCards = [...Object.values(cards), unpricedCard, unlistedCard];
 const allEntries = Object.values(entries);
 const imageless: Card = { ...cards.lightningBolt, id: 'imageless', images: null };
 
@@ -86,7 +86,7 @@ export function ComponentGallery() {
         </ul>
       </Section>
 
-      <Section name="CardTile" note="Search result shape, with an action slot. Foil-only Propaganda is priced at its foil price.">
+      <Section name="CardTile" note="Search result shape, with an action slot. Foil-only Propaganda is priced at its foil price; the last Ragavan is a printing Scryfall no longer lists.">
         <Grid minItemWidth="180px" className="entry-grid">
           {allCards.map((c) => (
             <CardTile key={c.id} card={c} actions={<button type="button">Add</button>} />
@@ -94,7 +94,7 @@ export function ComponentGallery() {
         </Grid>
       </Section>
 
-      <Section name="PrintingOption" note="Click to select.">
+      <Section name="PrintingOption" note="Click to select. The last is a printing Scryfall no longer lists.">
         <div className="printing-list">
           {allCards.map((c) => (
             <PrintingOption key={c.id} card={c} selected={printing === c.id} onSelect={(card) => setPrinting(card.id)} />

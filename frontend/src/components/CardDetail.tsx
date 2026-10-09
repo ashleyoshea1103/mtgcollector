@@ -4,6 +4,7 @@ import type { Card, CardFace, CollectionEntry, Finish } from '../types';
 import { DataTable, type Column } from '../ui';
 import { CardImage } from './CardImage';
 import { ManaCost } from './ManaCost';
+import { NoLongerListed } from './NoLongerListed';
 import { OracleText } from './OracleText';
 import { Price } from './Price';
 import { RarityBadge } from './RarityBadge';
@@ -44,7 +45,7 @@ export function CardDetail({ card, entries = [] }: Props) {
           <h2 className="card-detail__name">{card.name}</h2>
           <p className="card-detail__printing">
             <SetSymbol set={card.set} rarity={card.rarity} nameShown /> {card.set.name} #{card.collector_number} <RarityBadge rarity={card.rarity} />{' '}
-            <time dateTime={card.released_at}>{card.released_at}</time>
+            <time dateTime={card.released_at}>{card.released_at}</time> <NoLongerListed card={card} />
           </p>
         </header>
 

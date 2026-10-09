@@ -38,6 +38,36 @@ type Card struct {
 	UpdatedAt       pgtype.Timestamptz
 }
 
+type CardListing struct {
+	ID              pgtype.UUID
+	OracleID        pgtype.UUID
+	Name            string
+	Lang            string
+	SetCode         string
+	CollectorNumber string
+	Rarity          string
+	Layout          string
+	ManaCost        string
+	Cmc             pgtype.Numeric
+	TypeLine        string
+	OracleText      pgtype.Text
+	Colors          []string
+	ColorIdentity   []string
+	Finishes        []string
+	Images          []byte
+	Faces           []byte
+	PriceEur        pgtype.Numeric
+	PriceEurFoil    pgtype.Numeric
+	PriceUsd        pgtype.Numeric
+	PriceUsdFoil    pgtype.Numeric
+	PriceUsdEtched  pgtype.Numeric
+	CardmarketUrl   pgtype.Text
+	ReleasedAt      pgtype.Date
+	GoneSince       pgtype.Timestamptz
+	SetName         string
+	SetIconSvgUri   pgtype.Text
+}
+
 type CardsStaging struct {
 	ID              pgtype.UUID
 	OracleID        pgtype.UUID

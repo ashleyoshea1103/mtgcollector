@@ -3,6 +3,7 @@ import { defaultFinish } from '../lib/price';
 import type { CardSummary, Finish } from '../types';
 import { Cluster } from '../ui';
 import { CardImage } from './CardImage';
+import { NoLongerListed } from './NoLongerListed';
 import { Price } from './Price';
 import { SetSymbol } from './SetSymbol';
 
@@ -33,7 +34,7 @@ export function CardTile({ card, finish = defaultFinish(card), unitPrice, overla
         <h3 className="card-tile__name">{card.name}</h3>
         <p className="card-tile__printing">
           <SetSymbol set={card.set} rarity={card.rarity} nameShown /> <span className="card-tile__set">{card.set.name}</span>{' '}
-          <span className="card-tile__number">#{card.collector_number}</span>
+          <span className="card-tile__number">#{card.collector_number}</span> <NoLongerListed card={card} />
         </p>
         <p className="card-tile__price">
           {unitPrice !== undefined ? <Price value={unitPrice} /> : <Price prices={card.prices} finish={finish} />}

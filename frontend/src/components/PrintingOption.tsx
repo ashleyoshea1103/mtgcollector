@@ -1,6 +1,7 @@
 import { defaultFinish } from '../lib/price';
 import type { CardSummary } from '../types';
 import { ToggleButton } from '../ui';
+import { NoLongerListed } from './NoLongerListed';
 import { Price } from './Price';
 import { SetSymbol } from './SetSymbol';
 
@@ -21,6 +22,7 @@ export function PrintingOption({ card, selected = false, onSelect }: Props) {
         {card.released_at.slice(0, 4)}
       </time>
       <Price prices={card.prices} finish={defaultFinish(card)} />
+      <NoLongerListed card={card} />
     </ToggleButton>
   );
 }

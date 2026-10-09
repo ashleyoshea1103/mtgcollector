@@ -20,9 +20,18 @@ type Pinger interface {
 const healthTimeout = 2 * time.Second
 
 // NewHandler returns the API's routes, all under /api/.
-func NewHandler(db Pinger) http.Handler {
+func NewHandler(db Pinger, cards Cards) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", health(db))
+	mux.HandleFunc("GET /api/cards/search", searchCards(cards))
+	mux.HandleFunc("GET /api/cards/autocomplete", autocomplete(cards))
+	mux.HandleFunc("GET /api/cards/{id}", getCard(cards))
+	mux.HandleFunc("GET /api/cards/{id}/printings", printings(cards))
+	// Anything else under /api/ is a JSON 404, like every other API error.
+	// (GET only: a wrong method on a real route still gets 405.)
+	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, http.StatusNotFound, "no such API endpoint")
+	})
 	return securityHeaders(mux)
 }
 

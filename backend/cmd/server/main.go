@@ -28,6 +28,7 @@ import (
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/scryfall"
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 )
 
 type config struct {
@@ -92,7 +93,7 @@ func run(ctx context.Context, cfg config) error {
 		importer := &cards.Importer{Pool: pool, Source: scryfall.New(), LockKey: cards.DefaultLockKey, Log: slog.Default()}
 		background = func(ctx context.Context) { importer.RunDaily(ctx, syncCheckEvery) }
 	}
-	return serve(ctx, cfg.Addr, api.NewHandler(pool), background)
+	return serve(ctx, cfg.Addr, api.NewHandler(pool, &cards.Searcher{Q: store.New(pool)}), background)
 }
 
 // serve runs handler on addr, with background (if not nil) running alongside it, until ctx

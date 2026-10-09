@@ -32,7 +32,7 @@ func get(t *testing.T, h http.Handler, method, path string) *httptest.ResponseRe
 }
 
 func TestHealthReportsOKWhenTheDatabaseAnswers(t *testing.T) {
-	rec := get(t, NewHandler(&fakeDB{}), http.MethodGet, "/api/health")
+	rec := get(t, NewHandler(&fakeDB{}, &fakeCards{}), http.MethodGet, "/api/health")
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rec.Code)
@@ -47,7 +47,7 @@ func TestHealthReportsOKWhenTheDatabaseAnswers(t *testing.T) {
 
 func TestHealthReportsUnavailableWithoutLeakingTheReason(t *testing.T) {
 	db := &fakeDB{err: errors.New(`failed to connect to user=secret-user database=secret-db`)}
-	rec := get(t, NewHandler(db), http.MethodGet, "/api/health")
+	rec := get(t, NewHandler(db, &fakeCards{}), http.MethodGet, "/api/health")
 
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Errorf("status = %d, want 503", rec.Code)
@@ -62,7 +62,7 @@ func TestHealthReportsUnavailableWithoutLeakingTheReason(t *testing.T) {
 
 func TestHealthGivesTheDatabaseABoundedTime(t *testing.T) {
 	db := &fakeDB{}
-	get(t, NewHandler(db), http.MethodGet, "/api/health")
+	get(t, NewHandler(db, &fakeCards{}), http.MethodGet, "/api/health")
 	end := time.Now()
 
 	if db.deadline.IsZero() {
@@ -88,7 +88,7 @@ func TestEveryResponseGetsTheSecurityHeaders(t *testing.T) {
 		{"a wrong method", http.MethodPost, "/api/health"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			rec := get(t, NewHandler(&fakeDB{}), tc.method, tc.path)
+			rec := get(t, NewHandler(&fakeDB{}, &fakeCards{}), tc.method, tc.path)
 			for k, v := range want {
 				if got := rec.Header().Get(k); got != v {
 					t.Errorf("%s = %q, want %q", k, got, v)
@@ -100,7 +100,7 @@ func TestEveryResponseGetsTheSecurityHeaders(t *testing.T) {
 
 func TestOnlyGETReachesTheHealthCheck(t *testing.T) {
 	db := &fakeDB{}
-	rec := get(t, NewHandler(db), http.MethodPost, "/api/health")
+	rec := get(t, NewHandler(db, &fakeCards{}), http.MethodPost, "/api/health")
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("status = %d, want 405", rec.Code)
@@ -118,7 +118,7 @@ func TestHealthWithARealPoolAndNoServer(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
-	rec := get(t, NewHandler(pool), http.MethodGet, "/api/health")
+	rec := get(t, NewHandler(pool, &fakeCards{}), http.MethodGet, "/api/health")
 
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Errorf("status = %d, want 503", rec.Code)
