@@ -22,18 +22,19 @@ SELECT $1, c.id, $2, $3, $4, $5
                       AND condition = $4 AND language = $5))
 ON CONFLICT (user_id, card_id, finish, condition, language)
 DO UPDATE SET quantity = e.quantity + excluded.quantity
-        WHERE e.quantity + excluded.quantity <= 999
+        WHERE e.quantity + excluded.quantity <= $8::integer
 RETURNING e.id, (xmax = 0)::boolean AS created
 `
 
 type AddEntryParams struct {
-	UserID     int64
-	Quantity   int32
-	Finish     string
-	Condition  string
-	Language   string
-	CardID     pgtype.UUID
-	MaxEntries int32
+	UserID      int64
+	Quantity    int32
+	Finish      string
+	Condition   string
+	Language    string
+	CardID      pgtype.UUID
+	MaxEntries  int32
+	MaxQuantity int32
 }
 
 type AddEntryRow struct {
@@ -43,7 +44,7 @@ type AddEntryRow struct {
 
 // Adds copies: a new entry, or more of one the user has with the same printing, finish,
 // condition and language. No row when there's no such card, it doesn't come in that finish,
-// there would be more than 999 copies, or it would be a new entry and the user already has
+// there would be more than max_quantity copies, or it would be a new entry and the user already has
 // max_entries. (That limit is approximate: adds at the same moment can each see room.)
 func (q *Queries) AddEntry(ctx context.Context, arg AddEntryParams) (AddEntryRow, error) {
 	row := q.db.QueryRow(ctx, addEntry,
@@ -54,6 +55,7 @@ func (q *Queries) AddEntry(ctx context.Context, arg AddEntryParams) (AddEntryRow
 		arg.Language,
 		arg.CardID,
 		arg.MaxEntries,
+		arg.MaxQuantity,
 	)
 	var i AddEntryRow
 	err := row.Scan(&i.ID, &i.Created)
@@ -65,8 +67,10 @@ const cardFinishes = `-- name: CardFinishes :one
 SELECT finishes FROM cards WHERE id = $1
 `
 
-// Queries for the collection (internal/collection). Every one is for one user's entries:
-// user_id is in every WHERE clause. Prices come from the entry_prices view.
+// Queries for the collection (internal/collection). Every query of entries is for one user's:
+// user_id is in its WHERE clause. Prices come from the entry_prices view. Names sort by the
+// "unicode" collation (ICU's root), so "Æther Vial" comes with the aethers, not after "Zur",
+// whatever the database's own collation is.
 func (q *Queries) CardFinishes(ctx context.Context, id pgtype.UUID) ([]string, error) {
 	row := q.db.QueryRow(ctx, cardFinishes, id)
 	var finishes []string
@@ -251,8 +255,9 @@ SELECT p.id, p.user_id, p.card_id, p.quantity, p.finish, p.condition, p.language
  WHERE p.user_id = $1
    AND card_group($2, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $3
    AND ($4::bigint IS NULL
-        OR (p.cmc, p.name, p.id) > ($5::numeric, $6::text, $4::bigint))
- ORDER BY p.cmc, p.name, p.id
+        OR (p.cmc, p.name COLLATE "unicode", p.id)
+         > ($5::numeric, $6::text COLLATE "unicode", $4::bigint))
+ ORDER BY p.cmc, p.name COLLATE "unicode", p.id
  LIMIT $7
 `
 
@@ -350,8 +355,9 @@ SELECT p.id, p.user_id, p.card_id, p.quantity, p.finish, p.condition, p.language
   JOIN card_listing v ON v.id = p.card_id
  WHERE p.user_id = $1
    AND card_group($2, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $3
-   AND ($4::bigint IS NULL OR (p.name, p.id) > ($5::text, $4::bigint))
- ORDER BY p.name, p.id
+   AND ($4::bigint IS NULL
+        OR (p.name COLLATE "unicode", p.id) > ($5::text COLLATE "unicode", $4::bigint))
+ ORDER BY p.name COLLATE "unicode", p.id
  LIMIT $6
 `
 

@@ -1,5 +1,7 @@
--- Queries for the collection (internal/collection). Every one is for one user's entries:
--- user_id is in every WHERE clause. Prices come from the entry_prices view.
+-- Queries for the collection (internal/collection). Every query of entries is for one user's:
+-- user_id is in its WHERE clause. Prices come from the entry_prices view. Names sort by the
+-- "unicode" collation (ICU's root), so "Æther Vial" comes with the aethers, not after "Zur",
+-- whatever the database's own collation is.
 
 -- name: CardFinishes :one
 SELECT finishes FROM cards WHERE id = @id;
@@ -7,7 +9,7 @@ SELECT finishes FROM cards WHERE id = @id;
 -- name: AddEntry :one
 -- Adds copies: a new entry, or more of one the user has with the same printing, finish,
 -- condition and language. No row when there's no such card, it doesn't come in that finish,
--- there would be more than 999 copies, or it would be a new entry and the user already has
+-- there would be more than max_quantity copies, or it would be a new entry and the user already has
 -- max_entries. (That limit is approximate: adds at the same moment can each see room.)
 INSERT INTO collection_entries AS e (user_id, card_id, quantity, finish, condition, language)
 SELECT @user_id, c.id, @quantity, @finish, @condition, @language
@@ -19,7 +21,7 @@ SELECT @user_id, c.id, @quantity, @finish, @condition, @language
                       AND condition = @condition AND language = @language))
 ON CONFLICT (user_id, card_id, finish, condition, language)
 DO UPDATE SET quantity = e.quantity + excluded.quantity
-        WHERE e.quantity + excluded.quantity <= 999
+        WHERE e.quantity + excluded.quantity <= @max_quantity::integer
 RETURNING e.id, (xmax = 0)::boolean AS created; -- xmax is 0 for a row this statement inserted
 
 -- name: HasEntry :one
@@ -92,8 +94,9 @@ SELECT sqlc.embed(p), sqlc.embed(v)
   JOIN card_listing v ON v.id = p.card_id
  WHERE p.user_id = @user_id
    AND card_group(@group_by, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = @group_key
-   AND (sqlc.narg(after_id)::bigint IS NULL OR (p.name, p.id) > (sqlc.narg(after_name)::text, sqlc.narg(after_id)::bigint))
- ORDER BY p.name, p.id
+   AND (sqlc.narg(after_id)::bigint IS NULL
+        OR (p.name COLLATE "unicode", p.id) > (sqlc.narg(after_name)::text COLLATE "unicode", sqlc.narg(after_id)::bigint))
+ ORDER BY p.name COLLATE "unicode", p.id
  LIMIT @row_limit;
 
 -- name: EntriesByPrice :many
@@ -116,8 +119,9 @@ SELECT sqlc.embed(p), sqlc.embed(v)
  WHERE p.user_id = @user_id
    AND card_group(@group_by, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = @group_key
    AND (sqlc.narg(after_id)::bigint IS NULL
-        OR (p.cmc, p.name, p.id) > (sqlc.narg(after_cmc)::numeric, sqlc.narg(after_name)::text, sqlc.narg(after_id)::bigint))
- ORDER BY p.cmc, p.name, p.id
+        OR (p.cmc, p.name COLLATE "unicode", p.id)
+         > (sqlc.narg(after_cmc)::numeric, sqlc.narg(after_name)::text COLLATE "unicode", sqlc.narg(after_id)::bigint))
+ ORDER BY p.cmc, p.name COLLATE "unicode", p.id
  LIMIT @row_limit;
 
 -- name: EntriesByAdded :many

@@ -73,7 +73,7 @@ func (s *Service) Add(ctx context.Context, userID int64, e contract.NewEntry) (c
 	row, err := s.Q.AddEntry(ctx, store.AddEntryParams{
 		UserID: userID, CardID: cardID, Quantity: int32(e.Quantity),
 		Finish: string(e.Finish), Condition: string(e.Condition), Language: string(e.Language),
-		MaxEntries: int32(s.maxEntries()),
+		MaxEntries: int32(s.maxEntries()), MaxQuantity: contract.MaxQuantity,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return contract.CollectionEntry{}, false, s.whyNotAdded(ctx, userID, cardID, e)

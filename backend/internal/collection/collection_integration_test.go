@@ -51,14 +51,18 @@ func newFixture(t *testing.T) *fixture {
 			t.Fatal(err)
 		}
 	}
-	// Three sets, released in this order.
-	for _, s := range []struct{ code, name, released string }{
-		{"aaa", "Alpha Test", "2001-01-01"}, {"bbb", "Beta Test", "2010-01-01"}, {"ccc", "Gamma Test", "2020-01-01"},
+	// Four sets, released in this order; the last two on the same day, one with no symbol.
+	for _, s := range []struct {
+		code, name, released string
+		icon                 bool
+	}{
+		{"aaa", "Alpha Test", "2001-01-01", true}, {"bbb", "Beta Test", "2010-01-01", true},
+		{"ccc", "Gamma Test", "2020-01-01", true}, {"ddd", "Delta Test", "2020-01-01", false},
 	} {
 		if _, err := pool.Exec(t.Context(),
 			`INSERT INTO sets (code, scryfall_id, name, set_type, released_at, icon_svg_uri)
-			 VALUES ($1, $2, $3, 'expansion', $4, 'https://svgs.scryfall.io/sets/' || $1 || '.svg')`,
-			s.code, uuid(t), s.name, s.released); err != nil {
+			 VALUES ($1, $2, $3, 'expansion', $4, CASE WHEN $5 THEN 'https://svgs.scryfall.io/sets/' || $1 || '.svg' END)`,
+			s.code, uuid(t), s.name, s.released, s.icon); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -428,12 +432,19 @@ func TestDeletingAnEntry(t *testing.T) {
 // A small collection: Ann's cards, and one of Bob's that must never show up in hers.
 func (f *fixture) collection(t *testing.T) {
 	t.Helper()
-	add := func(c testCard, quantity int, finish contract.Finish) {
-		e := newEntry(f.card(t, c), quantity)
+	add := func(c testCard, quantity int, finish contract.Finish) string {
+		id := f.card(t, c)
+		e := newEntry(id, quantity)
 		e.Finish = finish
 		f.add(t, f.ann, e)
+		return id
 	}
-	add(testCard{name: "Delver", set: "bbb", identity: []string{"U"}, typeLine: "Creature — Human Wizard", rarity: "common", cmc: 1, eur: euros(0.5)}, 4, contract.FinishNonfoil)
+	delver := add(testCard{name: "Delver", set: "bbb", identity: []string{"U"}, typeLine: "Creature — Human Wizard", rarity: "common", cmc: 1, eur: euros(0.5)}, 4, contract.FinishNonfoil)
+	// A second entry for the same card: groups count entries and cards apart.
+	played := newEntry(delver, 1)
+	played.Condition = contract.ConditionLP
+	f.add(t, f.ann, played)
+	add(testCard{name: "Wrath", set: "ddd", identity: []string{"W"}, typeLine: "Sorcery", rarity: "special", cmc: 4, eur: euros(2)}, 1, contract.FinishNonfoil)
 	add(testCard{name: "Bolt", set: "aaa", identity: []string{"R"}, typeLine: "Instant", rarity: "uncommon", cmc: 1, eur: euros(1.25), eurFoil: euros(10)}, 2, contract.FinishFoil)
 	add(testCard{name: "Fire // Ice", set: "ccc", identity: []string{"U", "R"}, typeLine: "Instant // Instant", rarity: "uncommon", cmc: 4, eur: euros(3)}, 1, contract.FinishNonfoil)
 	add(testCard{name: "Elves", set: "ccc", identity: []string{"G"}, typeLine: "Creature — Elf", rarity: "rare", cmc: 2}, 3, contract.FinishNonfoil) // no price
@@ -452,24 +463,26 @@ func TestGroups(t *testing.T) {
 		unpriced       int
 	}
 	for by, want := range map[contract.GroupBy][]group{
-		contract.GroupByNone: {{"all", "All cards", 6, 21, 20 + 1 + 3 + 2 + 20, 3}},
+		contract.GroupByNone: {{"all", "All cards", 8, 23, 48.5, 3}},
 		contract.GroupByColor: {
-			{"U", "Blue", 1, 4, 2, 0}, {"R", "Red", 1, 2, 20, 0}, {"G", "Green", 1, 3, 0, 3},
+			{"W", "White", 1, 1, 2, 0}, {"U", "Blue", 2, 5, 2.5, 0}, {"R", "Red", 1, 2, 20, 0}, {"G", "Green", 1, 3, 0, 3},
 			{"M", "Multicolor", 1, 1, 3, 0}, {"C", "Colorless", 2, 11, 21, 0},
 		},
 		contract.GroupByType: {
-			{"creature", "Creatures", 3, 8, 22, 3}, {"instant", "Instants", 2, 3, 23, 0}, {"land", "Lands", 1, 10, 1, 0},
+			{"creature", "Creatures", 4, 9, 22.5, 3}, {"instant", "Instants", 2, 3, 23, 0}, {"sorcery", "Sorceries", 1, 1, 2, 0},
+			{"land", "Lands", 1, 10, 1, 0},
 		},
 		contract.GroupByRarity: {
 			{"mythic", "Mythic rare", 1, 1, 20, 0}, {"rare", "Rare", 1, 3, 0, 3}, {"uncommon", "Uncommon", 2, 3, 23, 0},
-			{"common", "Common", 2, 14, 3, 0},
+			{"common", "Common", 3, 15, 3.5, 0}, {"special", "Special", 1, 1, 2, 0},
 		},
 		contract.GroupByCMC: {
-			{"0", "0", 1, 10, 1, 0}, {"1", "1", 2, 6, 22, 0}, {"2", "2", 1, 3, 0, 3}, {"4", "4", 1, 1, 3, 0}, {"7", "7+", 1, 1, 20, 0},
+			{"0", "0", 1, 10, 1, 0}, {"1", "1", 3, 7, 22.5, 0}, {"2", "2", 1, 3, 0, 3}, {"4", "4", 2, 2, 5, 0}, {"7", "7+", 1, 1, 20, 0},
 		},
-		// Newest set first.
+		// Newest set first; on the same day, by name.
 		contract.GroupBySet: {
-			{"ccc", "Gamma Test", 2, 4, 3, 3}, {"bbb", "Beta Test", 2, 5, 22, 0}, {"aaa", "Alpha Test", 2, 12, 21, 0},
+			{"ddd", "Delta Test", 1, 1, 2, 0}, {"ccc", "Gamma Test", 2, 4, 3, 3}, {"bbb", "Beta Test", 3, 6, 22.5, 0},
+			{"aaa", "Alpha Test", 2, 12, 21, 0},
 		},
 	} {
 		res, err := f.s.Groups(t.Context(), f.ann, by)
@@ -482,7 +495,7 @@ func TestGroups(t *testing.T) {
 			if (by == contract.GroupBySet) != (g.Set != nil) {
 				t.Errorf("%s group %s: set = %+v; want one exactly when grouping by set", by, g.Key, g.Set)
 			}
-			if g.Set != nil && (g.Set.Code != g.Key || g.Set.IconSVGURI == nil) {
+			if g.Set != nil && (g.Set.Code != g.Key || (g.Set.IconSVGURI == nil) != (g.Key == "ddd")) {
 				t.Errorf("set group %s carries set %+v", g.Key, g.Set)
 			}
 		}
@@ -501,6 +514,9 @@ func TestAnEmptyCollectionStillHasItsOneGroup(t *testing.T) {
 	want := []contract.GroupSummary{{Key: "all", Label: "All cards"}}
 	if err != nil || !reflect.DeepEqual(got.Groups, want) {
 		t.Errorf("= %+v, %v; want the all group with no cards", got.Groups, err)
+	}
+	if got, err := f.s.Groups(t.Context(), f.ann, ""); err != nil || got.GroupBy != contract.GroupByNone || len(got.Groups) != 1 {
+		t.Errorf("no group_by = %+v, %v; want none", got, err)
 	}
 	for _, by := range []contract.GroupBy{contract.GroupBySet, contract.GroupByColor} {
 		if got, _ := f.s.Groups(t.Context(), f.ann, by); len(got.Groups) != 0 {
@@ -532,10 +548,10 @@ func TestStats(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := contract.CollectionStats{
-		ValueTotal:  contract.ValueTotal{CardCount: 21, ValueEUR: 46, UnpricedCount: 3},
-		UniqueCards: 6,
-		ByColor:     map[string]int{"U": 4, "R": 2, "G": 3, "M": 1, "C": 11},
-		ByRarity:    map[contract.Rarity]int{"mythic": 1, "rare": 3, "uncommon": 3, "common": 14},
+		ValueTotal:  contract.ValueTotal{CardCount: 23, ValueEUR: 48.5, UnpricedCount: 3},
+		UniqueCards: 7,
+		ByColor:     map[string]int{"W": 1, "U": 5, "R": 2, "G": 3, "M": 1, "C": 11},
+		ByRarity:    map[contract.Rarity]int{"mythic": 1, "rare": 3, "uncommon": 3, "common": 15, "special": 1},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("stats:\n got  %+v\n want %+v", got, want)
@@ -549,7 +565,10 @@ func TestPagingThroughEveryOrder(t *testing.T) {
 	var all []contract.CollectionEntry
 	for i := range 26 {
 		c := testCard{name: fmt.Sprintf("Card %02d", i%13), cmc: float64(i % 5), identity: []string{"G"}}
-		if i%4 != 0 {
+		switch {
+		case i == 3:
+			c.eur = euros(0) // free: still before the unpriced
+		case i%4 != 0:
 			c.eur = euros(float64(i%7) + 0.25)
 		}
 		id := f.card(t, c)
@@ -565,6 +584,23 @@ func TestPagingThroughEveryOrder(t *testing.T) {
 	for i := range 3 {
 		red = append(red, f.add(t, f.ann, newEntry(f.card(t, testCard{name: fmt.Sprintf("Card %02d", i), identity: []string{"R"}, eur: euros(9)}), 1)))
 	}
+	// Added times out of id order, and some the same, so the newest-first order and its
+	// cursor have to use the time and then the id.
+	if _, err := f.pool.Exec(t.Context(),
+		`UPDATE collection_entries SET added_at = '2026-01-01T00:00:00Z'::timestamptz + ((id * 37) % 40) * interval '1.5 seconds'`); err != nil {
+		t.Fatal(err)
+	}
+	reread := func(entries []contract.CollectionEntry) {
+		for i, e := range entries {
+			fresh, err := f.s.get(t.Context(), f.ann, e.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			entries[i] = fresh
+		}
+	}
+	reread(all)
+	reread(red)
 
 	for _, sort := range []contract.SortBy{contract.SortByName, contract.SortByPrice, contract.SortByCMC, contract.SortByAdded} {
 		for _, q := range []EntryQuery{{GroupBy: contract.GroupByNone}, {GroupBy: contract.GroupByColor, Key: "G"}} {
@@ -769,4 +805,71 @@ func nilCollection(v reflect.Value, path string) string {
 		}
 	}
 	return ""
+}
+
+// Every value of the contract's enums can be stored: the table's CHECKs agree with them.
+func TestEveryEnumValueCanBeStored(t *testing.T) {
+	f := newFixture(t)
+	card := f.card(t, testCard{finishes: []string{"nonfoil", "foil", "etched"}})
+	for _, l := range contract.Languages {
+		e := newEntry(card, 1)
+		e.Language = l
+		f.add(t, f.ann, e)
+	}
+	for _, c := range []contract.Condition{contract.ConditionMT, contract.ConditionNM, contract.ConditionEX,
+		contract.ConditionGD, contract.ConditionLP, contract.ConditionPL, contract.ConditionPO} {
+		e := newEntry(card, contract.MaxQuantity)
+		e.Condition, e.Finish = c, contract.FinishEtched
+		f.add(t, f.ann, e)
+	}
+	for _, fin := range []contract.Finish{contract.FinishNonfoil, contract.FinishFoil, contract.FinishEtched} {
+		e := newEntry(card, 1)
+		e.Finish, e.Language = fin, contract.LanguageQuenya
+		f.add(t, f.ann, e)
+	}
+	// And the table refuses one copy more than the contract allows.
+	if _, err := f.pool.Exec(t.Context(),
+		`INSERT INTO collection_entries (user_id, card_id, quantity, finish, condition, language) VALUES ($1, $2, $3, 'foil', 'NM', 'en')`,
+		f.bob, card, contract.MaxQuantity+1); err == nil {
+		t.Errorf("the table took %d copies", contract.MaxQuantity+1)
+	}
+}
+
+// Names sort as a person would read them, whatever the database's own collation.
+func TestNamesSortByUnicode(t *testing.T) {
+	f := newFixture(t)
+	names := []string{"Zur", "\u00c6ther Vial", "aether Hub", "Aether Spellbomb", "_odd"}
+	for _, n := range names {
+		f.add(t, f.ann, newEntry(f.card(t, testCard{name: n}), 1))
+	}
+	page, err := f.s.Entries(t.Context(), f.ann, EntryQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, e := range page.Entries {
+		got = append(got, e.Card.Name)
+	}
+	want := []string{"_odd", "aether Hub", "Aether Spellbomb", "\u00c6ther Vial", "Zur"}
+	if !slices.Equal(got, want) {
+		t.Errorf("by name: %q, want %q", got, want)
+	}
+}
+
+// A cursor is refused past its length limit even when it's otherwise one this listing could use.
+func TestALongCursorIsRefused(t *testing.T) {
+	f := newFixture(t)
+	q := EntryQuery{GroupBy: contract.GroupByNone, Key: "all", Sort: contract.SortByName}
+	c := cursor{Version: cursorVersion, GroupBy: q.GroupBy, Key: q.Key, Sort: q.Sort, ID: 1}
+	c.Name = strings.Repeat("a", 600)
+	if s := c.encode(); len(s) > maxCursorLength {
+		t.Fatalf("a 600-character name made a %d-character cursor; make the name shorter", len(s))
+	}
+	if _, err := f.s.Entries(t.Context(), f.ann, EntryQuery{Cursor: c.encode()}); err != nil {
+		t.Errorf("a cursor under the limit: %v", err)
+	}
+	c.Name = strings.Repeat("a", 800)
+	if _, err := f.s.Entries(t.Context(), f.ann, EntryQuery{Cursor: c.encode()}); !isInputError(err) {
+		t.Errorf("a %d-character cursor = %v, want an apperr.Invalid", len(c.encode()), err)
+	}
 }

@@ -39,9 +39,14 @@ var fixedGroups = map[contract.GroupBy][]struct{ key, label string }{
 // A set code, as Scryfall writes them: lower-case letters and digits.
 var setCode = regexp.MustCompile(`^[a-z0-9]{1,8}$`)
 
-// Groups returns the user's groups for one way of grouping, in order: by set, newest set
-// first; otherwise in the order of fixedGroups. Groups the user has no cards in are left out.
+// Groups returns the user's groups for one way of grouping (none if not given), in order: by
+// set, newest set first (sets released the same day by name, those with no date last);
+// otherwise in the order of fixedGroups. Groups the user has no cards in are left out, but
+// for none's one group, which is always there.
 func (s *Service) Groups(ctx context.Context, userID int64, by contract.GroupBy) (contract.CollectionGroups, error) {
+	if by == "" {
+		by = contract.GroupByNone
+	}
 	if err := checkEnum(by); err != nil {
 		return contract.CollectionGroups{}, invalid("%s", err)
 	}
