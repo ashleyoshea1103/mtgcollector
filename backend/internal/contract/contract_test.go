@@ -16,7 +16,7 @@ import (
 var all = []any{
 	CardImages{}, CardFace{}, Prices{}, CardSet{}, CardSummary{}, Card{}, CollectionEntry{}, ValueTotal{},
 	GroupSummary{}, EntryPage{}, GroupMember{}, GroupMemberPage{}, CustomGroup{}, CollectionStats{},
-	Health{}, NewEntry{}, CardPage{}, CardNames{}, APIError{},
+	Health{}, NewEntry{}, CardPage{}, CardNames{}, APIError{}, User{}, Credentials{},
 }
 
 // `all` must list every struct in the package's Go files, or the rule test below misses it.

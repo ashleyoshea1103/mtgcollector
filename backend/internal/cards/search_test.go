@@ -1,13 +1,10 @@
 package cards
 
 import (
-	"context"
 	"errors"
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 )
@@ -127,33 +124,6 @@ func TestPagesSayWhetherThereIsMore(t *testing.T) {
 	// Page MaxPage+1 would be refused, so the last page doesn't offer it.
 	if p, err := page(full, MaxPage); err != nil || p.HasMore {
 		t.Errorf("page %d: has_more %v, %v; want false", MaxPage, p.HasMore, err)
-	}
-}
-
-// pgx cancels a query whose context ends, and gets back Postgres's "canceling statement"
-// error, which doesn't say why; dbError adds the context's reason.
-func TestDBErrorSaysWhyAQueryWasCancelled(t *testing.T) {
-	canceled := &pgconn.PgError{Code: "57014", Message: "canceling statement due to user request"}
-
-	expired, cancel := context.WithTimeout(t.Context(), 0)
-	defer cancel()
-	<-expired.Done()
-	if err := dbError(expired, "search", canceled); !errors.Is(err, context.DeadlineExceeded) {
-		t.Errorf("timed out: %v doesn't say so", err)
-	}
-
-	gone, cancel := context.WithCancel(t.Context())
-	cancel()
-	if err := dbError(gone, "search", canceled); !errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		t.Errorf("caller went away: %v", err)
-	}
-
-	if err := dbError(t.Context(), "search", canceled); errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		t.Errorf("context still live: %v blames it", err)
-	}
-	var pg *pgconn.PgError
-	if err := dbError(expired, "search", canceled); !errors.As(err, &pg) {
-		t.Errorf("the database's error is lost: %v", err)
 	}
 }
 

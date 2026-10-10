@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
@@ -19,7 +20,7 @@ func TestLoadConfigDefaultsToTheLocalDevelopmentSetup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg != (config{DatabaseURL: db.DefaultURL, Addr: defaultAddr, DailySync: true}) {
+	if want := (config{DatabaseURL: db.DefaultURL, Addr: defaultAddr, DailySync: true, AllowedHosts: []string{"localhost", "127.0.0.1", "::1"}}); !reflect.DeepEqual(cfg, want) {
 		t.Errorf("loadConfig() = %+v", cfg)
 	}
 }
@@ -27,11 +28,16 @@ func TestLoadConfigDefaultsToTheLocalDevelopmentSetup(t *testing.T) {
 func TestLoadConfigReadsTheEnvironment(t *testing.T) {
 	cfg, err := loadConfig(env(map[string]string{
 		"DATABASE_URL": "postgres://u@db.example:5432/app", "ADDR": ":9000", "SCRYFALL_SYNC": "off",
+		"ALLOWED_HOSTS": "collection.example.com, www.collection.example.com", "STATIC_DIR": "../frontend/dist",
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg != (config{DatabaseURL: "postgres://u@db.example:5432/app", Addr: ":9000", DailySync: false}) {
+	want := config{
+		DatabaseURL: "postgres://u@db.example:5432/app", Addr: ":9000", DailySync: false,
+		AllowedHosts: []string{"collection.example.com", "www.collection.example.com"}, StaticDir: "../frontend/dist",
+	}
+	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("loadConfig() = %+v", cfg)
 	}
 }
@@ -40,6 +46,12 @@ func TestLoadConfigRejectsAnUnknownSyncSetting(t *testing.T) {
 	// A typo like "of" must not silently leave the daily import on (or off).
 	if _, err := loadConfig(env(map[string]string{"SCRYFALL_SYNC": "of"})); err == nil {
 		t.Error("SCRYFALL_SYNC=of was accepted")
+	}
+}
+
+func TestLoadConfigRejectsHostsWithPorts(t *testing.T) {
+	if _, err := loadConfig(env(map[string]string{"ALLOWED_HOSTS": "example.com:443"})); err == nil {
+		t.Error("ALLOWED_HOSTS=example.com:443 was accepted; hosts are matched without their port")
 	}
 }
 

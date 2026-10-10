@@ -224,8 +224,12 @@ func TestStagingHasTheSameColumnsAsCards(t *testing.T) {
 // tests' handful of cards would never notice.
 func TestStagedCardsAreIndexedByID(t *testing.T) {
 	pool := testdb.New(t)
-	if n := count(t, pool, `SELECT count(*) FROM pg_indexes
-		  WHERE schemaname = current_schema() AND tablename = 'cards_staging' AND indexdef LIKE '%(id)'`); n != 1 {
+	// Only this table's indexes are described: pg_indexes describes every index in the
+	// database, and fails if a parallel test drops its schema meanwhile. (OFFSET 0 keeps
+	// Postgres from describing them before it has picked this table's.)
+	if n := count(t, pool, `SELECT count(*) FROM
+		  (SELECT indexrelid FROM pg_index WHERE indrelid = 'cards_staging'::regclass OFFSET 0) i
+		  WHERE pg_get_indexdef(i.indexrelid) LIKE '%(id)'`); n != 1 {
 		t.Error("cards_staging has no index on id")
 	}
 }

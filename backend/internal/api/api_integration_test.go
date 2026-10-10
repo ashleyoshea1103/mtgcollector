@@ -14,7 +14,7 @@ import (
 )
 
 func TestHealthAgainstARealDatabase(t *testing.T) {
-	srv := httptest.NewServer(NewHandler(testdb.New(t), nil))
+	srv := httptest.NewServer(NewHandler(Services{DB: testdb.New(t)}))
 	t.Cleanup(srv.Close)
 
 	res, err := http.Get(srv.URL + "/api/health")
@@ -33,7 +33,7 @@ func TestHealthAgainstARealDatabase(t *testing.T) {
 // tests, with cards in the database; this one checks the wiring).
 func TestCardRoutesAgainstARealDatabase(t *testing.T) {
 	pool := testdb.New(t)
-	srv := httptest.NewServer(NewHandler(pool, &cards.Searcher{Q: store.New(pool)}))
+	srv := httptest.NewServer(NewHandler(Services{DB: pool, Cards: &cards.Searcher{Q: store.New(pool)}}))
 	t.Cleanup(srv.Close)
 
 	for _, tc := range []struct {

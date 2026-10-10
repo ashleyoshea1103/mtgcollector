@@ -262,3 +262,22 @@ type NewEntry struct {
 	Language  string    `json:"language"`
 	GroupID   *int64    `json:"group_id" tstype:"number | null,required"`
 }
+
+// The signed-in user: GET /api/auth/me, and the reply to signing up or logging in.
+type User struct {
+	ID    int64  `json:"id"`
+	Email string `json:"email"`
+}
+
+// What the sign-up and log-in forms submit.
+type Credentials struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// The fewest characters a password may have: NIST SP 800-63B's minimum for a password that
+// is the only sign-in factor. Long passphrases are welcome.
+const MinPasswordLength = 15
+
+// The most characters a password may have.
+const MaxPasswordLength = 256

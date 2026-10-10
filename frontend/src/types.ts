@@ -291,3 +291,26 @@ export interface NewEntry {
   language: string;
   group_id: number | null;
 }
+/**
+ * The signed-in user: GET /api/auth/me, and the reply to signing up or logging in.
+ */
+export interface User {
+  id: number /* int64 */;
+  email: string;
+}
+/**
+ * What the sign-up and log-in forms submit.
+ */
+export interface Credentials {
+  email: string;
+  password: string;
+}
+/**
+ * The fewest characters a password may have: NIST SP 800-63B's minimum for a password that
+ * is the only sign-in factor. Long passphrases are welcome.
+ */
+export const MinPasswordLength = 15;
+/**
+ * The most characters a password may have.
+ */
+export const MaxPasswordLength = 256;

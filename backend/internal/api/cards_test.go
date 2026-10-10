@@ -47,7 +47,7 @@ func (f *fakeCards) Printings(_ context.Context, id string, page int) (contract.
 
 func TestSearchPassesEveryFilterOn(t *testing.T) {
 	c := &fakeCards{}
-	rec := get(t, NewHandler(&fakeDB{}, c), http.MethodGet,
+	rec := get(t, NewHandler(Services{DB: &fakeDB{}, Cards: c}), http.MethodGet,
 		"/api/cards/search?q=lightning+bolt&set=M10&type=instant&rarity=common&colors=r&extras=true&page=3")
 
 	if rec.Code != http.StatusOK {
@@ -64,7 +64,7 @@ func TestSearchPassesEveryFilterOn(t *testing.T) {
 
 func TestSearchDefaultsToPageOneWithoutExtras(t *testing.T) {
 	c := &fakeCards{}
-	get(t, NewHandler(&fakeDB{}, c), http.MethodGet, "/api/cards/search?q=bolt")
+	get(t, NewHandler(Services{DB: &fakeDB{}, Cards: c}), http.MethodGet, "/api/cards/search?q=bolt")
 	if c.search.Page != 1 || c.search.IncludeExtras {
 		t.Errorf("search = %+v, want page 1 without extras", c.search)
 	}
@@ -79,7 +79,7 @@ func TestBadParametersAreRefusedBeforeTheSearch(t *testing.T) {
 	} {
 		t.Run(path, func(t *testing.T) {
 			c := &fakeCards{}
-			rec := get(t, NewHandler(&fakeDB{}, c), http.MethodGet, path)
+			rec := get(t, NewHandler(Services{DB: &fakeDB{}, Cards: c}), http.MethodGet, path)
 			if rec.Code != http.StatusBadRequest {
 				t.Errorf("status = %d, want 400", rec.Code)
 			}
@@ -108,7 +108,7 @@ func TestErrorsBecomeTheRightStatus(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, path := range []string{"/api/cards/search?q=bolt", "/api/cards/autocomplete?q=bol", "/api/cards/x", "/api/cards/x/printings"} {
-				rec := get(t, NewHandler(&fakeDB{}, &fakeCards{err: tc.err}), http.MethodGet, path)
+				rec := get(t, NewHandler(Services{DB: &fakeDB{}, Cards: &fakeCards{err: tc.err}}), http.MethodGet, path)
 				if rec.Code != tc.status {
 					t.Errorf("%s: status = %d, want %d", path, rec.Code, tc.status)
 				}
@@ -133,7 +133,7 @@ func TestEachCardRouteReachesItsHandler(t *testing.T) {
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			c := &fakeCards{}
-			rec := get(t, NewHandler(&fakeDB{}, c), http.MethodGet, tc.path)
+			rec := get(t, NewHandler(Services{DB: &fakeDB{}, Cards: c}), http.MethodGet, tc.path)
 			if rec.Code != http.StatusOK {
 				t.Fatalf("status = %d: %s", rec.Code, rec.Body)
 			}
@@ -152,7 +152,7 @@ func TestEachCardRouteReachesItsHandler(t *testing.T) {
 
 func TestUnknownAPIPathsAreJSON404s(t *testing.T) {
 	for _, path := range []string{"/api/nope", "/api/cards/x/y/z", "/api/"} {
-		rec := get(t, NewHandler(&fakeDB{}, &fakeCards{}), http.MethodGet, path)
+		rec := get(t, NewHandler(Services{DB: &fakeDB{}, Cards: &fakeCards{}}), http.MethodGet, path)
 		if rec.Code != http.StatusNotFound {
 			t.Errorf("%s: status = %d, want 404", path, rec.Code)
 		}
@@ -165,7 +165,7 @@ func TestUnknownAPIPathsAreJSON404s(t *testing.T) {
 
 func TestOnlyGETReachesTheCards(t *testing.T) {
 	c := &fakeCards{}
-	rec := get(t, NewHandler(&fakeDB{}, c), http.MethodPost, "/api/cards/search?q=bolt")
+	rec := get(t, NewHandler(Services{DB: &fakeDB{}, Cards: c}), http.MethodPost, "/api/cards/search?q=bolt")
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("status = %d, want 405", rec.Code)
 	}
@@ -184,4 +184,21 @@ func assertJSONError(t *testing.T, body string) string {
 		t.Errorf("body %q isn't an API error: %v", body, err)
 	}
 	return e.Error
+}
+
+// A client that went away gets no answer, and isn't reported as a timeout, even though Postgres
+// says its query was cancelled: the searcher adds the context's reason to that error.
+func TestAQueryWhoseClientWentAwayIsNotATimeout(t *testing.T) {
+	cancelled := fmt.Errorf("search: %w (%w)", &pgconn.PgError{Code: "57014"}, context.Canceled)
+	var logs strings.Builder
+	captureLogs(t, &logs)
+
+	rec := get(t, NewHandler(Services{DB: &fakeDB{}, Cards: &fakeCards{err: cancelled}}), http.MethodGet, "/api/cards/search?q=bolt")
+
+	if rec.Body.Len() != 0 {
+		t.Errorf("body = %q, want nothing", rec.Body)
+	}
+	if strings.Contains(logs.String(), "timed out") {
+		t.Errorf("logged as a timeout: %s", logs.String())
+	}
 }
