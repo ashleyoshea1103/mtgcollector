@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
@@ -54,15 +55,11 @@ const (
 )
 
 // ErrNotFound means there's no card with the given id.
-var ErrNotFound = errors.New("card not found")
+var ErrNotFound = apperr.New(apperr.NotFound, "no card with that id")
 
-// A QueryError is a search the caller asked for wrongly; its message is safe to show them.
-type QueryError struct{ Reason string }
-
-func (e *QueryError) Error() string { return e.Reason }
-
+// invalid is a search the caller asked for wrongly; its message is safe to show them.
 func invalid(format string, args ...any) error {
-	return &QueryError{Reason: fmt.Sprintf(format, args...)}
+	return apperr.New(apperr.Invalid, format, args...)
 }
 
 // Search is a card search, as parsed from a request.
@@ -263,7 +260,7 @@ func page(rows []store.CardListing, n int) (contract.CardPage, error) {
 // A Scryfall id in its usual form (pgtype would also accept other separators, or none).
 var idFormat = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-// ParseID reads a Scryfall card id, or says it isn't one (a *QueryError).
+// ParseID reads a Scryfall card id, or says it isn't one (an apperr.Invalid).
 func ParseID(id string) (pgtype.UUID, error) {
 	if !idFormat.MatchString(id) {
 		return pgtype.UUID{}, invalid("card id must be a Scryfall id, like 0b8fe8b3-…")

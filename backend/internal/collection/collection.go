@@ -7,14 +7,15 @@ import (
 	"context"
 	"encoding"
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
@@ -28,24 +29,29 @@ const PageSize = 60
 const queryTimeout = 5 * time.Second
 
 var (
-	ErrNotFound = errors.New("no such entry")
+	ErrNotFound = apperr.New(apperr.NotFound, "no such entry")
 	// A change that would make an entry the same as another of the user's.
-	ErrConflict = errors.New("you already have this card with those details; change that entry instead")
+	ErrConflict = apperr.New(apperr.Conflict, "you already have this card with those details; change that entry instead")
 )
 
-// InputError is a request the server won't accept; Reason says why, for the user.
-type InputError struct{ Reason string }
-
-func (e *InputError) Error() string { return e.Reason }
-
+// invalid is a request the server won't accept; the message says why, for the user.
 func invalid(format string, args ...any) error {
-	return &InputError{fmt.Sprintf(format, args...)}
+	return apperr.New(apperr.Invalid, format, args...)
 }
 
 // Service does the work, for one user at a time: every call takes the user's id, and every
 // query is limited to that user's entries.
 type Service struct {
 	Q *store.Queries
+	// The most entries a collection can hold; zero means contract.MaxEntries.
+	MaxEntries int
+}
+
+func (s *Service) maxEntries() int {
+	if s.MaxEntries > 0 {
+		return s.MaxEntries
+	}
+	return contract.MaxEntries
 }
 
 // Add adds copies of a printing: a new entry, or more copies of the one the user has with
@@ -64,28 +70,44 @@ func (s *Service) Add(ctx context.Context, userID int64, e contract.NewEntry) (c
 	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	finishes, err := s.Q.CardFinishes(ctx, cardID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return contract.CollectionEntry{}, false, invalid("there's no card with that id")
-	}
-	if err != nil {
-		return contract.CollectionEntry{}, false, db.Error(ctx, "find card", err)
-	}
-	if err := checkFinish(e.Finish, finishes); err != nil {
-		return contract.CollectionEntry{}, false, err
-	}
 	row, err := s.Q.AddEntry(ctx, store.AddEntryParams{
 		UserID: userID, CardID: cardID, Quantity: int32(e.Quantity),
 		Finish: string(e.Finish), Condition: string(e.Condition), Language: string(e.Language),
+		MaxEntries: int32(s.maxEntries()),
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return contract.CollectionEntry{}, false, invalid("that would make more than %d copies of this card", contract.MaxQuantity)
+		return contract.CollectionEntry{}, false, s.whyNotAdded(ctx, userID, cardID, e)
 	}
 	if err != nil {
 		return contract.CollectionEntry{}, false, db.Error(ctx, "add entry", err)
 	}
 	entry, err := s.get(ctx, userID, row.ID)
 	return entry, row.Created, err
+}
+
+// whyNotAdded says why AddEntry added nothing: there's no such card, it doesn't come in
+// that finish, there would be too many copies, or too many entries.
+func (s *Service) whyNotAdded(ctx context.Context, userID int64, cardID pgtype.UUID, e contract.NewEntry) error {
+	finishes, err := s.Q.CardFinishes(ctx, cardID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return invalid("there's no card with that id")
+	}
+	if err != nil {
+		return db.Error(ctx, "find card", err)
+	}
+	if err := checkFinish(e.Finish, finishes); err != nil {
+		return err
+	}
+	has, err := s.Q.HasEntry(ctx, store.HasEntryParams{
+		UserID: userID, CardID: cardID, Finish: string(e.Finish), Condition: string(e.Condition), Language: string(e.Language),
+	})
+	if err != nil {
+		return db.Error(ctx, "find entry", err)
+	}
+	if has {
+		return invalid("that would make more than %d copies of this card", contract.MaxQuantity)
+	}
+	return invalid("your collection has %d entries, the most it can hold; remove some to add others", s.maxEntries())
 }
 
 // Change changes an entry's quantity, finish, condition or language.
@@ -163,7 +185,7 @@ func (s *Service) get(ctx context.Context, userID, id int64) (contract.Collectio
 	if err != nil {
 		return contract.CollectionEntry{}, db.Error(ctx, "get entry", err)
 	}
-	return toEntry(store.EntriesByNameRow(row))
+	return toEntry(row.EntryPrice, row.CardListing)
 }
 
 // checkEntry checks what an entry is: values the JSON decoder hasn't already checked
@@ -174,7 +196,7 @@ func checkEntry(quantity int, finish contract.Finish, condition contract.Conditi
 	}
 	for _, err := range []error{checkEnum(finish), checkEnum(condition), checkEnum(language)} {
 		if err != nil {
-			return &InputError{err.Error()}
+			return invalid("%s", err)
 		}
 	}
 	return nil
@@ -197,16 +219,17 @@ func checkFinish(f contract.Finish, finishes []string) error {
 	return nil
 }
 
-// toEntry is an entry row as the API shows it. Every entry query returns the same columns.
-func toEntry(r store.EntriesByNameRow) (contract.CollectionEntry, error) {
-	card, err := cards.Summary(r.CardListing)
+// toEntry is an entry and its card as the API shows them.
+func toEntry(r store.EntryPrice, v store.CardListing) (contract.CollectionEntry, error) {
+	card, err := cards.Summary(v)
 	if err != nil {
 		return contract.CollectionEntry{}, err
 	}
 	return contract.CollectionEntry{
 		ID: r.ID, Card: card, Quantity: int(r.Quantity),
 		Finish: contract.Finish(r.Finish), Condition: contract.Condition(r.Condition), Language: contract.Language(r.Language),
-		AddedAt:      r.AddedAt.Time.UTC().Format(time.RFC3339),
+		// To the microsecond, as stored: the newest-first order uses all of it.
+		AddedAt:      r.AddedAt.Time.UTC().Format(time.RFC3339Nano),
 		UnitPriceEUR: cards.Number(r.UnitPrice),
 		ValueEUR:     cards.Number(r.Value),
 	}, nil

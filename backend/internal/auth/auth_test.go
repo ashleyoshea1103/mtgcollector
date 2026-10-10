@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 )
@@ -150,9 +151,8 @@ func TestEmailChecks(t *testing.T) {
 		"ann@example.com, bob@example.com", "ann @example.com", "ann@exa\x00mple.com",
 		strings.Repeat("a", 243) + "@example.com", // 255 characters
 	} {
-		var input *InputError
-		if err := checkEmail(bad); !errors.As(err, &input) {
-			t.Errorf("checkEmail(%q) = %v, want an InputError", bad, err)
+		if err := checkEmail(bad); apperr.KindOf(err) != apperr.Invalid {
+			t.Errorf("checkEmail(%q) = %v, want an apperr.Invalid", bad, err)
 		}
 	}
 	if err := checkEmail(strings.Repeat("a", 242) + "@example.com"); err != nil { // 254
@@ -179,8 +179,7 @@ func TestPasswordChecks(t *testing.T) {
 		"not UTF-8":                 {strings.Repeat("\xff", min), false},
 	} {
 		err := checkPassword(tc.password, "ann.lee@example.com")
-		var input *InputError
-		if tc.ok && err != nil || !tc.ok && !errors.As(err, &input) {
+		if tc.ok && err != nil || !tc.ok && apperr.KindOf(err) != apperr.Invalid {
 			t.Errorf("%s: checkPassword = %v, want ok %v", name, err, tc.ok)
 		}
 	}

@@ -304,6 +304,10 @@ type EntryChange struct {
 // The most copies one entry can hold.
 const MaxQuantity = 999
 
+// The most entries one collection can hold: plenty for a collection, and it bounds the work
+// of every listing, which reads the whole collection.
+const MaxEntries = 50_000
+
 // The signed-in user: GET /api/auth/me, and the reply to signing up or logging in.
 type User struct {
 	ID    int64  `json:"id"`

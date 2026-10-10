@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strconv"
 
@@ -112,17 +111,9 @@ func entryID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 
 // collectionResult writes a result with status, or the error as its status.
 func collectionResult(w http.ResponseWriter, r *http.Request, status int, res any, err error) {
-	var input *collection.InputError
-	switch {
-	case err == nil:
-		writeJSON(w, status, res)
-	case errors.As(err, &input):
-		writeError(w, http.StatusBadRequest, input.Reason)
-	case errors.Is(err, collection.ErrNotFound):
-		writeError(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, collection.ErrConflict):
-		writeError(w, http.StatusConflict, err.Error())
-	default:
-		serverError(w, r, err)
+	if err != nil {
+		fail(w, r, err)
+		return
 	}
+	writeJSON(w, status, res)
 }

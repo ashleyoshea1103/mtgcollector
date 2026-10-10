@@ -13,7 +13,13 @@ import (
 
 const addEntry = `-- name: AddEntry :one
 INSERT INTO collection_entries AS e (user_id, card_id, quantity, finish, condition, language)
-VALUES ($1, $2, $3, $4, $5, $6)
+SELECT $1, c.id, $2, $3, $4, $5
+  FROM cards c
+ WHERE c.id = $6 AND $3::text = ANY (c.finishes)
+   AND ((SELECT count(*) FROM collection_entries WHERE user_id = $1) < $7::integer
+        OR EXISTS (SELECT 1 FROM collection_entries
+                    WHERE user_id = $1 AND card_id = $6 AND finish = $3
+                      AND condition = $4 AND language = $5))
 ON CONFLICT (user_id, card_id, finish, condition, language)
 DO UPDATE SET quantity = e.quantity + excluded.quantity
         WHERE e.quantity + excluded.quantity <= 999
@@ -21,12 +27,13 @@ RETURNING e.id, (xmax = 0)::boolean AS created
 `
 
 type AddEntryParams struct {
-	UserID    int64
-	CardID    pgtype.UUID
-	Quantity  int32
-	Finish    string
-	Condition string
-	Language  string
+	UserID     int64
+	Quantity   int32
+	Finish     string
+	Condition  string
+	Language   string
+	CardID     pgtype.UUID
+	MaxEntries int32
 }
 
 type AddEntryRow struct {
@@ -35,15 +42,18 @@ type AddEntryRow struct {
 }
 
 // Adds copies: a new entry, or more of one the user has with the same printing, finish,
-// condition and language. No row when that would make more than 999 copies.
+// condition and language. No row when there's no such card, it doesn't come in that finish,
+// there would be more than 999 copies, or it would be a new entry and the user already has
+// max_entries. (That limit is approximate: adds at the same moment can each see room.)
 func (q *Queries) AddEntry(ctx context.Context, arg AddEntryParams) (AddEntryRow, error) {
 	row := q.db.QueryRow(ctx, addEntry,
 		arg.UserID,
-		arg.CardID,
 		arg.Quantity,
 		arg.Finish,
 		arg.Condition,
 		arg.Language,
+		arg.CardID,
+		arg.MaxEntries,
 	)
 	var i AddEntryRow
 	err := row.Scan(&i.ID, &i.Created)
@@ -56,12 +66,67 @@ SELECT finishes FROM cards WHERE id = $1
 `
 
 // Queries for the collection (internal/collection). Every one is for one user's entries:
-// user_id is in every WHERE clause.
+// user_id is in every WHERE clause. Prices come from the entry_prices view.
 func (q *Queries) CardFinishes(ctx context.Context, id pgtype.UUID) ([]string, error) {
 	row := q.db.QueryRow(ctx, cardFinishes, id)
 	var finishes []string
 	err := row.Scan(&finishes)
 	return finishes, err
+}
+
+const collectionStats = `-- name: CollectionStats :many
+SELECT GROUPING(g.color, g.rarity)::integer AS totals_of,
+       coalesce(g.color, '')::text AS color,
+       coalesce(g.rarity, '')::text AS rarity,
+       coalesce(sum(g.quantity), 0)::integer AS card_count,
+       coalesce(sum(g.value), 0)::numeric AS value_eur,
+       coalesce(sum(g.quantity) FILTER (WHERE g.unit_price IS NULL), 0)::integer AS unpriced_count,
+       count(DISTINCT g.card_id)::integer AS unique_cards
+  FROM (SELECT p.quantity, p.value, p.unit_price, p.card_id, p.rarity,
+               card_group('color', p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) AS color
+          FROM entry_prices p
+         WHERE p.user_id = $1) g
+ GROUP BY GROUPING SETS ((), (g.color), (g.rarity))
+`
+
+type CollectionStatsRow struct {
+	TotalsOf      int32
+	Color         string
+	Rarity        string
+	CardCount     int32
+	ValueEur      pgtype.Numeric
+	UnpricedCount int32
+	UniqueCards   int32
+}
+
+// The user's totals in one pass: over everything (totals_of 3), by colour group (1) and by
+// rarity (2). The whole-collection row is there even when the collection is empty.
+func (q *Queries) CollectionStats(ctx context.Context, userID int64) ([]CollectionStatsRow, error) {
+	rows, err := q.db.Query(ctx, collectionStats, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CollectionStatsRow
+	for rows.Next() {
+		var i CollectionStatsRow
+		if err := rows.Scan(
+			&i.TotalsOf,
+			&i.Color,
+			&i.Rarity,
+			&i.CardCount,
+			&i.ValueEur,
+			&i.UnpricedCount,
+			&i.UniqueCards,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const deleteEntry = `-- name: DeleteEntry :execrows
@@ -82,17 +147,14 @@ func (q *Queries) DeleteEntry(ctx context.Context, arg DeleteEntryParams) (int64
 }
 
 const entriesByAdded = `-- name: EntriesByAdded :many
-SELECT e.id, e.quantity, e.finish, e.condition, e.language, e.added_at,
-       unit_price_eur(e.finish, v.price_eur, v.price_eur_foil)::numeric AS unit_price,
-       line_value(unit_price_eur(e.finish, v.price_eur, v.price_eur_foil), e.quantity)::numeric AS value,
-       v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
-  FROM collection_entries e
-  JOIN card_listing v ON v.id = e.card_id
- WHERE e.user_id = $1
-   AND card_group($2, v.set_code, v.color_identity, v.type_line, v.rarity, v.cmc) = $3
+SELECT p.id, p.user_id, p.card_id, p.quantity, p.finish, p.condition, p.language, p.added_at, p.name, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc, p.unit_price, p.value, v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
+  FROM entry_prices p
+  JOIN card_listing v ON v.id = p.card_id
+ WHERE p.user_id = $1
+   AND card_group($2, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $3
    AND ($4::bigint IS NULL
-        OR (e.added_at, e.id) < ($5::timestamptz, $4::bigint))
- ORDER BY e.added_at DESC, e.id DESC
+        OR (p.added_at, p.id) < ($5::timestamptz, $4::bigint))
+ ORDER BY p.added_at DESC, p.id DESC
  LIMIT $6
 `
 
@@ -106,14 +168,7 @@ type EntriesByAddedParams struct {
 }
 
 type EntriesByAddedRow struct {
-	ID          int64
-	Quantity    int32
-	Finish      string
-	Condition   string
-	Language    string
-	AddedAt     pgtype.Timestamptz
-	UnitPrice   pgtype.Numeric
-	Value       pgtype.Numeric
+	EntryPrice  EntryPrice
 	CardListing CardListing
 }
 
@@ -135,14 +190,22 @@ func (q *Queries) EntriesByAdded(ctx context.Context, arg EntriesByAddedParams) 
 	for rows.Next() {
 		var i EntriesByAddedRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Quantity,
-			&i.Finish,
-			&i.Condition,
-			&i.Language,
-			&i.AddedAt,
-			&i.UnitPrice,
-			&i.Value,
+			&i.EntryPrice.ID,
+			&i.EntryPrice.UserID,
+			&i.EntryPrice.CardID,
+			&i.EntryPrice.Quantity,
+			&i.EntryPrice.Finish,
+			&i.EntryPrice.Condition,
+			&i.EntryPrice.Language,
+			&i.EntryPrice.AddedAt,
+			&i.EntryPrice.Name,
+			&i.EntryPrice.SetCode,
+			&i.EntryPrice.ColorIdentity,
+			&i.EntryPrice.TypeLine,
+			&i.EntryPrice.Rarity,
+			&i.EntryPrice.Cmc,
+			&i.EntryPrice.UnitPrice,
+			&i.EntryPrice.Value,
 			&i.CardListing.ID,
 			&i.CardListing.OracleID,
 			&i.CardListing.Name,
@@ -182,17 +245,14 @@ func (q *Queries) EntriesByAdded(ctx context.Context, arg EntriesByAddedParams) 
 }
 
 const entriesByCMC = `-- name: EntriesByCMC :many
-SELECT e.id, e.quantity, e.finish, e.condition, e.language, e.added_at,
-       unit_price_eur(e.finish, v.price_eur, v.price_eur_foil)::numeric AS unit_price,
-       line_value(unit_price_eur(e.finish, v.price_eur, v.price_eur_foil), e.quantity)::numeric AS value,
-       v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
-  FROM collection_entries e
-  JOIN card_listing v ON v.id = e.card_id
- WHERE e.user_id = $1
-   AND card_group($2, v.set_code, v.color_identity, v.type_line, v.rarity, v.cmc) = $3
+SELECT p.id, p.user_id, p.card_id, p.quantity, p.finish, p.condition, p.language, p.added_at, p.name, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc, p.unit_price, p.value, v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
+  FROM entry_prices p
+  JOIN card_listing v ON v.id = p.card_id
+ WHERE p.user_id = $1
+   AND card_group($2, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $3
    AND ($4::bigint IS NULL
-        OR (v.cmc, v.name, e.id) > ($5::numeric, $6::text, $4::bigint))
- ORDER BY v.cmc, v.name, e.id
+        OR (p.cmc, p.name, p.id) > ($5::numeric, $6::text, $4::bigint))
+ ORDER BY p.cmc, p.name, p.id
  LIMIT $7
 `
 
@@ -207,14 +267,7 @@ type EntriesByCMCParams struct {
 }
 
 type EntriesByCMCRow struct {
-	ID          int64
-	Quantity    int32
-	Finish      string
-	Condition   string
-	Language    string
-	AddedAt     pgtype.Timestamptz
-	UnitPrice   pgtype.Numeric
-	Value       pgtype.Numeric
+	EntryPrice  EntryPrice
 	CardListing CardListing
 }
 
@@ -236,14 +289,22 @@ func (q *Queries) EntriesByCMC(ctx context.Context, arg EntriesByCMCParams) ([]E
 	for rows.Next() {
 		var i EntriesByCMCRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Quantity,
-			&i.Finish,
-			&i.Condition,
-			&i.Language,
-			&i.AddedAt,
-			&i.UnitPrice,
-			&i.Value,
+			&i.EntryPrice.ID,
+			&i.EntryPrice.UserID,
+			&i.EntryPrice.CardID,
+			&i.EntryPrice.Quantity,
+			&i.EntryPrice.Finish,
+			&i.EntryPrice.Condition,
+			&i.EntryPrice.Language,
+			&i.EntryPrice.AddedAt,
+			&i.EntryPrice.Name,
+			&i.EntryPrice.SetCode,
+			&i.EntryPrice.ColorIdentity,
+			&i.EntryPrice.TypeLine,
+			&i.EntryPrice.Rarity,
+			&i.EntryPrice.Cmc,
+			&i.EntryPrice.UnitPrice,
+			&i.EntryPrice.Value,
 			&i.CardListing.ID,
 			&i.CardListing.OracleID,
 			&i.CardListing.Name,
@@ -284,16 +345,13 @@ func (q *Queries) EntriesByCMC(ctx context.Context, arg EntriesByCMCParams) ([]E
 
 const entriesByName = `-- name: EntriesByName :many
 
-SELECT e.id, e.quantity, e.finish, e.condition, e.language, e.added_at,
-       unit_price_eur(e.finish, v.price_eur, v.price_eur_foil)::numeric AS unit_price,
-       line_value(unit_price_eur(e.finish, v.price_eur, v.price_eur_foil), e.quantity)::numeric AS value,
-       v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
-  FROM collection_entries e
-  JOIN card_listing v ON v.id = e.card_id
- WHERE e.user_id = $1
-   AND card_group($2, v.set_code, v.color_identity, v.type_line, v.rarity, v.cmc) = $3
-   AND ($4::bigint IS NULL OR (v.name, e.id) > ($5::text, $4::bigint))
- ORDER BY v.name, e.id
+SELECT p.id, p.user_id, p.card_id, p.quantity, p.finish, p.condition, p.language, p.added_at, p.name, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc, p.unit_price, p.value, v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
+  FROM entry_prices p
+  JOIN card_listing v ON v.id = p.card_id
+ WHERE p.user_id = $1
+   AND card_group($2, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $3
+   AND ($4::bigint IS NULL OR (p.name, p.id) > ($5::text, $4::bigint))
+ ORDER BY p.name, p.id
  LIMIT $6
 `
 
@@ -307,20 +365,13 @@ type EntriesByNameParams struct {
 }
 
 type EntriesByNameRow struct {
-	ID          int64
-	Quantity    int32
-	Finish      string
-	Condition   string
-	Language    string
-	AddedAt     pgtype.Timestamptz
-	UnitPrice   pgtype.Numeric
-	Value       pgtype.Numeric
+	EntryPrice  EntryPrice
 	CardListing CardListing
 }
 
 // A page of one group's entries, in one order. Each order is its own query, so each can
 // page by keyset: the page after the row whose sort key is the cursor's. The group is the
-// one card_group gives the key for; group_by 'none' is every entry.
+// one card_group gives the key for; group_by 'none' is every entry ('all').
 func (q *Queries) EntriesByName(ctx context.Context, arg EntriesByNameParams) ([]EntriesByNameRow, error) {
 	rows, err := q.db.Query(ctx, entriesByName,
 		arg.UserID,
@@ -338,14 +389,22 @@ func (q *Queries) EntriesByName(ctx context.Context, arg EntriesByNameParams) ([
 	for rows.Next() {
 		var i EntriesByNameRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Quantity,
-			&i.Finish,
-			&i.Condition,
-			&i.Language,
-			&i.AddedAt,
-			&i.UnitPrice,
-			&i.Value,
+			&i.EntryPrice.ID,
+			&i.EntryPrice.UserID,
+			&i.EntryPrice.CardID,
+			&i.EntryPrice.Quantity,
+			&i.EntryPrice.Finish,
+			&i.EntryPrice.Condition,
+			&i.EntryPrice.Language,
+			&i.EntryPrice.AddedAt,
+			&i.EntryPrice.Name,
+			&i.EntryPrice.SetCode,
+			&i.EntryPrice.ColorIdentity,
+			&i.EntryPrice.TypeLine,
+			&i.EntryPrice.Rarity,
+			&i.EntryPrice.Cmc,
+			&i.EntryPrice.UnitPrice,
+			&i.EntryPrice.Value,
 			&i.CardListing.ID,
 			&i.CardListing.OracleID,
 			&i.CardListing.Name,
@@ -385,20 +444,15 @@ func (q *Queries) EntriesByName(ctx context.Context, arg EntriesByNameParams) ([
 }
 
 const entriesByPrice = `-- name: EntriesByPrice :many
-SELECT e.id, e.quantity, e.finish, e.condition, e.language, e.added_at,
-       unit_price_eur(e.finish, v.price_eur, v.price_eur_foil)::numeric AS unit_price,
-       line_value(unit_price_eur(e.finish, v.price_eur, v.price_eur_foil), e.quantity)::numeric AS value,
-       v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
-  FROM collection_entries e
-  JOIN card_listing v ON v.id = e.card_id
- WHERE e.user_id = $1
-   AND card_group($2, v.set_code, v.color_identity, v.type_line, v.rarity, v.cmc) = $3
+SELECT p.id, p.user_id, p.card_id, p.quantity, p.finish, p.condition, p.language, p.added_at, p.name, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc, p.unit_price, p.value, v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
+  FROM entry_prices p
+  JOIN card_listing v ON v.id = p.card_id
+ WHERE p.user_id = $1
+   AND card_group($2, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $3
    AND ($4::bigint IS NULL
-        OR (unit_price_eur(e.finish, v.price_eur, v.price_eur_foil) IS NULL,
-            -coalesce(unit_price_eur(e.finish, v.price_eur, v.price_eur_foil), 0), e.id)
+        OR (p.unit_price IS NULL, -coalesce(p.unit_price, 0), p.id)
          > ($5::boolean, -coalesce($6::numeric, 0), $4::bigint))
- ORDER BY unit_price_eur(e.finish, v.price_eur, v.price_eur_foil) IS NULL,
-          -coalesce(unit_price_eur(e.finish, v.price_eur, v.price_eur_foil), 0), e.id
+ ORDER BY p.unit_price IS NULL, -coalesce(p.unit_price, 0), p.id
  LIMIT $7
 `
 
@@ -413,14 +467,7 @@ type EntriesByPriceParams struct {
 }
 
 type EntriesByPriceRow struct {
-	ID          int64
-	Quantity    int32
-	Finish      string
-	Condition   string
-	Language    string
-	AddedAt     pgtype.Timestamptz
-	UnitPrice   pgtype.Numeric
-	Value       pgtype.Numeric
+	EntryPrice  EntryPrice
 	CardListing CardListing
 }
 
@@ -443,14 +490,22 @@ func (q *Queries) EntriesByPrice(ctx context.Context, arg EntriesByPriceParams) 
 	for rows.Next() {
 		var i EntriesByPriceRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Quantity,
-			&i.Finish,
-			&i.Condition,
-			&i.Language,
-			&i.AddedAt,
-			&i.UnitPrice,
-			&i.Value,
+			&i.EntryPrice.ID,
+			&i.EntryPrice.UserID,
+			&i.EntryPrice.CardID,
+			&i.EntryPrice.Quantity,
+			&i.EntryPrice.Finish,
+			&i.EntryPrice.Condition,
+			&i.EntryPrice.Language,
+			&i.EntryPrice.AddedAt,
+			&i.EntryPrice.Name,
+			&i.EntryPrice.SetCode,
+			&i.EntryPrice.ColorIdentity,
+			&i.EntryPrice.TypeLine,
+			&i.EntryPrice.Rarity,
+			&i.EntryPrice.Cmc,
+			&i.EntryPrice.UnitPrice,
+			&i.EntryPrice.Value,
 			&i.CardListing.ID,
 			&i.CardListing.OracleID,
 			&i.CardListing.Name,
@@ -490,7 +545,6 @@ func (q *Queries) EntriesByPrice(ctx context.Context, arg EntriesByPriceParams) 
 }
 
 const entryCard = `-- name: EntryCard :one
-
 SELECT e.quantity, e.finish, e.condition, e.language, c.finishes
   FROM collection_entries e
   JOIN cards c ON c.id = e.card_id
@@ -510,7 +564,6 @@ type EntryCardRow struct {
 	Finishes  []string
 }
 
-// xmax is 0 for a row this statement inserted
 // What an entry is, for checking a change to it.
 func (q *Queries) EntryCard(ctx context.Context, arg EntryCardParams) (EntryCardRow, error) {
 	row := q.db.QueryRow(ctx, entryCard, arg.UserID, arg.ID)
@@ -526,13 +579,10 @@ func (q *Queries) EntryCard(ctx context.Context, arg EntryCardParams) (EntryCard
 }
 
 const getEntry = `-- name: GetEntry :one
-SELECT e.id, e.quantity, e.finish, e.condition, e.language, e.added_at,
-       unit_price_eur(e.finish, v.price_eur, v.price_eur_foil)::numeric AS unit_price,
-       line_value(unit_price_eur(e.finish, v.price_eur, v.price_eur_foil), e.quantity)::numeric AS value,
-       v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
-  FROM collection_entries e
-  JOIN card_listing v ON v.id = e.card_id
- WHERE e.user_id = $1 AND e.id = $2
+SELECT p.id, p.user_id, p.card_id, p.quantity, p.finish, p.condition, p.language, p.added_at, p.name, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc, p.unit_price, p.value, v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
+  FROM entry_prices p
+  JOIN card_listing v ON v.id = p.card_id
+ WHERE p.user_id = $1 AND p.id = $2
 `
 
 type GetEntryParams struct {
@@ -541,14 +591,7 @@ type GetEntryParams struct {
 }
 
 type GetEntryRow struct {
-	ID          int64
-	Quantity    int32
-	Finish      string
-	Condition   string
-	Language    string
-	AddedAt     pgtype.Timestamptz
-	UnitPrice   pgtype.Numeric
-	Value       pgtype.Numeric
+	EntryPrice  EntryPrice
 	CardListing CardListing
 }
 
@@ -556,14 +599,22 @@ func (q *Queries) GetEntry(ctx context.Context, arg GetEntryParams) (GetEntryRow
 	row := q.db.QueryRow(ctx, getEntry, arg.UserID, arg.ID)
 	var i GetEntryRow
 	err := row.Scan(
-		&i.ID,
-		&i.Quantity,
-		&i.Finish,
-		&i.Condition,
-		&i.Language,
-		&i.AddedAt,
-		&i.UnitPrice,
-		&i.Value,
+		&i.EntryPrice.ID,
+		&i.EntryPrice.UserID,
+		&i.EntryPrice.CardID,
+		&i.EntryPrice.Quantity,
+		&i.EntryPrice.Finish,
+		&i.EntryPrice.Condition,
+		&i.EntryPrice.Language,
+		&i.EntryPrice.AddedAt,
+		&i.EntryPrice.Name,
+		&i.EntryPrice.SetCode,
+		&i.EntryPrice.ColorIdentity,
+		&i.EntryPrice.TypeLine,
+		&i.EntryPrice.Rarity,
+		&i.EntryPrice.Cmc,
+		&i.EntryPrice.UnitPrice,
+		&i.EntryPrice.Value,
 		&i.CardListing.ID,
 		&i.CardListing.OracleID,
 		&i.CardListing.Name,
@@ -596,14 +647,13 @@ func (q *Queries) GetEntry(ctx context.Context, arg GetEntryParams) (GetEntryRow
 }
 
 const groupTotals = `-- name: GroupTotals :many
-SELECT card_group($1, c.set_code, c.color_identity, c.type_line, c.rarity, c.cmc)::text AS key,
+SELECT card_group($1, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc)::text AS key,
        count(*)::integer AS entry_count,
-       sum(e.quantity)::integer AS card_count,
-       coalesce(sum(line_value(unit_price_eur(e.finish, c.price_eur, c.price_eur_foil), e.quantity)), 0)::numeric AS value_eur,
-       coalesce(sum(e.quantity) FILTER (WHERE unit_price_eur(e.finish, c.price_eur, c.price_eur_foil) IS NULL), 0)::integer AS unpriced_count
-  FROM collection_entries e
-  JOIN cards c ON c.id = e.card_id
- WHERE e.user_id = $2
+       sum(p.quantity)::integer AS card_count,
+       coalesce(sum(p.value), 0)::numeric AS value_eur,
+       coalesce(sum(p.quantity) FILTER (WHERE p.unit_price IS NULL), 0)::integer AS unpriced_count
+  FROM entry_prices p
+ WHERE p.user_id = $2
  GROUP BY 1
 `
 
@@ -648,6 +698,36 @@ func (q *Queries) GroupTotals(ctx context.Context, arg GroupTotalsParams) ([]Gro
 	return items, nil
 }
 
+const hasEntry = `-- name: HasEntry :one
+
+SELECT EXISTS (SELECT 1 FROM collection_entries
+                WHERE user_id = $1 AND card_id = $2 AND finish = $3
+                  AND condition = $4 AND language = $5)
+`
+
+type HasEntryParams struct {
+	UserID    int64
+	CardID    pgtype.UUID
+	Finish    string
+	Condition string
+	Language  string
+}
+
+// xmax is 0 for a row this statement inserted
+// Whether the user has an entry for this printing, finish, condition and language.
+func (q *Queries) HasEntry(ctx context.Context, arg HasEntryParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasEntry,
+		arg.UserID,
+		arg.CardID,
+		arg.Finish,
+		arg.Condition,
+		arg.Language,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const setsByCode = `-- name: SetsByCode :many
 SELECT code, name, icon_svg_uri, released_at FROM sets WHERE code = ANY ($1::text[])
 `
@@ -683,18 +763,6 @@ func (q *Queries) SetsByCode(ctx context.Context, codes []string) ([]SetsByCodeR
 		return nil, err
 	}
 	return items, nil
-}
-
-const uniqueCards = `-- name: UniqueCards :one
-SELECT count(DISTINCT card_id)::integer FROM collection_entries WHERE user_id = $1
-`
-
-// Distinct printings the user owns.
-func (q *Queries) UniqueCards(ctx context.Context, userID int64) (int32, error) {
-	row := q.db.QueryRow(ctx, uniqueCards, userID)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
 }
 
 const updateEntry = `-- name: UpdateEntry :one

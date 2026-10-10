@@ -1,6 +1,7 @@
 package collection
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 	"time"
@@ -43,13 +44,12 @@ func TestKeys(t *testing.T) {
 	}
 }
 
-func row(id int64, name string, price, cmc string, added time.Time) store.EntriesByNameRow {
-	r := store.EntriesByNameRow{ID: id, AddedAt: pgtype.Timestamptz{Time: added, Valid: true}}
-	r.CardListing.Name = name
+func row(id int64, name string, price, cmc string, added time.Time) store.EntryPrice {
+	r := store.EntryPrice{ID: id, Name: name, AddedAt: pgtype.Timestamptz{Time: added, Valid: true}}
 	if price != "" {
 		r.UnitPrice.Scan(price)
 	}
-	r.CardListing.Cmc.Scan(cmc)
+	r.Cmc.Scan(cmc)
 	return r
 }
 
@@ -119,6 +119,27 @@ func TestACursorIsOnlyForItsListing(t *testing.T) {
 		tc.edit(&c)
 		if _, err := decodeCursor(c.encode(), q); err == nil {
 			t.Errorf("%s cursor without its sort key was accepted: %+v", tc.sort, c)
+		}
+	}
+	nul := cursorAfter(q, row(1, "Bo\x00lt", "1", "1", time.Now()))
+	if _, err := decodeCursor(nul.encode(), q); err == nil {
+		t.Error("a cursor whose name has a NUL (which Postgres can't take) was accepted")
+	}
+	// Numbers Postgres wouldn't take, or that no price or mana value is.
+	for _, raw := range []string{`1e-20000`, `1e20000`, `"NaN"`, `"Infinity"`, `"-Infinity"`, `123456789012345678901234567890`} {
+		for _, sort := range []contract.SortBy{contract.SortByPrice, contract.SortByCMC} {
+			field := map[contract.SortBy]string{contract.SortByPrice: "price", contract.SortByCMC: "cmc"}[sort]
+			forged := base64.RawURLEncoding.EncodeToString([]byte(`{"v":1,"g":"none","k":"all","s":"` + string(sort) + `","id":1,"` + field + `":` + raw + `}`))
+			if _, err := decodeCursor(forged, EntryQuery{GroupBy: contract.GroupByNone, Key: "all", Sort: sort}); err == nil {
+				t.Errorf("%s cursor with %s %s was accepted", sort, field, raw)
+			}
+		}
+	}
+	for _, ok := range []string{"0", "0.5", "1000000", "12.34"} {
+		var n pgtype.Numeric
+		n.Scan(ok)
+		if !plainNumber(n) {
+			t.Errorf("%s isn't a plain number", ok)
 		}
 	}
 	if _, err := decodeCursor(strings.Repeat("A", maxCursorLength+1), q); err == nil {

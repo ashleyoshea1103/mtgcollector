@@ -3,6 +3,7 @@ package collection
 import (
 	"encoding/base64"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -37,17 +38,17 @@ type cursor struct {
 }
 
 // cursorAfter is the cursor for the page after the one ending with r.
-func cursorAfter(q EntryQuery, r store.EntriesByNameRow) cursor {
+func cursorAfter(q EntryQuery, r store.EntryPrice) cursor {
 	c := cursor{Version: cursorVersion, GroupBy: q.GroupBy, Key: q.Key, Sort: q.Sort, ID: r.ID}
 	switch q.Sort {
 	case contract.SortByPrice:
 		c.Unpriced, c.Price = !r.UnitPrice.Valid, r.UnitPrice
 	case contract.SortByCMC:
-		c.CMC, c.Name = r.CardListing.Cmc, r.CardListing.Name
+		c.CMC, c.Name = r.Cmc, r.Name
 	case contract.SortByAdded:
 		c.Added = r.AddedAt.Time
 	default:
-		c.Name = r.CardListing.Name
+		c.Name = r.Name
 	}
 	return c
 }
@@ -55,6 +56,14 @@ func cursorAfter(q EntryQuery, r store.EntriesByNameRow) cursor {
 func (c cursor) encode() string {
 	b, _ := json.Marshal(c) // only strings, numbers and times
 	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+// plainNumber reports whether n is a number like the prices and mana values this server puts
+// in cursors: finite, and of a size Postgres takes. (One like 1e-20000 is a numeric pgx reads
+// but Postgres refuses, which would fail the query.)
+func plainNumber(n pgtype.Numeric) bool {
+	return n.Valid && !n.NaN && n.InfinityModifier == pgtype.Finite &&
+		n.Exp >= -16 && n.Exp <= 16 && n.Int != nil && n.Int.BitLen() <= 64
 }
 
 // decodeCursor reads a cursor from the client, and checks it's for the listing asked for.
@@ -74,14 +83,18 @@ func decodeCursor(s string, q EntryQuery) (cursor, error) {
 	if c.Version != cursorVersion || c.GroupBy != q.GroupBy || c.Key != q.Key || c.Sort != q.Sort {
 		return cursor{}, bad
 	}
+	// Postgres text can't hold a NUL, so a name with one would fail the query (a 500).
+	if strings.ContainsRune(c.Name, 0) {
+		return cursor{}, bad
+	}
 	// The sort key the order needs must be there (a price may be null: unpriced).
 	switch q.Sort {
 	case contract.SortByPrice:
-		if c.Unpriced == c.Price.Valid {
+		if c.Unpriced == c.Price.Valid || c.Price.Valid && !plainNumber(c.Price) {
 			return cursor{}, bad
 		}
 	case contract.SortByCMC:
-		if !c.CMC.Valid {
+		if !plainNumber(c.CMC) {
 			return cursor{}, bad
 		}
 	case contract.SortByAdded:

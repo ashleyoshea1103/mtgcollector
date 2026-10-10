@@ -1,11 +1,11 @@
 package cards
 
 import (
-	"errors"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 )
 
@@ -36,7 +36,7 @@ func TestParseColors(t *testing.T) {
 	}
 	for _, bad := range []string{"x", "rc", "CR", "red", "r,g"} {
 		if _, _, err := parseColors(bad); !isQueryError(err) {
-			t.Errorf("parseColors(%q) err = %v, want a QueryError", bad, err)
+			t.Errorf("parseColors(%q) err = %v, want an apperr.Invalid", bad, err)
 		}
 	}
 }
@@ -70,19 +70,19 @@ func TestSearchRefusesBadRequests(t *testing.T) {
 		"a too-long name in a set": {Set: "mh2", Name: strings.Repeat("x ", MaxQueryLength), Page: 1},
 	} {
 		if _, err := s.Search(t.Context(), q); !isQueryError(err) {
-			t.Errorf("%s: err = %v, want a QueryError", name, err)
+			t.Errorf("%s: err = %v, want an apperr.Invalid", name, err)
 		}
 	}
 	for _, id := range []string{"not-a-uuid", "0b8fe8b3-0000-4000-8000-00000000000", "0b8fe8b3x0000x4000x8000x000000000000", "0b8fe8b300004000800000000000000000"} {
 		if _, err := s.Printings(t.Context(), id, 1); !isQueryError(err) {
-			t.Errorf("Printings(%q): err = %v, want a QueryError", id, err)
+			t.Errorf("Printings(%q): err = %v, want an apperr.Invalid", id, err)
 		}
 		if _, err := s.Card(t.Context(), id); !isQueryError(err) {
-			t.Errorf("Card(%q): err = %v, want a QueryError", id, err)
+			t.Errorf("Card(%q): err = %v, want an apperr.Invalid", id, err)
 		}
 	}
 	if _, err := s.Autocomplete(t.Context(), strings.Repeat("x", MaxQueryLength+1)); !isQueryError(err) {
-		t.Errorf("Autocomplete with a too-long query: err = %v, want a QueryError", err)
+		t.Errorf("Autocomplete with a too-long query: err = %v, want an apperr.Invalid", err)
 	}
 }
 
@@ -127,7 +127,4 @@ func TestPagesSayWhetherThereIsMore(t *testing.T) {
 	}
 }
 
-func isQueryError(err error) bool {
-	var q *QueryError
-	return errors.As(err, &q)
-}
+func isQueryError(err error) bool { return apperr.KindOf(err) == apperr.Invalid }

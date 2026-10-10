@@ -334,6 +334,11 @@ export interface EntryChange {
  */
 export const MaxQuantity = 999;
 /**
+ * The most entries one collection can hold: plenty for a collection, and it bounds the work
+ * of every listing, which reads the whole collection.
+ */
+export const MaxEntries = 50_000;
+/**
  * The signed-in user: GET /api/auth/me, and the reply to signing up or logging in.
  */
 export interface User {

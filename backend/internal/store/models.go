@@ -109,6 +109,25 @@ type CollectionEntry struct {
 	AddedAt   pgtype.Timestamptz
 }
 
+type EntryPrice struct {
+	ID            int64
+	UserID        int64
+	CardID        pgtype.UUID
+	Quantity      int32
+	Finish        string
+	Condition     string
+	Language      string
+	AddedAt       pgtype.Timestamptz
+	Name          string
+	SetCode       string
+	ColorIdentity []string
+	TypeLine      string
+	Rarity        string
+	Cmc           pgtype.Numeric
+	UnitPrice     pgtype.Numeric
+	Value         pgtype.Numeric
+}
+
 type ScryfallSync struct {
 	ID            int64
 	StartedAt     pgtype.Timestamptz

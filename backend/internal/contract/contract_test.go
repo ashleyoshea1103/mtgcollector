@@ -171,7 +171,14 @@ func TestEnumsReadOnlyTheirOwnValues(t *testing.T) {
 		listed[reflect.TypeOf(v).Elem().Name()] = reflect.TypeOf(v)
 	}
 	consts := map[string][]string{} // type name: its constants' values
-	for _, name := range []string{"contract.go"} {
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range files {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
 		file, err := parser.ParseFile(token.NewFileSet(), name, nil, parser.SkipObjectResolution)
 		if err != nil {
 			t.Fatal(err)

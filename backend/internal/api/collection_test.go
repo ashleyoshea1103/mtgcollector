@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/collection"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 )
@@ -176,7 +177,7 @@ func TestCollectionErrorsGetTheirStatus(t *testing.T) {
 		status int
 		msg    string
 	}{
-		{&collection.InputError{Reason: "quantity must be from 1 to 999"}, 400, "quantity must be from 1 to 999"},
+		{apperr.New(apperr.Invalid, "quantity must be from 1 to 999"), 400, "quantity must be from 1 to 999"},
 		{collection.ErrNotFound, 404, "no such entry"},
 		{collection.ErrConflict, 409, collection.ErrConflict.Error()},
 		{context.DeadlineExceeded, 503, "that took too long; try again"},

@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/auth"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/ratelimit"
@@ -166,7 +167,7 @@ func TestAuthErrorsGetTheirStatusAndNoCookie(t *testing.T) {
 		status int
 		body   string
 	}{
-		{"a bad sign-up", &auth.InputError{Reason: "use a longer password"}, 400, "use a longer password"},
+		{"a bad sign-up", apperr.New(apperr.Invalid, "use a longer password"), 400, "use a longer password"},
 		{"a taken email", auth.ErrEmailTaken, 409, "an account with that email already exists"},
 		{"wrong credentials", auth.ErrBadCredentials, 401, "email or password is incorrect"},
 		{"a timeout", context.DeadlineExceeded, 503, "that took too long; try again"},

@@ -43,20 +43,37 @@ CREATE FUNCTION card_group(group_by text, set_code text, color_identity text[], 
     RETURN CASE group_by
         WHEN 'set' THEN set_code
         WHEN 'color' THEN CASE cardinality(color_identity) WHEN 0 THEN 'C' WHEN 1 THEN color_identity[1] ELSE 'M' END
-        WHEN 'type' THEN coalesce((
-            SELECT u.type
-              FROM unnest(ARRAY['creature', 'planeswalker', 'battle', 'instant', 'sorcery',
-                                'artifact', 'enchantment', 'land']) WITH ORDINALITY AS u (type, rank)
-             -- The words before the dash ("Legendary Artifact Creature — Elf") of the front face.
-             WHERE u.type = ANY (string_to_array(lower(split_part(split_part(type_line, ' // ', 1), ' — ', 1)), ' '))
-             ORDER BY u.rank
-             LIMIT 1), 'other')
+        -- A whole word before the first dash ("Legendary Artifact Creature — Elf") or slash
+        -- (the front face's, of "Sorcery // Instant"). No subquery, so Postgres can inline the
+        -- function into the queries: called as a function, it costs more than the rest of them.
+        WHEN 'type' THEN CASE
+            WHEN type_line ~* '^[^—/]*\mcreature\M' THEN 'creature'
+            WHEN type_line ~* '^[^—/]*\mplaneswalker\M' THEN 'planeswalker'
+            WHEN type_line ~* '^[^—/]*\mbattle\M' THEN 'battle'
+            WHEN type_line ~* '^[^—/]*\minstant\M' THEN 'instant'
+            WHEN type_line ~* '^[^—/]*\msorcery\M' THEN 'sorcery'
+            WHEN type_line ~* '^[^—/]*\martifact\M' THEN 'artifact'
+            WHEN type_line ~* '^[^—/]*\menchantment\M' THEN 'enchantment'
+            WHEN type_line ~* '^[^—/]*\mland\M' THEN 'land'
+            ELSE 'other'
+        END
         WHEN 'rarity' THEN rarity
         WHEN 'cmc' THEN least(floor(cmc), 7)::integer::text
         ELSE 'all'
     END;
 
+-- Each entry with what its card's grouping and pricing need, and its price: what the
+-- collection's queries read, so the pricing rule is written once.
+CREATE VIEW entry_prices AS
+SELECT e.id, e.user_id, e.card_id, e.quantity, e.finish, e.condition, e.language, e.added_at,
+       c.name, c.set_code, c.color_identity, c.type_line, c.rarity, c.cmc,
+       unit_price_eur(e.finish, c.price_eur, c.price_eur_foil) AS unit_price,
+       line_value(unit_price_eur(e.finish, c.price_eur, c.price_eur_foil), e.quantity) AS value
+  FROM collection_entries e
+  JOIN cards c ON c.id = e.card_id;
+
 -- +goose Down
+DROP VIEW entry_prices;
 DROP FUNCTION card_group;
 DROP FUNCTION line_value;
 DROP FUNCTION unit_price_eur;

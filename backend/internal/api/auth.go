@@ -151,18 +151,8 @@ func clearSessionCookie(w http.ResponseWriter) {
 
 // authError answers with the status for an auth error.
 func authError(w http.ResponseWriter, r *http.Request, err error) {
-	var input *auth.InputError
-	switch {
-	case errors.As(err, &input):
-		writeError(w, http.StatusBadRequest, input.Reason)
-	case errors.Is(err, auth.ErrEmailTaken):
-		writeError(w, http.StatusConflict, err.Error())
-	case errors.Is(err, auth.ErrBadCredentials):
-		writeError(w, http.StatusUnauthorized, err.Error())
-	case errors.Is(err, auth.ErrNoSession):
+	if errors.Is(err, auth.ErrNoSession) {
 		clearSessionCookie(w) // a cookie for a session that's gone: stop sending it
-		writeError(w, http.StatusUnauthorized, err.Error())
-	default:
-		serverError(w, r, err)
 	}
+	fail(w, r, err)
 }

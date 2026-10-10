@@ -12,9 +12,11 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/testdb"
@@ -118,10 +120,7 @@ func (f *fixture) add(t *testing.T, user int64, e contract.NewEntry) contract.Co
 	return entry
 }
 
-func isInputError(err error) bool {
-	var input *InputError
-	return errors.As(err, &input)
-}
+func isInputError(err error) bool { return apperr.KindOf(err) == apperr.Invalid }
 
 // The server prices cards with the rules the frontend uses: every EUR case in the shared file.
 func TestPricingMatchesTheSharedCases(t *testing.T) {
@@ -311,12 +310,47 @@ func TestAddsTheServerRefuses(t *testing.T) {
 		e := contract.NewEntry{CardID: foilOnly, Quantity: 9, Finish: contract.FinishFoil, Condition: contract.ConditionNM, Language: contract.LanguageEnglish}
 		edit(&e)
 		if _, _, err := f.s.Add(t.Context(), f.ann, e); !isInputError(err) {
-			t.Errorf("%s: = %v, want an InputError", name, err)
+			t.Errorf("%s: = %v, want an apperr.Invalid", name, err)
 		}
 	}
 	// Exactly 999 is fine.
 	if _, _, err := f.s.Add(t.Context(), f.ann, contract.NewEntry{CardID: foilOnly, Quantity: 9, Finish: contract.FinishFoil, Condition: contract.ConditionNM, Language: contract.LanguageEnglish}); err != nil {
 		t.Errorf("adding up to 999: %v", err)
+	}
+}
+
+func TestACollectionHoldsAtMostMaxEntries(t *testing.T) {
+	f := newFixture(t)
+	f.s.MaxEntries = 3
+	card := f.card(t, testCard{})
+	var first contract.CollectionEntry
+	for i, cond := range []contract.Condition{contract.ConditionMT, contract.ConditionNM, contract.ConditionEX} {
+		e := newEntry(card, 1)
+		e.Condition = cond
+		if i == 0 {
+			first = f.add(t, f.ann, e)
+		} else {
+			f.add(t, f.ann, e)
+		}
+	}
+	fourth := newEntry(card, 1)
+	fourth.Condition = contract.ConditionGD
+	_, _, err := f.s.Add(t.Context(), f.ann, fourth)
+	if !isInputError(err) || !strings.Contains(err.Error(), "the most it can hold") {
+		t.Errorf("a 4th entry = %v, want the limit", err)
+	}
+	// More copies of an entry the user has are still fine.
+	again := newEntry(card, 2)
+	again.Condition = contract.ConditionMT
+	if e, created, err := f.s.Add(t.Context(), f.ann, again); err != nil || created || e.ID != first.ID || e.Quantity != 3 {
+		t.Errorf("adding to an entry at the limit = %+v, created %v, %v", e, created, err)
+	}
+	// And the limit is each user's own.
+	if _, _, err := f.s.Add(t.Context(), f.bob, fourth); err != nil {
+		t.Errorf("Bob's first entry: %v", err)
+	}
+	if f2 := (&Service{Q: f.s.Q}); f2.maxEntries() != contract.MaxEntries {
+		t.Errorf("the default limit is %d, want contract.MaxEntries", f2.maxEntries())
 	}
 }
 
@@ -366,7 +400,7 @@ func TestChangingAnEntry(t *testing.T) {
 		"an unknown condition":         {Condition: &bad},
 	} {
 		if _, err := f.s.Change(t.Context(), f.ann, e.ID, c); !isInputError(err) {
-			t.Errorf("%s: = %v, want an InputError", name, err)
+			t.Errorf("%s: = %v, want an apperr.Invalid", name, err)
 		}
 	}
 	if _, err := f.s.Change(t.Context(), f.bob, e.ID, contract.EntryChange{Quantity: &qty}); !errors.Is(err, ErrNotFound) {
@@ -457,7 +491,32 @@ func TestGroups(t *testing.T) {
 		}
 	}
 	if _, err := f.s.Groups(t.Context(), f.ann, "price"); !isInputError(err) {
-		t.Errorf("grouping by price = %v, want an InputError", err)
+		t.Errorf("grouping by price = %v, want an apperr.Invalid", err)
+	}
+}
+
+func TestAnEmptyCollectionStillHasItsOneGroup(t *testing.T) {
+	f := newFixture(t)
+	got, err := f.s.Groups(t.Context(), f.ann, contract.GroupByNone)
+	want := []contract.GroupSummary{{Key: "all", Label: "All cards"}}
+	if err != nil || !reflect.DeepEqual(got.Groups, want) {
+		t.Errorf("= %+v, %v; want the all group with no cards", got.Groups, err)
+	}
+	for _, by := range []contract.GroupBy{contract.GroupBySet, contract.GroupByColor} {
+		if got, _ := f.s.Groups(t.Context(), f.ann, by); len(got.Groups) != 0 {
+			t.Errorf("%s: groups %+v in an empty collection", by, got.Groups)
+		}
+	}
+}
+
+func TestAddedAtIsToTheMicrosecond(t *testing.T) {
+	f := newFixture(t)
+	e := f.add(t, f.ann, newEntry(f.card(t, testCard{}), 1))
+	var stored time.Time
+	f.pool.QueryRow(t.Context(), `SELECT added_at FROM collection_entries WHERE id = $1`, e.ID).Scan(&stored)
+	got, err := time.Parse(time.RFC3339Nano, e.AddedAt)
+	if err != nil || !got.Equal(stored) || !strings.HasSuffix(e.AddedAt, "Z") {
+		t.Errorf("added_at %q (%v), stored %v; want the same instant, in UTC", e.AddedAt, err, stored)
 	}
 }
 
@@ -565,10 +624,12 @@ func order(sort contract.SortBy) func(a, b contract.CollectionEntry) int {
 			}
 			return byID
 		case contract.SortByAdded:
-			if a.AddedAt != b.AddedAt {
-				return strings.Compare(b.AddedAt, a.AddedAt)
+			ta, _ := time.Parse(time.RFC3339Nano, a.AddedAt)
+			tb, _ := time.Parse(time.RFC3339Nano, b.AddedAt)
+			if c := tb.Compare(ta); c != 0 {
+				return c
 			}
-			return -byID // within a second, by id: the RFC 3339 time has whole seconds
+			return -byID
 		default:
 			if a.Card.Name != b.Card.Name {
 				return strings.Compare(a.Card.Name, b.Card.Name)
@@ -629,7 +690,7 @@ func TestABadListingIsRefused(t *testing.T) {
 		"a cursor without its price": {Sort: contract.SortByPrice, Cursor: forged(t, next, func(c *cursor) { c.Price.Valid = false })},
 	} {
 		if _, err := f.s.Entries(t.Context(), f.ann, q); !isInputError(err) {
-			t.Errorf("%s: = %v, want an InputError", name, err)
+			t.Errorf("%s: = %v, want an apperr.Invalid", name, err)
 		}
 	}
 	if _, err := f.s.Entries(t.Context(), f.ann, EntryQuery{Sort: contract.SortByPrice, Cursor: next}); err != nil {
