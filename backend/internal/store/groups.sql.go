@@ -12,34 +12,41 @@ import (
 )
 
 const addToGroup = `-- name: AddToGroup :execrows
+WITH grp AS (
+    SELECT g.id, g.user_id
+      FROM custom_groups g
+     WHERE g.id = $5 AND g.user_id = $3
+       FOR KEY SHARE
+)
 INSERT INTO group_members AS m (group_id, entry_id, user_id, quantity)
-SELECT g.id, e.id, g.user_id, least($1::integer, e.quantity)
-  FROM custom_groups g, collection_entries e
- WHERE g.id = $2 AND g.user_id = $3 AND e.id = $4 AND e.user_id = $3
-   AND ((SELECT count(*) FROM group_members c WHERE c.user_id = $3) < $5::integer
-        OR EXISTS (SELECT 1 FROM group_members x WHERE x.group_id = $2 AND x.entry_id = $4))
+SELECT grp.id, e.id, grp.user_id, least($1::integer, e.quantity)
+  FROM grp, collection_entries e
+ WHERE e.id = $2 AND e.user_id = $3
+   AND ((SELECT count(*) FROM group_members c WHERE c.user_id = $3) < $4::integer
+        OR EXISTS (SELECT 1 FROM group_members x WHERE x.group_id = $5 AND x.entry_id = $2))
 ON CONFLICT (group_id, entry_id) DO UPDATE SET quantity = least(m.quantity + excluded.quantity,
     (SELECT quantity FROM collection_entries WHERE id = excluded.entry_id))
 `
 
 type AddToGroupParams struct {
 	Quantity   int32
-	GroupID    int64
-	UserID     int64
 	EntryID    int64
+	UserID     int64
 	MaxMembers int32
+	GroupID    int64
 }
 
 // Puts copies just added to an entry in a group too (or more of them, if they're there): never
-// more than the entry has. No row when there's no such group (deleted meanwhile), or it would be
-// a new member and the user already has max_members.
+// more than the entry has. Reads the group FOR KEY SHARE, as SetMember. No row when there's no
+// such group (deleted meanwhile), or it would be a new member and the user already has
+// max_members.
 func (q *Queries) AddToGroup(ctx context.Context, arg AddToGroupParams) (int64, error) {
 	result, err := q.db.Exec(ctx, addToGroup,
 		arg.Quantity,
-		arg.GroupID,
-		arg.UserID,
 		arg.EntryID,
+		arg.UserID,
 		arg.MaxMembers,
+		arg.GroupID,
 	)
 	if err != nil {
 		return 0, err
@@ -260,37 +267,44 @@ const setMember = `-- name: SetMember :one
 WITH entry AS (
     SELECT e.id, e.quantity
       FROM collection_entries e
-     WHERE e.id = $5 AND e.user_id = $3
+     WHERE e.id = $5 AND e.user_id = $2
        FOR SHARE
+), grp AS (
+    SELECT g.id, g.user_id
+      FROM custom_groups g
+     WHERE g.id = $4 AND g.user_id = $2
+       FOR KEY SHARE
 )
 INSERT INTO group_members AS m (group_id, entry_id, user_id, quantity)
-SELECT g.id, entry.id, g.user_id, $1
-  FROM entry, custom_groups g
- WHERE g.id = $2 AND g.user_id = $3 AND entry.quantity >= $1::integer
-   AND ((SELECT count(*) FROM group_members c WHERE c.user_id = $3) < $4::integer
-        OR EXISTS (SELECT 1 FROM group_members x WHERE x.group_id = $2 AND x.entry_id = $5))
+SELECT grp.id, entry.id, grp.user_id, $1
+  FROM entry, grp
+ WHERE entry.quantity >= $1::integer
+   AND ((SELECT count(*) FROM group_members c WHERE c.user_id = $2) < $3::integer
+        OR EXISTS (SELECT 1 FROM group_members x WHERE x.group_id = $4 AND x.entry_id = $5))
 ON CONFLICT (group_id, entry_id) DO UPDATE SET quantity = excluded.quantity
 RETURNING (xmax = 0)::boolean AS created
 `
 
 type SetMemberParams struct {
 	Quantity   int32
-	GroupID    int64
 	UserID     int64
 	MaxMembers int32
+	GroupID    int64
 	EntryID    int64
 }
 
 // Puts quantity copies of one of the user's entries in one of their groups (or sets how many
 // are there). Reads the entry FOR SHARE first, so a change to its quantity can't slip in
-// between. No row when there's no such group or entry, the entry has fewer copies, or it
-// would be a new member and the user already has max_members (approximate, as max_groups).
+// between, then the group FOR KEY SHARE, so a delete of it either finishes first (and there's
+// no group) or waits. No row when there's no such group or entry, the entry has fewer copies,
+// or it would be a new member and the user already has max_members (approximate, as
+// max_groups).
 func (q *Queries) SetMember(ctx context.Context, arg SetMemberParams) (bool, error) {
 	row := q.db.QueryRow(ctx, setMember,
 		arg.Quantity,
-		arg.GroupID,
 		arg.UserID,
 		arg.MaxMembers,
+		arg.GroupID,
 		arg.EntryID,
 	)
 	var created bool

@@ -72,18 +72,25 @@ SELECT g.id, g.name, g.kind, g.description,
 -- name: SetMember :one
 -- Puts quantity copies of one of the user's entries in one of their groups (or sets how many
 -- are there). Reads the entry FOR SHARE first, so a change to its quantity can't slip in
--- between. No row when there's no such group or entry, the entry has fewer copies, or it
--- would be a new member and the user already has max_members (approximate, as max_groups).
+-- between, then the group FOR KEY SHARE, so a delete of it either finishes first (and there's
+-- no group) or waits. No row when there's no such group or entry, the entry has fewer copies,
+-- or it would be a new member and the user already has max_members (approximate, as
+-- max_groups).
 WITH entry AS (
     SELECT e.id, e.quantity
       FROM collection_entries e
      WHERE e.id = @entry_id AND e.user_id = @user_id
        FOR SHARE
+), grp AS (
+    SELECT g.id, g.user_id
+      FROM custom_groups g
+     WHERE g.id = @group_id AND g.user_id = @user_id
+       FOR KEY SHARE
 )
 INSERT INTO group_members AS m (group_id, entry_id, user_id, quantity)
-SELECT g.id, entry.id, g.user_id, @quantity
-  FROM entry, custom_groups g
- WHERE g.id = @group_id AND g.user_id = @user_id AND entry.quantity >= @quantity::integer
+SELECT grp.id, entry.id, grp.user_id, @quantity
+  FROM entry, grp
+ WHERE entry.quantity >= @quantity::integer
    AND ((SELECT count(*) FROM group_members c WHERE c.user_id = @user_id) < @max_members::integer
         OR EXISTS (SELECT 1 FROM group_members x WHERE x.group_id = @group_id AND x.entry_id = @entry_id))
 ON CONFLICT (group_id, entry_id) DO UPDATE SET quantity = excluded.quantity
@@ -91,12 +98,19 @@ RETURNING (xmax = 0)::boolean AS created;
 
 -- name: AddToGroup :execrows
 -- Puts copies just added to an entry in a group too (or more of them, if they're there): never
--- more than the entry has. No row when there's no such group (deleted meanwhile), or it would be
--- a new member and the user already has max_members.
+-- more than the entry has. Reads the group FOR KEY SHARE, as SetMember. No row when there's no
+-- such group (deleted meanwhile), or it would be a new member and the user already has
+-- max_members.
+WITH grp AS (
+    SELECT g.id, g.user_id
+      FROM custom_groups g
+     WHERE g.id = @group_id AND g.user_id = @user_id
+       FOR KEY SHARE
+)
 INSERT INTO group_members AS m (group_id, entry_id, user_id, quantity)
-SELECT g.id, e.id, g.user_id, least(@quantity::integer, e.quantity)
-  FROM custom_groups g, collection_entries e
- WHERE g.id = @group_id AND g.user_id = @user_id AND e.id = @entry_id AND e.user_id = @user_id
+SELECT grp.id, e.id, grp.user_id, least(@quantity::integer, e.quantity)
+  FROM grp, collection_entries e
+ WHERE e.id = @entry_id AND e.user_id = @user_id
    AND ((SELECT count(*) FROM group_members c WHERE c.user_id = @user_id) < @max_members::integer
         OR EXISTS (SELECT 1 FROM group_members x WHERE x.group_id = @group_id AND x.entry_id = @entry_id))
 ON CONFLICT (group_id, entry_id) DO UPDATE SET quantity = least(m.quantity + excluded.quantity,

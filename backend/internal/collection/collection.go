@@ -103,6 +103,9 @@ func (s *Service) Add(ctx context.Context, userID int64, e contract.NewEntry) (c
 	if errors.Is(err, pgx.ErrNoRows) {
 		return contract.CollectionEntry{}, false, s.whyNotAdded(ctx, userID, cardID, e)
 	}
+	if e.GroupID != nil && isForeignKeyViolation(err) { // the group was deleted just as the copies went in
+		return contract.CollectionEntry{}, false, s.whyNotGrouped(ctx, s.q(), userID, *e.GroupID)
+	}
 	if err != nil {
 		return contract.CollectionEntry{}, false, dbError(ctx, "add entry", err)
 	}

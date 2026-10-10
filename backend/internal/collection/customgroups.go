@@ -210,7 +210,8 @@ func (s *Service) SetMember(ctx context.Context, userID, groupID, entryID int64,
 	created, err := s.q().SetMember(ctx, store.SetMemberParams{
 		UserID: userID, GroupID: groupID, EntryID: entryID, Quantity: int32(quantity), MaxMembers: int32(s.maxMembers()),
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
+	// (A foreign key violation: the group or entry was deleted just as the member was written.)
+	if errors.Is(err, pgx.ErrNoRows) || isForeignKeyViolation(err) {
 		return contract.GroupMember{}, false, s.whyNotSet(ctx, userID, groupID, entryID, quantity)
 	}
 	if err != nil {
@@ -327,8 +328,8 @@ func checkName(name string) (string, error) {
 		return "", invalid("give the group a name")
 	case n > contract.MaxGroupNameLength:
 		return "", invalid("a group's name can't be longer than %d characters", contract.MaxGroupNameLength)
-	case !plainText(name, false):
-		return "", invalid("a group's name can only have printable characters")
+	case !plainText(name, false) || !strings.ContainsFunc(name, visible):
+		return "", invalid("a group's name needs a letter, digit or symbol, and only characters that show")
 	}
 	return name, nil
 }
@@ -339,21 +340,35 @@ func checkDescription(description string) (string, error) {
 		return "", invalid("a group's description can't be longer than %d characters", contract.MaxGroupDescriptionLength)
 	}
 	if !plainText(description, true) {
-		return "", invalid("a group's description can only have printable characters and line breaks")
+		return "", invalid("a group's description can only have characters that show, spaces and line breaks")
 	}
 	return description, nil
 }
 
-// plainText reports whether s is valid UTF-8 with no control characters (Postgres can't
-// store a NUL), but for line breaks and tabs where lines are allowed.
+// plainText reports whether s is valid UTF-8 of characters that show (letters, marks, digits,
+// punctuation, symbols) and spaces, and line breaks and tabs where lines are allowed: no
+// control characters (Postgres can't store a NUL), and no invisible ones that would let
+// "Binder" and a look-alike be two groups (zero-width spaces, direction overrides, private-use
+// or unassigned code points). The zero-width joiner stays, as emoji sequences use it.
 func plainText(s string, lines bool) bool {
 	if !utf8.ValidString(s) {
 		return false
 	}
 	for _, r := range s {
-		if unicode.IsControl(r) && !(lines && (r == '\n' || r == '\r' || r == '\t')) {
+		ok := unicode.In(r, unicode.L, unicode.M, unicode.N, unicode.P, unicode.S, unicode.Zs) || r == '\u200d' ||
+			lines && (r == '\n' || r == '\r' || r == '\t')
+		if !ok {
 			return false
 		}
 	}
 	return true
+}
+
+// visible reports whether r is a letter, digit, punctuation or symbol: something that shows.
+func visible(r rune) bool { return unicode.In(r, unicode.L, unicode.N, unicode.P, unicode.S) }
+
+// isForeignKeyViolation reports a write that referred to a row deleted meanwhile.
+func isForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
 }

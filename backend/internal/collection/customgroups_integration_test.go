@@ -67,19 +67,32 @@ func TestGroupsTheServerRefuses(t *testing.T) {
 	f := newFixture(t)
 	f.group(t, f.ann, "Trade binder")
 	for name, g := range map[string]contract.NewGroup{
-		"no name":                  {Name: "", Kind: "deck"},
-		"a blank name":             {Name: "   ", Kind: "deck"},
-		"a name too long":          {Name: strings.Repeat("x", contract.MaxGroupNameLength+1), Kind: "deck"},
-		"a NUL in the name":        {Name: "Bin\x00der", Kind: "deck"},
-		"a line break in the name": {Name: "Bin\nder", Kind: "deck"},
-		"invalid UTF-8":            {Name: "Bin\xffder", Kind: "deck"},
-		"no kind":                  {Name: "Deck"},
-		"an unknown kind":          {Name: "Deck", Kind: "cube"},
-		"a description too long":   {Name: "Deck", Kind: "deck", Description: strings.Repeat("x", contract.MaxGroupDescriptionLength+1)},
-		"a NUL in the description": {Name: "Deck", Kind: "deck", Description: "a\x00b"},
+		"no name":                     {Name: "", Kind: "deck"},
+		"a blank name":                {Name: "   ", Kind: "deck"},
+		"a name too long":             {Name: strings.Repeat("x", contract.MaxGroupNameLength+1), Kind: "deck"},
+		"a NUL in the name":           {Name: "Bin\x00der", Kind: "deck"},
+		"a line break in the name":    {Name: "Bin\nder", Kind: "deck"},
+		"invalid UTF-8":               {Name: "Bin\xffder", Kind: "deck"},
+		"no kind":                     {Name: "Deck"},
+		"an unknown kind":             {Name: "Deck", Kind: "cube"},
+		"a description too long":      {Name: "Deck", Kind: "deck", Description: strings.Repeat("x", contract.MaxGroupDescriptionLength+1)},
+		"a NUL in the description":    {Name: "Deck", Kind: "deck", Description: "a\x00b"},
+		"only a zero-width space":     {Name: "\u200b", Kind: "deck"},
+		"a look-alike of a name":      {Name: "Trade binder\u200b", Kind: "deck"},
+		"a direction override":        {Name: "\u202eredniB", Kind: "deck"},
+		"only punctuation marks":      {Name: "\u0301\u0301", Kind: "deck"},
+		"a private-use character":     {Name: "Bin\ue000der", Kind: "deck"},
+		"a line separator":            {Name: "Bin\u2028der", Kind: "deck"},
+		"a line separator, described": {Name: "Deck", Kind: "deck", Description: "a\u2029b"},
 	} {
 		if _, err := f.s.CreateGroup(t.Context(), f.ann, g); !isInputError(err) {
 			t.Errorf("%s: = %v, want an apperr.Invalid", name, err)
+		}
+	}
+	// Emoji (joined by zero-width joiners), accents and symbols are fine.
+	for _, name := range []string{"Family deck \U0001F468\u200d\U0001F469\u200d\U0001F467", "Caf\u00e9 \u2605", "\u00bfQu\u00e9?"} {
+		if _, err := f.s.CreateGroup(t.Context(), f.ann, contract.NewGroup{Name: name, Kind: "box", Description: "Line one\nLine two\tand a tab"}); err != nil {
+			t.Errorf("%q: %v", name, err)
 		}
 	}
 	// The longest name and description are fine, counted in characters.
@@ -692,5 +705,41 @@ func TestDeletingAUserDeletesTheirGroups(t *testing.T) {
 	f.pool.QueryRow(t.Context(), `SELECT (SELECT count(*) FROM custom_groups), (SELECT count(*) FROM group_members)`).Scan(&groups, &members)
 	if groups != 1 || members != 1 {
 		t.Errorf("%d groups and %d members left, want Bob's one of each", groups, members)
+	}
+}
+
+// A member written just as its group is deleted: the write waits for the delete, then finds
+// no group (a 404, not a failure).
+func TestAMemberWrittenAsItsGroupIsDeleted(t *testing.T) {
+	f := newFixture(t)
+	g := f.group(t, f.ann, "Binder")
+	e := f.add(t, f.ann, newEntry(f.card(t, testCard{}), 2))
+	tx, err := f.pool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(t.Context(), `DELETE FROM custom_groups WHERE id = $1`, g.ID); err != nil {
+		t.Fatal(err)
+	}
+	set, add := make(chan error, 1), make(chan error, 1)
+	go func() { _, _, err := f.s.SetMember(t.Context(), f.ann, g.ID, e.ID, 1); set <- err }()
+	go func() {
+		ne := newEntry(e.Card.ID, 1)
+		ne.GroupID = &g.ID
+		_, _, err := f.s.Add(t.Context(), f.ann, ne)
+		add <- err
+	}()
+	time.Sleep(200 * time.Millisecond) // both are waiting on the delete
+	if err := tx.Commit(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-set; !errors.Is(err, ErrGroupNotFound) {
+		t.Errorf("SetMember = %v, want ErrGroupNotFound", err)
+	}
+	if err := <-add; !isInputError(err) || !strings.Contains(err.Error(), "no group") {
+		t.Errorf("Add = %v, want \"there's no group with that id\"", err)
+	}
+	if got, _ := f.s.get(t.Context(), f.ann, e.ID); got.Quantity != 2 {
+		t.Errorf("the entry has %d copies, want its 2: the add into the deleted group went in", got.Quantity)
 	}
 }
