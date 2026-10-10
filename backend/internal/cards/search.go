@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
@@ -54,15 +55,11 @@ const (
 )
 
 // ErrNotFound means there's no card with the given id.
-var ErrNotFound = errors.New("card not found")
+var ErrNotFound = apperr.New(apperr.NotFound, "no card with that id")
 
-// A QueryError is a search the caller asked for wrongly; its message is safe to show them.
-type QueryError struct{ Reason string }
-
-func (e *QueryError) Error() string { return e.Reason }
-
+// invalid is a search the caller asked for wrongly; its message is safe to show them.
 func invalid(format string, args ...any) error {
-	return &QueryError{Reason: fmt.Sprintf(format, args...)}
+	return apperr.New(apperr.Invalid, format, args...)
 }
 
 // Search is a card search, as parsed from a request.
@@ -188,7 +185,7 @@ func (s *Searcher) Autocomplete(ctx context.Context, typed string) (contract.Car
 
 // Card returns one printing with everything the detail view shows.
 func (s *Searcher) Card(ctx context.Context, id string) (contract.Card, error) {
-	uuid, err := parseID(id)
+	uuid, err := ParseID(id)
 	if err != nil {
 		return contract.Card{}, err
 	}
@@ -207,7 +204,7 @@ func (s *Searcher) Card(ctx context.Context, id string) (contract.Card, error) {
 // Printings returns a page of every printing of the card the given printing is of, newest
 // first, including ones Scryfall no longer lists.
 func (s *Searcher) Printings(ctx context.Context, id string, pageNo int) (contract.CardPage, error) {
-	uuid, err := parseID(id)
+	uuid, err := ParseID(id)
 	if err != nil {
 		return contract.CardPage{}, err
 	}
@@ -251,7 +248,7 @@ func page(rows []store.CardListing, n int) (contract.CardPage, error) {
 	// Never more after MaxPage, as the next page would be refused.
 	p := contract.CardPage{Cards: make([]contract.CardSummary, 0, min(len(rows), PageSize)), Page: n, HasMore: len(rows) > PageSize && n < MaxPage}
 	for _, r := range rows[:min(len(rows), PageSize)] {
-		c, err := toSummary(r)
+		c, err := Summary(r)
 		if err != nil {
 			return contract.CardPage{}, err
 		}
@@ -263,7 +260,8 @@ func page(rows []store.CardListing, n int) (contract.CardPage, error) {
 // A Scryfall id in its usual form (pgtype would also accept other separators, or none).
 var idFormat = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-func parseID(id string) (pgtype.UUID, error) {
+// ParseID reads a Scryfall card id, or says it isn't one (an apperr.Invalid).
+func ParseID(id string) (pgtype.UUID, error) {
 	if !idFormat.MatchString(id) {
 		return pgtype.UUID{}, invalid("card id must be a Scryfall id, like 0b8fe8b3-…")
 	}
@@ -323,7 +321,8 @@ func likeEscape(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
-func toSummary(r store.CardListing) (contract.CardSummary, error) {
+// Summary is a card listing row as the API shows it in lists.
+func Summary(r store.CardListing) (contract.CardSummary, error) {
 	c := contract.CardSummary{
 		ID: uuidString(r.ID), OracleID: uuidString(r.OracleID), Name: r.Name,
 		Set:             contract.CardSet{Code: r.SetCode, Name: r.SetName, IconSVGURI: textPtr(r.SetIconSvgUri)},
@@ -331,14 +330,14 @@ func toSummary(r store.CardListing) (contract.CardSummary, error) {
 		ManaCost: r.ManaCost, TypeLine: r.TypeLine,
 		Colors: nonNil(r.Colors), ColorIdentity: nonNil(r.ColorIdentity),
 		Prices: contract.Prices{
-			EUR: numberPtr(r.PriceEur), EURFoil: numberPtr(r.PriceEurFoil),
-			USD: numberPtr(r.PriceUsd), USDFoil: numberPtr(r.PriceUsdFoil), USDEtched: numberPtr(r.PriceUsdEtched),
+			EUR: Number(r.PriceEur), EURFoil: Number(r.PriceEurFoil),
+			USD: Number(r.PriceUsd), USDFoil: Number(r.PriceUsdFoil), USDEtched: Number(r.PriceUsdEtched),
 		},
 		Finishes:       make([]contract.Finish, len(r.Finishes)),
 		ReleasedAt:     r.ReleasedAt.Time.Format(time.DateOnly),
 		NoLongerListed: r.GoneSince.Valid,
 	}
-	if cmc := numberPtr(r.Cmc); cmc != nil {
+	if cmc := Number(r.Cmc); cmc != nil {
 		c.CMC = *cmc
 	}
 	for i, f := range r.Finishes {
@@ -353,7 +352,7 @@ func toSummary(r store.CardListing) (contract.CardSummary, error) {
 }
 
 func toCard(r store.CardListing) (contract.Card, error) {
-	summary, err := toSummary(r)
+	summary, err := Summary(r)
 	if err != nil {
 		return contract.Card{}, err
 	}
@@ -379,7 +378,8 @@ func textPtr(t pgtype.Text) *string {
 	return &t.String
 }
 
-func numberPtr(n pgtype.Numeric) *float64 {
+// Number is a numeric column as a JSON number, or nil for null.
+func Number(n pgtype.Numeric) *float64 {
 	f, err := n.Float64Value()
 	if err != nil || !f.Valid {
 		return nil

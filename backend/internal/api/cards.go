@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 )
@@ -90,20 +91,36 @@ func pageParam(w http.ResponseWriter, r *http.Request) (int, bool) {
 // respond writes a result, or the error as the right status: the caller's mistakes say
 // what was wrong; anything else is logged and reported without details.
 func respond(w http.ResponseWriter, r *http.Request, res any, err error) {
-	var bad *cards.QueryError
 	switch {
 	case err == nil:
 		writeJSON(w, http.StatusOK, res)
-	case errors.As(err, &bad):
-		writeError(w, http.StatusBadRequest, bad.Reason)
-	case errors.Is(err, cards.ErrNotFound):
-		writeError(w, http.StatusNotFound, "no card with that id")
 	case isTimeout(err):
 		slog.WarnContext(r.Context(), "card query timed out", "path", r.URL.Path, "error", err)
 		writeError(w, http.StatusServiceUnavailable, "that took too long; try a narrower search")
 	default:
-		serverError(w, r, err)
+		fail(w, r, err)
 	}
+}
+
+// The status for each kind of caller's mistake.
+var statusOf = map[apperr.Kind]int{
+	apperr.Invalid:      http.StatusBadRequest,
+	apperr.NotFound:     http.StatusNotFound,
+	apperr.Conflict:     http.StatusConflict,
+	apperr.Unauthorized: http.StatusUnauthorized,
+}
+
+// fail answers with an error: a caller's mistake (an apperr.Error) with its status and
+// message, anything else as a server error.
+func fail(w http.ResponseWriter, r *http.Request, err error) {
+	var e *apperr.Error
+	if errors.As(err, &e) {
+		if status, ok := statusOf[e.Kind]; ok {
+			writeError(w, status, e.Msg)
+			return
+		}
+	}
+	serverError(w, r, err)
 }
 
 // serverError answers for a failure that isn't the caller's: a query that ran out of time

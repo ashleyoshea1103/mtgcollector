@@ -7,6 +7,8 @@ import (
 	"io"
 	"mime"
 	"net/http"
+
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 )
 
 // The largest request body the API reads.
@@ -35,9 +37,12 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	}
 	var tooBig *http.MaxBytesError
 	var typeErr *json.UnmarshalTypeError
+	var enumErr *contract.EnumError
 	switch {
 	case errors.As(err, &tooBig):
 		writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("the body can't be more than %d bytes", maxBodyBytes))
+	case errors.As(err, &enumErr):
+		writeError(w, http.StatusBadRequest, enumErr.Error())
 	case errors.As(err, &typeErr) && typeErr.Field != "":
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("%s has the wrong type", typeErr.Field))
 	default:

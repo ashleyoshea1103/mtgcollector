@@ -39,8 +39,25 @@ The API's own responses are JSON, shaped by the types in `backend/internal/contr
 | `POST /api/auth/login` | Signs in with `Credentials`: 200 with the `User`, or 401 whether the email or the password was wrong. |
 | `POST /api/auth/logout` | Ends this browser's session: 204. |
 | `GET /api/auth/me` | The signed-in `User`, or 401. |
+| `GET /api/collection/groups?group_by=` | The signed-in user's groups (`CollectionGroups`) for one way of grouping (`none` if left out), with each group's totals. Groups with none of the user's cards are left out, except `none`'s one group, `all`. |
+| `GET /api/collection/entries?group_by=&key=&sort=&cursor=` | A page of one group's entries (`EntryPage`), sorted by `name` (the default; Unicode order, so "Æther Vial" sorts with the aethers), `price` (most valuable copy first, unpriced last), `cmc` or `added` (newest first: when the entry was made, not when copies were last added to it). Pass `next_cursor` back as `cursor` for the next page. |
+| `GET /api/collection/stats` | Totals for the whole collection (`CollectionStats`). |
+| `POST /api/collection/entries` | Adds copies (`NewEntry`): 201 with a new entry, or 200 with the entry of the same printing, finish, condition and language they were added to. |
+| `PATCH /api/collection/entries/{id}` | Changes an entry's quantity, finish, condition or language (`EntryChange`): 200 with the entry; 409 if it would then be the same as another of yours. |
+| `DELETE /api/collection/entries/{id}` | Removes an entry: 204. |
 
 Pages hold 60 cards, up to page 50.
+
+**The collection.** Every collection endpoint needs a signed-in user, and only ever sees that user's cards (another user's entry is a 404). An entry holds 1 to 999 copies; its finish must be one the printing comes in. A collection holds at most 50,000 entries (`MaxEntries`); past that, only copies of entries already there can be added. Its EUR price is the regular price for non-foil, and the foil price, else the regular one, for foil and etched (the rules in `testdata/pricing-cases.json`, which the frontend and the server's tests both run); a card Scryfall no longer lists has no price. Totals add up the priced cards and count the others as `unpriced_count`. The `group_by` values and their groups' keys:
+
+| `group_by` | Groups (in order) |
+|---|---|
+| `none` | `all` |
+| `set` | the set codes, newest set first (sets released the same day by name; those with no date last) |
+| `color` | by colour identity: `W`, `U`, `B`, `R`, `G`, `M` (several), `C` (none) |
+| `type` | the front face's first of `creature`, `planeswalker`, `battle`, `instant`, `sorcery`, `artifact`, `enchantment`, `land`; else `other` |
+| `rarity` | `mythic`, `rare`, `uncommon`, `common`, `special`, `bonus` |
+| `cmc` | mana value, rounded down: `0` to `6`, then `7` for 7 or more |
 
 **Signing in.** A session lasts about 30 days from its last use (its expiry moves forward at most once a day), and 90 days at most; the browser holds it in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, and the database only the token's SHA-256. Passwords are hashed with argon2id. Request bodies are JSON (`Content-Type: application/json`, at most 16 KB, no unknown fields). Requests that change anything are refused (403) when a browser says they come from another site, by their `Sec-Fetch-Site` or `Origin` header.
 

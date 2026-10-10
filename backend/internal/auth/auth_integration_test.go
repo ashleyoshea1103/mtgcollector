@@ -14,6 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/testdb"
 )
@@ -74,9 +75,8 @@ func TestAnEmailCanOnlyBeUsedOnceWhateverItsCase(t *testing.T) {
 
 func TestABadSignupIsRefusedBeforeTheDatabase(t *testing.T) {
 	s, pool, _ := newService(t)
-	var input *InputError
-	if _, _, err := s.Signup(t.Context(), "ann@example.com", "short"); !errors.As(err, &input) {
-		t.Errorf("= %v, want an InputError", err)
+	if _, _, err := s.Signup(t.Context(), "ann@example.com", "short"); apperr.KindOf(err) != apperr.Invalid {
+		t.Errorf("= %v, want an apperr.Invalid", err)
 	}
 	var n int
 	pool.QueryRow(t.Context(), `SELECT count(*) FROM users`).Scan(&n)

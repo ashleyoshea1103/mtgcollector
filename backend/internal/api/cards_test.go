@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 )
@@ -98,8 +99,8 @@ func TestErrorsBecomeTheRightStatus(t *testing.T) {
 		status int
 		body   string
 	}{
-		{"the caller's mistake", &cards.QueryError{Reason: "set must be a set code, like mh2"}, 400, "set must be a set code, like mh2"},
-		{"a wrapped mistake", fmt.Errorf("parse: %w", &cards.QueryError{Reason: "page must be from 1 to 50"}), 400, "page must be from 1 to 50"},
+		{"the caller's mistake", apperr.New(apperr.Invalid, "set must be a set code, like mh2"), 400, "set must be a set code, like mh2"},
+		{"a wrapped mistake", fmt.Errorf("parse: %w", apperr.New(apperr.Invalid, "page must be from 1 to 50")), 400, "page must be from 1 to 50"},
 		{"an unknown card", cards.ErrNotFound, 404, "no card with that id"},
 		{"a slow query", fmt.Errorf("search: %w", context.DeadlineExceeded), 503, "that took too long; try a narrower search"},
 		// What Postgres says when pgx cancels a query whose time ran out.

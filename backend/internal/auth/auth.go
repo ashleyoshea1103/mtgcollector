@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
@@ -50,15 +51,15 @@ const queryTimeout = 5 * time.Second
 var hashWait = 10 * time.Second
 
 var (
-	ErrEmailTaken     = errors.New("an account with that email already exists")
-	ErrBadCredentials = errors.New("email or password is incorrect")
-	ErrNoSession      = errors.New("not signed in")
+	ErrEmailTaken     = apperr.New(apperr.Conflict, "an account with that email already exists")
+	ErrBadCredentials = apperr.New(apperr.Unauthorized, "email or password is incorrect")
+	ErrNoSession      = apperr.New(apperr.Unauthorized, "not signed in")
 )
 
-// InputError is a sign-up the server won't accept; Reason says why, for the user.
-type InputError struct{ Reason string }
-
-func (e *InputError) Error() string { return e.Reason }
+// invalid is a sign-up the server won't accept; the message says why, for the user.
+func invalid(format string, args ...any) error {
+	return apperr.New(apperr.Invalid, format, args...)
+}
 
 // Session is a sign-in to hand to the browser: Token goes in its cookie, which should
 // expire at ExpiresAt.
@@ -318,15 +319,15 @@ func hashToken(token string) ([]byte, bool) {
 
 func checkEmail(email string) error {
 	if email == "" {
-		return &InputError{"enter your email address"}
+		return invalid("enter your email address")
 	}
 	if len(email) > maxEmailLength {
-		return &InputError{fmt.Sprintf("an email address can't be longer than %d characters", maxEmailLength)}
+		return invalid("an email address can't be longer than %d characters", maxEmailLength)
 	}
 	// Only a plain address: no display name ("Ann <ann@example.com>"), comments or quoting.
 	addr, err := mail.ParseAddress(email)
 	if err != nil || addr.Address != email || addr.Name != "" || !strings.Contains(email[strings.LastIndexByte(email, '@'):], ".") {
-		return &InputError{"that doesn't look like an email address"}
+		return invalid("that doesn't look like an email address")
 	}
 	return nil
 }
@@ -335,13 +336,13 @@ func checkPassword(password, email string) error {
 	n := utf8.RuneCountInString(string(normalize(password)))
 	switch {
 	case !utf8.ValidString(password):
-		return &InputError{"the password isn't valid text"}
+		return invalid("the password isn't valid text")
 	case n < contract.MinPasswordLength:
-		return &InputError{fmt.Sprintf("use a password of at least %d characters; a few words together work well", contract.MinPasswordLength)}
+		return invalid("use a password of at least %d characters; a few words together work well", contract.MinPasswordLength)
 	case n > contract.MaxPasswordLength:
-		return &InputError{fmt.Sprintf("a password can't be longer than %d characters", contract.MaxPasswordLength)}
+		return invalid("a password can't be longer than %d characters", contract.MaxPasswordLength)
 	case strings.EqualFold(strings.TrimSpace(password), email):
-		return &InputError{"the password can't be your email address"}
+		return invalid("the password can't be your email address")
 	}
 	return nil
 }

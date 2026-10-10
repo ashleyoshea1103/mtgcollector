@@ -1,7 +1,9 @@
 package contract
 
 import (
+	"encoding"
 	"encoding/json"
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -16,7 +18,7 @@ import (
 var all = []any{
 	CardImages{}, CardFace{}, Prices{}, CardSet{}, CardSummary{}, Card{}, CollectionEntry{}, ValueTotal{},
 	GroupSummary{}, EntryPage{}, GroupMember{}, GroupMemberPage{}, CustomGroup{}, CollectionStats{},
-	Health{}, NewEntry{}, CardPage{}, CardNames{}, APIError{}, User{}, Credentials{},
+	Health{}, NewEntry{}, CardPage{}, CardNames{}, APIError{}, User{}, Credentials{}, CollectionGroups{}, EntryChange{},
 }
 
 // `all` must list every struct in the package's Go files, or the rule test below misses it.
@@ -30,7 +32,8 @@ func TestAllListsEveryStruct(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range files {
-		if strings.HasSuffix(name, "_test.go") {
+		// enums.go is Go-only (tygo leaves it out): its EnumError is an error, not JSON.
+		if strings.HasSuffix(name, "_test.go") || name == "enums.go" {
 			continue
 		}
 		src, err := os.ReadFile(name)
@@ -74,7 +77,9 @@ func TestStructsFollowTheContractRules(t *testing.T) {
 				t.Errorf("%s: needs a json name", where)
 			}
 			nullable := strings.HasSuffix(tstype, " | null,required")
-			if f.Type.Kind() == reflect.Pointer && !nullable {
+			// Omitted when nil, a pointer field is optional in the TypeScript (it's only received).
+			omitted := strings.Contains(opts, "omitempty") && tstype == ""
+			if f.Type.Kind() == reflect.Pointer && !nullable && !omitted {
 				t.Errorf("%s: a pointer is encoded as null, so it needs `tstype:\"T | null,required\"` (got %q)", where, tstype)
 			}
 			if strings.Contains(tstype, "| null") && !canBeNull(f.Type) {
@@ -150,5 +155,84 @@ func TestEmbeddedTotalsAreFlattened(t *testing.T) {
 	want := `{"card_count":3,"value_eur":1.5,"unpriced_count":1,"key":"R","label":"","set":null,"entry_count":0}`
 	if string(b) != want {
 		t.Errorf("got  %s\nwant %s", b, want)
+	}
+}
+
+// Every enum: a string type with constants.
+var enums = []any{
+	new(Finish), new(Condition), new(Language), new(Rarity), new(ImageSize), new(GroupBy), new(SortBy),
+	new(CustomGroupKind), new(HealthStatus),
+}
+
+// Every enum reads its own constants, and only those (enums.go).
+func TestEnumsReadOnlyTheirOwnValues(t *testing.T) {
+	listed := map[string]reflect.Type{}
+	for _, v := range enums {
+		listed[reflect.TypeOf(v).Elem().Name()] = reflect.TypeOf(v)
+	}
+	consts := map[string][]string{} // type name: its constants' values
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range files {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), name, nil, parser.SkipObjectResolution)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			switch n := n.(type) {
+			case *ast.TypeSpec:
+				if id, ok := n.Type.(*ast.Ident); ok && id.Name == "string" {
+					if _, seen := consts[n.Name.Name]; !seen {
+						consts[n.Name.Name] = nil // an enum, maybe without constants yet
+					}
+				}
+			case *ast.ValueSpec:
+				if typ, ok := n.Type.(*ast.Ident); ok && len(n.Values) == 1 {
+					if lit, ok := n.Values[0].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+						consts[typ.Name] = append(consts[typ.Name], strings.Trim(lit.Value, "\""))
+					}
+				}
+			}
+			return true
+		})
+	}
+	for name, values := range consts {
+		typ, ok := listed[name]
+		if !ok {
+			t.Errorf("enum %s is missing from `enums`", name)
+			continue
+		}
+		if len(values) == 0 {
+			t.Errorf("enum %s has no constants", name)
+		}
+		for _, v := range values {
+			dst := reflect.New(typ.Elem()).Interface().(encoding.TextUnmarshaler)
+			if err := dst.UnmarshalText([]byte(v)); err != nil {
+				t.Errorf("%s refuses its own constant %q: %v", name, v, err)
+			} else if got := reflect.ValueOf(dst).Elem().String(); got != v {
+				t.Errorf("%s read %q as %q", name, v, got)
+			}
+		}
+		for _, bad := range []string{"", "bogus", strings.ToUpper(values[0]) + "x", " " + values[0]} {
+			dst := reflect.New(typ.Elem()).Interface().(encoding.TextUnmarshaler)
+			var enumErr *EnumError
+			if err := dst.UnmarshalText([]byte(bad)); !errors.As(err, &enumErr) || !strings.Contains(err.Error(), values[0]) {
+				t.Errorf("%s read %q: %v, want an EnumError listing its values", name, bad, err)
+			}
+		}
+	}
+}
+
+func TestAnUnknownEnumValueInJSONIsAnError(t *testing.T) {
+	var e NewEntry
+	err := json.Unmarshal([]byte(`{"finish":"shiny"}`), &e)
+	var enumErr *EnumError
+	if !errors.As(err, &enumErr) || err.Error() == "" || !strings.Contains(enumErr.Error(), "finish must be one of nonfoil, foil, etched") {
+		t.Errorf("= %v, want the EnumError", err)
 	}
 }

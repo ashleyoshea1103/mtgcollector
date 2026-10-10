@@ -21,6 +21,30 @@ const (
 	ConditionPO Condition = "PO"
 )
 
+// The languages Scryfall prints cards in (https://scryfall.com/docs/api/languages).
+type Language string
+
+const (
+	LanguageEnglish            Language = "en"
+	LanguageGerman             Language = "de"
+	LanguageFrench             Language = "fr"
+	LanguageItalian            Language = "it"
+	LanguageSpanish            Language = "es"
+	LanguagePortuguese         Language = "pt"
+	LanguageJapanese           Language = "ja"
+	LanguageKorean             Language = "ko"
+	LanguageRussian            Language = "ru"
+	LanguageSimplifiedChinese  Language = "zhs"
+	LanguageTraditionalChinese Language = "zht"
+	LanguageHebrew             Language = "he"
+	LanguageLatin              Language = "la"
+	LanguageAncientGreek       Language = "grc"
+	LanguageArabic             Language = "ar"
+	LanguageSanskrit           Language = "sa"
+	LanguagePhyrexian          Language = "ph"
+	LanguageQuenya             Language = "qya"
+)
+
 type Rarity string
 
 const (
@@ -141,7 +165,7 @@ type CollectionEntry struct {
 	Quantity  int         `json:"quantity"`
 	Finish    Finish      `json:"finish"`
 	Condition Condition   `json:"condition"`
-	Language  string      `json:"language"`
+	Language  Language    `json:"language"`
 	AddedAt   string      `json:"added_at"`
 	// EUR price of one copy in this finish, set by the server; null when there's no price.
 	UnitPriceEUR *float64 `json:"unit_price_eur" tstype:"number | null,required"`
@@ -189,6 +213,12 @@ type GroupSummary struct {
 	Set *CardSet `json:"set" tstype:"CardSet | null,required"`
 	// Number of collection entries (distinct printing/finish/condition/language rows).
 	EntryCount int `json:"entry_count"`
+}
+
+// GET /api/collection/groups: the collection's groups, in order, for one way of grouping.
+type CollectionGroups struct {
+	GroupBy GroupBy        `json:"group_by"`
+	Groups  []GroupSummary `json:"groups"`
 }
 
 // One page of collection entries; pass next_cursor back to get the next page.
@@ -259,9 +289,24 @@ type NewEntry struct {
 	Quantity  int       `json:"quantity"`
 	Finish    Finish    `json:"finish"`
 	Condition Condition `json:"condition"`
-	Language  string    `json:"language"`
+	Language  Language  `json:"language"`
 	GroupID   *int64    `json:"group_id" tstype:"number | null,required"`
 }
+
+// PATCH /api/collection/entries/{id}: what to change about an entry. Leave out what stays.
+type EntryChange struct {
+	Quantity  *int       `json:"quantity,omitempty"`
+	Finish    *Finish    `json:"finish,omitempty"`
+	Condition *Condition `json:"condition,omitempty"`
+	Language  *Language  `json:"language,omitempty"`
+}
+
+// The most copies one entry can hold.
+const MaxQuantity = 999
+
+// The most entries one collection can hold: plenty for a collection, and it bounds the work
+// of every listing, which reads the whole collection.
+const MaxEntries = 50_000
 
 // The signed-in user: GET /api/auth/me, and the reply to signing up or logging in.
 type User struct {
