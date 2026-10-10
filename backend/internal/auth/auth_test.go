@@ -1,12 +1,14 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 )
 
 func TestAPasswordVerifiesAgainstItsOwnHashOnly(t *testing.T) {
@@ -43,7 +45,7 @@ func TestHashingTheSamePasswordTwiceGivesDifferentHashes(t *testing.T) {
 
 func TestPasswordsMatchHoweverTheirCharactersAreComposed(t *testing.T) {
 	hash, _ := hashPassword("café au lait s'il vous plaît") // precomposed é and î
-	match, _, err := verifyPassword(hash, "café au lait s'il vous plaît")
+	match, _, err := verifyPassword(hash, "cafe\u0301 au lait s'il vous plaît")
 	if err != nil || !match {
 		t.Errorf("decomposed accents didn't match the precomposed password: %v, %v", match, err)
 	}
@@ -76,6 +78,7 @@ func TestMalformedOrExtravagantHashesAreRefused(t *testing.T) {
 		"bcrypt":            "$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ01234",
 		"argon2i":           with(1, "argon2i"),
 		"old version":       with(2, "v=16"),
+		"version with junk": with(2, "v=19junk"),
 		"too much memory":   with(3, "m=1048576,t=2,p=1"),
 		"too many passes":   with(3, "m=19456,t=11,p=1"),
 		"no passes":         with(3, "m=19456,t=0,p=1"),
@@ -87,6 +90,7 @@ func TestMalformedOrExtravagantHashesAreRefused(t *testing.T) {
 		"bad salt":          with(4, "!!!"),
 		"short salt":        with(4, "AAAA"),
 		"short key":         with(5, "AAAA"),
+		"long key":          with(5, strings.Repeat("A", 88)), // 66 bytes
 		"padded base64":     with(5, parts[5]+"="),
 		"extra part":        good + "$x",
 		"missing leading $": good[1:],
@@ -166,9 +170,9 @@ func TestPasswordChecks(t *testing.T) {
 		"one too short":             {strings.Repeat("a", min-1), false},
 		"longest":                   {strings.Repeat("a", max), true},
 		"one too long":              {strings.Repeat("a", max+1), false},
-		"counted in characters":     {strings.Repeat("é", min), true},     // 30 bytes, 15 characters
-		"short in characters":       {strings.Repeat("é", min-1), false},  // 28 bytes
-		"counted after normalizing": {strings.Repeat("é", min-1), false}, // 28 code points, 14 characters
+		"counted in characters":     {strings.Repeat("é", min), true},          // 30 bytes, 15 characters
+		"short in characters":       {strings.Repeat("é", min-1), false},       // 28 bytes
+		"counted after normalizing": {strings.Repeat("e\u0301", min-1), false}, // 28 code points, 14 characters
 		"spaces count":              {"a b c d e f g h", true},
 		"the email":                 {"ann.lee@example.com", false},
 		"the email, other case":     {" ANN.LEE@example.com ", false},
@@ -197,5 +201,75 @@ func TestExpiryMovesWithUseButNotPastTheAbsoluteLimit(t *testing.T) {
 	}
 	if got := expiry(time.Date(2026, 1, 1, 0, 0, 0, 1999, time.UTC), created.Add(-time.Hour)); got.Nanosecond()%1000 != 0 {
 		t.Errorf("expiry %v has sub-microsecond precision, which Postgres would drop", got)
+	}
+}
+
+// Each setting on its own makes a hash stale, so changing any one of them rehashes.
+func TestAHashIsStaleIfAnyOneSettingDiffers(t *testing.T) {
+	salt := []byte("0123456789abcdef")
+	for name, p := range map[string]params{
+		"memory":  {memory: current.memory * 2, time: current.time, threads: current.threads},
+		"passes":  {memory: current.memory, time: current.time + 1, threads: current.threads},
+		"threads": {memory: current.memory, time: current.time, threads: current.threads + 1},
+	} {
+		hash := encode(p, salt, derive(p, normalize("an older hashed password"), salt, keyLen))
+		if match, stale, err := verifyPassword(hash, "an older hashed password"); err != nil || !match || !stale {
+			t.Errorf("other %s: match %v, stale %v, %v; want a stale match", name, match, stale, err)
+		}
+	}
+	short := []byte("01234567") // a shorter salt, with the current settings
+	hash := encode(current, short, derive(current, normalize("an older hashed password"), short, keyLen))
+	if _, stale, _ := verifyPassword(hash, "an older hashed password"); !stale {
+		t.Error("a hash with a short salt isn't stale")
+	}
+}
+
+// Login refuses what no account can have before it looks anything up: a service with no
+// database would panic if it tried.
+func TestLoginRefusesImpossibleCredentialsWithoutTheDatabase(t *testing.T) {
+	s := NewService(store.New(nil))
+	for name, tc := range map[string]struct{ email, password string }{
+		"a long email":       {strings.Repeat("a", 243) + "@example.com", "correct horse battery staple"},
+		"a NUL in the email": {"ann\x00@example.com", "correct horse battery staple"},
+		"an email not UTF-8": {"ann\xff@example.com", "correct horse battery staple"},
+		"an absurd password": {"ann@example.com", strings.Repeat("x", maxPasswordBytes+1)},
+	} {
+		if _, _, err := s.Login(t.Context(), tc.email, tc.password); !errors.Is(err, ErrBadCredentials) {
+			t.Errorf("%s: = %v, want ErrBadCredentials", name, err)
+		}
+	}
+}
+
+// Any password sign-up accepts is short enough for login to check.
+func TestEveryPasswordSignupAcceptsCanLogIn(t *testing.T) {
+	jamo := strings.Repeat("\u1100\u1161\u11a8", contract.MaxPasswordLength) // 각, typed as three jamo each
+	if err := checkPassword(jamo, "ann@example.com"); err != nil {
+		t.Fatalf("the longest password typed as jamo was refused: %v", err)
+	}
+	if len(jamo) > maxPasswordBytes {
+		t.Errorf("it's %d bytes, over login's %d", len(jamo), maxPasswordBytes)
+	}
+	// Four code points that normalize to one character (Greek capital alpha with three marks).
+	greek := strings.Repeat("\u0391\u0313\u0342\u0345", contract.MaxPasswordLength)
+	if err := checkPassword(greek, "ann@example.com"); err != nil || len(greek) > maxPasswordBytes {
+		t.Errorf("%d bytes, %v; want accepted, and within login's %d", len(greek), err, maxPasswordBytes)
+	}
+}
+
+func TestWaitingTooLongToHashIsATimeout(t *testing.T) {
+	defer func(old time.Duration) { hashWait = old }(hashWait)
+	hashWait = 10 * time.Millisecond
+	s := NewService(store.New(nil))
+	for range cap(s.hashSlots) {
+		s.hashSlots <- struct{}{} // every slot taken
+	}
+	err := s.withHashSlot(t.Context(), func() error { t.Error("ran without a slot"); return nil })
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("= %v, want a timeout", err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := s.withHashSlot(ctx, func() error { return nil }); !errors.Is(err, context.Canceled) {
+		t.Errorf("a caller that went away: %v, want context.Canceled", err)
 	}
 }

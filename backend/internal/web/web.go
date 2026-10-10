@@ -4,6 +4,7 @@ package web
 
 import (
 	"errors"
+	"io"
 	"io/fs"
 	"net"
 	"net/http"
@@ -83,10 +84,7 @@ func serveFile(w http.ResponseWriter, r *http.Request, static fs.FS, name string
 	if err != nil || !info.Mode().IsRegular() {
 		return false
 	}
-	content, ok := f.(interface {
-		Read([]byte) (int, error)
-		Seek(int64, int) (int64, error)
-	})
+	content, ok := f.(io.ReadSeeker)
 	if !ok {
 		return false
 	}

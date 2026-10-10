@@ -80,8 +80,7 @@ func decode(encoded string) (p params, salt, key []byte, err error) {
 	if len(parts) != 6 || parts[0] != "" || parts[1] != "argon2id" {
 		return p, nil, nil, errMalformedHash
 	}
-	var version int
-	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil || version != argon2.Version {
+	if parts[2] != fmt.Sprintf("v=%d", argon2.Version) {
 		return p, nil, nil, errMalformedHash
 	}
 	if n, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &p.memory, &p.time, &p.threads); err != nil || n != 3 ||

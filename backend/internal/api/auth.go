@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -44,16 +45,21 @@ func signup(a Auth) http.HandlerFunc {
 }
 
 // POST /api/auth/login {email, password}: signs in.
-func login(a Auth, perEmail *ratelimit.Keyed) http.HandlerFunc {
+func login(a Auth, failures *ratelimit.Keyed) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var c contract.Credentials
 		if !decodeJSON(w, r, &c) {
 			return
 		}
-		if !allow(w, perEmail, strings.ToLower(strings.TrimSpace(c.Email))) {
+		ok, wait, refund := failures.Take(loginKey(c.Email, r.RemoteAddr))
+		if !ok {
+			tooMany(w, wait)
 			return
 		}
 		user, sess, err := a.Login(r.Context(), c.Email, c.Password)
+		if !errors.Is(err, auth.ErrBadCredentials) {
+			refund() // only failures count
+		}
 		if err != nil {
 			if errors.Is(err, auth.ErrBadCredentials) {
 				slog.InfoContext(r.Context(), "login failed", "client", ratelimit.ClientKey(r.RemoteAddr))
@@ -66,16 +72,24 @@ func login(a Auth, perEmail *ratelimit.Keyed) http.HandlerFunc {
 	}
 }
 
-// POST /api/auth/logout: ends this browser's session.
+// loginKey is the failed-login limiter's key for logging in to email from remoteAddr's client:
+// a hash, so a long email in the request can't make the limiter hold a long key.
+func loginKey(email, remoteAddr string) string {
+	sum := sha256.Sum256([]byte(strings.ToLower(strings.TrimSpace(email)) + "\x00" + ratelimit.ClientKey(remoteAddr)))
+	return string(sum[:])
+}
+
+// POST /api/auth/logout: ends this browser's session. If that fails, the cookie is kept, so
+// logging out can be tried again.
 func logout(a Auth) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		clearSessionCookie(w)
 		if c, err := r.Cookie(sessionCookie); err == nil {
 			if err := a.Logout(r.Context(), c.Value); err != nil {
 				serverError(w, r, err)
 				return
 			}
 		}
+		clearSessionCookie(w)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

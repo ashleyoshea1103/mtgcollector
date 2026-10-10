@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 )
 
@@ -138,7 +139,7 @@ func (s *Searcher) Search(ctx context.Context, q Search) (contract.CardPage, err
 			RowLimit:      limit, RowOffset: offset,
 		})
 		if err != nil {
-			return contract.CardPage{}, dbError(ctx, "search cards by name", err)
+			return contract.CardPage{}, db.Error(ctx, "search cards by name", err)
 		}
 		for _, r := range res {
 			rows = append(rows, r.CardListing)
@@ -151,7 +152,7 @@ func (s *Searcher) Search(ctx context.Context, q Search) (contract.CardPage, err
 			RowLimit: limit, RowOffset: offset,
 		})
 		if err != nil {
-			return contract.CardPage{}, dbError(ctx, "search cards in set", err)
+			return contract.CardPage{}, db.Error(ctx, "search cards in set", err)
 		}
 		for _, r := range res {
 			rows = append(rows, r.CardListing)
@@ -180,7 +181,7 @@ func (s *Searcher) Autocomplete(ctx context.Context, typed string) (contract.Car
 		RowLimit: autocompleteLimit,
 	})
 	if err != nil {
-		return contract.CardNames{}, dbError(ctx, "autocomplete", err)
+		return contract.CardNames{}, db.Error(ctx, "autocomplete", err)
 	}
 	return contract.CardNames{Names: nonNil(names)}, nil
 }
@@ -198,7 +199,7 @@ func (s *Searcher) Card(ctx context.Context, id string) (contract.Card, error) {
 		return contract.Card{}, ErrNotFound
 	}
 	if err != nil {
-		return contract.Card{}, dbError(ctx, "get card", err)
+		return contract.Card{}, db.Error(ctx, "get card", err)
 	}
 	return toCard(row.CardListing)
 }
@@ -220,29 +221,18 @@ func (s *Searcher) Printings(ctx context.Context, id string, pageNo int) (contra
 		return contract.CardPage{}, ErrNotFound
 	}
 	if err != nil {
-		return contract.CardPage{}, dbError(ctx, "card oracle id", err)
+		return contract.CardPage{}, db.Error(ctx, "card oracle id", err)
 	}
 	limit, offset := pageWindow(pageNo)
 	res, err := s.Q.CardPrintings(ctx, store.CardPrintingsParams{OracleID: oracleID, RowLimit: limit, RowOffset: offset})
 	if err != nil {
-		return contract.CardPage{}, dbError(ctx, "card printings", err)
+		return contract.CardPage{}, db.Error(ctx, "card printings", err)
 	}
 	rows := make([]store.CardListing, len(res))
 	for i, r := range res {
 		rows[i] = r.CardListing
 	}
 	return page(rows, pageNo)
-}
-
-// dbError wraps a failed query's error, and, if the query's context had ended, the
-// context's error too. pgx cancels a query whose context ends, and what comes back is then
-// Postgres's "canceling statement" error, which doesn't say why: this way callers can tell
-// a timeout (context.DeadlineExceeded) or a caller that went away (context.Canceled).
-func dbError(ctx context.Context, what string, err error) error {
-	if ctxErr := ctx.Err(); ctxErr != nil && !errors.Is(err, ctxErr) {
-		return fmt.Errorf("%s: %w (%w)", what, ctxErr, err)
-	}
-	return fmt.Errorf("%s: %w", what, err)
 }
 
 func checkPage(n int) error {

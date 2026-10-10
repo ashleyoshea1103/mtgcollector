@@ -41,7 +41,7 @@ func NewHandler(s Services) http.Handler {
 	mux.HandleFunc("GET /api/cards/{id}", getCard(s.Cards))
 	mux.HandleFunc("GET /api/cards/{id}/printings", printings(s.Cards))
 	mux.Handle("POST /api/auth/signup", limit(l.AuthPerClient, signup(s.Auth)))
-	mux.Handle("POST /api/auth/login", limit(l.AuthPerClient, login(s.Auth, l.LoginPerEmail)))
+	mux.Handle("POST /api/auth/login", limit(l.AuthPerClient, login(s.Auth, l.LoginFailures)))
 	mux.HandleFunc("POST /api/auth/logout", logout(s.Auth))
 	mux.HandleFunc("GET /api/auth/me", requireUser(s.Auth, me))
 	// Anything else under /api/ is a JSON 404, like every other API error.
@@ -57,7 +57,41 @@ func NewHandler(s Services) http.Handler {
 	csrf.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "cross-origin requests can't change anything")
 	}))
-	return securityHeaders(limit(l.PerClient, csrf.Handler(mux)))
+	return securityHeaders(limit(l.PerClient, csrf.Handler(jsonMethodErrors(mux))))
+}
+
+// jsonMethodErrors has the router answer a wrong method (405) in JSON, like every other API
+// error, rather than in plain text.
+func jsonMethodErrors(mux *http.ServeMux) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, pattern := mux.Handler(r); pattern != "" {
+			mux.ServeHTTP(w, r) // a route: its handler answers
+			return
+		}
+		mux.ServeHTTP(&methodErrorWriter{ResponseWriter: w}, r)
+	})
+}
+
+// methodErrorWriter replaces a 405's plain-text body with a JSON error.
+type methodErrorWriter struct {
+	http.ResponseWriter
+	replaced bool
+}
+
+func (m *methodErrorWriter) WriteHeader(code int) {
+	if code != http.StatusMethodNotAllowed {
+		m.ResponseWriter.WriteHeader(code)
+		return
+	}
+	m.replaced = true
+	writeError(m.ResponseWriter, code, "this endpoint doesn't take that method") // the Allow header lists those it takes
+}
+
+func (m *methodErrorWriter) Write(b []byte) (int, error) {
+	if m.replaced {
+		return len(b), nil
+	}
+	return m.ResponseWriter.Write(b)
 }
 
 func health(db Pinger) http.HandlerFunc {

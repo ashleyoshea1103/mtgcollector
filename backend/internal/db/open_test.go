@@ -27,9 +27,22 @@ func TestDatabasesElsewhereNeedVerifiedTLS(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", url, err)
 		}
-		err = CheckTLS(*cfg)
+		err = CheckTLS(cfg)
 		if ok && err != nil || !ok && (err == nil || !strings.Contains(err.Error(), "sslmode=verify-full")) {
 			t.Errorf("%s: CheckTLS = %v, want ok %v", url, err, ok)
 		}
+	}
+}
+
+// Open checks before it connects, so a misconfigured server fails at start, not at its
+// first query (or, worse, works without TLS).
+func TestOpenRefusesAnUnverifiedRemoteDatabase(t *testing.T) {
+	pool, err := Open(t.Context(), "postgres://u@db.example.com/db?sslmode=require")
+	if err == nil {
+		pool.Close()
+		t.Fatal("Open accepted sslmode=require for a database on another machine")
+	}
+	if !strings.Contains(err.Error(), "sslmode=verify-full") {
+		t.Errorf("err = %v, want it to say what to use", err)
 	}
 }

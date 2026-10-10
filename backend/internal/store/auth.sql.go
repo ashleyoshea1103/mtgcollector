@@ -33,29 +33,45 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 	return err
 }
 
-const createUser = `-- name: CreateUser :one
+const createUserWithSession = `-- name: CreateUserWithSession :one
 
-INSERT INTO users (email, password_hash)
-VALUES ($1, $2)
-ON CONFLICT (email) DO NOTHING
-RETURNING id, email
+WITH new_user AS (
+    INSERT INTO users (email, password_hash)
+    VALUES ($1, $2)
+    ON CONFLICT (email) DO NOTHING
+    RETURNING id, email
+), new_session AS (
+    INSERT INTO sessions (token_hash, user_id, created_at, expires_at)
+    SELECT $3, new_user.id, $4, $5 FROM new_user
+)
+SELECT id, email FROM new_user
 `
 
-type CreateUserParams struct {
+type CreateUserWithSessionParams struct {
 	Email        string
 	PasswordHash string
+	TokenHash    []byte
+	CreatedAt    pgtype.Timestamptz
+	ExpiresAt    pgtype.Timestamptz
 }
 
-type CreateUserRow struct {
+type CreateUserWithSessionRow struct {
 	ID    int64
 	Email string
 }
 
 // Queries for accounts and sessions (internal/auth). Times come from the caller's clock.
-// No row when the email is taken (emails are case-insensitive).
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.PasswordHash)
-	var i CreateUserRow
+// Creates the account and its first session together, or neither: no row when the email is
+// taken (emails are case-insensitive).
+func (q *Queries) CreateUserWithSession(ctx context.Context, arg CreateUserWithSessionParams) (CreateUserWithSessionRow, error) {
+	row := q.db.QueryRow(ctx, createUserWithSession,
+		arg.Email,
+		arg.PasswordHash,
+		arg.TokenHash,
+		arg.CreatedAt,
+		arg.ExpiresAt,
+	)
+	var i CreateUserWithSessionRow
 	err := row.Scan(&i.ID, &i.Email)
 	return i, err
 }

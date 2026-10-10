@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 )
 
@@ -36,8 +37,17 @@ const (
 // The longest an email address can be (RFC 5321's limit on a path).
 const maxEmailLength = 254
 
+// The most bytes a password may take at login, checked before anything else. Sign-up's limit
+// is in characters after normalizing, and no password it accepts goes over this: a character
+// takes at most 4 bytes, or a few more when typed as several code points that normalizing
+// joins (a letter and its accents, Hangul jamo: 9 bytes for one syllable).
+const maxPasswordBytes = 16 * contract.MaxPasswordLength
+
 // How long one call may wait for the database.
 const queryTimeout = 5 * time.Second
+
+// How long a call may wait for a turn to hash a password (a variable for tests).
+var hashWait = 10 * time.Second
 
 var (
 	ErrEmailTaken     = errors.New("an account with that email already exists")
@@ -64,11 +74,12 @@ type Service struct {
 	log *slog.Logger
 	// Hashing takes 19 MiB and tens of milliseconds, so only a few run at once; the rest wait.
 	hashSlots chan struct{}
+	verify    func(encoded, password string) (match, stale bool, err error) // verifyPassword; tests watch it
 }
 
 // NewService returns a Service using the database through q.
 func NewService(q *store.Queries) *Service {
-	return &Service{q: q, now: time.Now, log: slog.Default(), hashSlots: make(chan struct{}, max(1, runtime.GOMAXPROCS(0)))}
+	return &Service{q: q, now: time.Now, log: slog.Default(), hashSlots: make(chan struct{}, max(1, runtime.GOMAXPROCS(0))), verify: verifyPassword}
 }
 
 // Signup creates an account and signs it in.
@@ -84,24 +95,30 @@ func (s *Service) Signup(ctx context.Context, email, password string) (contract.
 	if err := s.withHashSlot(ctx, func() (err error) { hash, err = hashPassword(password); return }); err != nil {
 		return contract.User{}, Session{}, err
 	}
+	sess, params, err := s.newSession()
+	if err != nil {
+		return contract.User{}, Session{}, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	row, err := s.q.CreateUser(ctx, store.CreateUserParams{Email: email, PasswordHash: hash})
+	row, err := s.q.CreateUserWithSession(ctx, store.CreateUserWithSessionParams{
+		Email: email, PasswordHash: hash, TokenHash: params.TokenHash, CreatedAt: params.CreatedAt, ExpiresAt: params.ExpiresAt,
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return contract.User{}, Session{}, ErrEmailTaken
 	}
 	if err != nil {
-		return contract.User{}, Session{}, dbError(ctx, "create user", err)
+		return contract.User{}, Session{}, db.Error(ctx, "create user", err)
 	}
-	sess, err := s.startSession(ctx, row.ID)
-	return contract.User{ID: row.ID, Email: row.Email}, sess, err
+	return contract.User{ID: row.ID, Email: row.Email}, sess, nil
 }
 
 // Login checks an email and password and starts a session. A wrong email and a wrong password
 // look the same, and take about as long, so neither reveals which accounts exist.
 func (s *Service) Login(ctx context.Context, email, password string) (contract.User, Session, error) {
 	email = strings.TrimSpace(email)
-	if len(email) > maxEmailLength || len(password) > 4*contract.MaxPasswordLength {
+	// No account has such an email (and Postgres would refuse a NUL or invalid UTF-8 in one).
+	if len(email) > maxEmailLength || !utf8.ValidString(email) || strings.ContainsRune(email, 0) || len(password) > maxPasswordBytes {
 		return contract.User{}, Session{}, ErrBadCredentials
 	}
 	qctx, cancel := context.WithTimeout(ctx, queryTimeout)
@@ -109,14 +126,14 @@ func (s *Service) Login(ctx context.Context, email, password string) (contract.U
 	row, err := s.q.UserCredentials(qctx, email)
 	found := err == nil
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return contract.User{}, Session{}, dbError(qctx, "find user", err)
+		return contract.User{}, Session{}, db.Error(qctx, "find user", err)
 	}
 	stored := row.PasswordHash
 	if !found {
 		stored = dummyHash()
 	}
 	var match, stale bool
-	if err := s.withHashSlot(ctx, func() (err error) { match, stale, err = verifyPassword(stored, password); return }); err != nil {
+	if err := s.withHashSlot(ctx, func() (err error) { match, stale, err = s.verify(stored, password); return }); err != nil {
 		if errors.Is(err, errMalformedHash) {
 			s.log.ErrorContext(ctx, "stored password hash is malformed", "user", row.ID)
 			return contract.User{}, Session{}, ErrBadCredentials
@@ -129,10 +146,17 @@ func (s *Service) Login(ctx context.Context, email, password string) (contract.U
 	if stale {
 		s.rehash(ctx, row.ID, password)
 	}
+	sess, params, err := s.newSession()
+	if err != nil {
+		return contract.User{}, Session{}, err
+	}
+	params.UserID = row.ID
 	ctx, cancel = context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	sess, err := s.startSession(ctx, row.ID)
-	return contract.User{ID: row.ID, Email: row.Email}, sess, err
+	if err := s.q.CreateSession(ctx, params); err != nil {
+		return contract.User{}, Session{}, db.Error(ctx, "create session", err)
+	}
+	return contract.User{ID: row.ID, Email: row.Email}, sess, nil
 }
 
 // rehash replaces a password hash made with old settings. A failure only means it's tried
@@ -159,7 +183,7 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 	if err := s.q.DeleteSession(ctx, hash); err != nil {
-		return dbError(ctx, "delete session", err)
+		return db.Error(ctx, "delete session", err)
 	}
 	return nil
 }
@@ -180,7 +204,7 @@ func (s *Service) Authenticate(ctx context.Context, token string) (contract.User
 		return contract.User{}, nil, ErrNoSession
 	}
 	if err != nil {
-		return contract.User{}, nil, dbError(ctx, "find session", err)
+		return contract.User{}, nil, db.Error(ctx, "find session", err)
 	}
 	user := contract.User{ID: row.ID, Email: row.Email}
 	expires := expiry(now, row.CreatedAt.Time)
@@ -189,7 +213,9 @@ func (s *Service) Authenticate(ctx context.Context, token string) (contract.User
 		return user, nil, nil
 	}
 	if err := s.q.SetSessionExpiry(ctx, store.SetSessionExpiryParams{TokenHash: hash, ExpiresAt: timestamp(expires)}); err != nil {
-		return contract.User{}, nil, dbError(ctx, "renew session", err)
+		// The session is still good; renewing it can wait for the next request.
+		s.log.WarnContext(ctx, "renew session", "user", user.ID, "error", db.Error(ctx, "renew session", err))
+		return user, nil, nil
 	}
 	return user, &Session{Token: token, ExpiresAt: expires}, nil
 }
@@ -200,7 +226,7 @@ func (s *Service) DeleteExpiredSessions(ctx context.Context) (int64, error) {
 	defer cancel()
 	n, err := s.q.DeleteExpiredSessions(ctx, timestamp(s.now()))
 	if err != nil {
-		return 0, dbError(ctx, "delete expired sessions", err)
+		return 0, db.Error(ctx, "delete expired sessions", err)
 	}
 	return n, nil
 }
@@ -223,28 +249,30 @@ func (s *Service) RunCleanup(ctx context.Context, interval time.Duration) {
 	}
 }
 
-func (s *Service) startSession(ctx context.Context, userID int64) (Session, error) {
+// newSession returns a new session for the browser, and the row to store for it (without
+// its user).
+func (s *Service) newSession() (Session, store.CreateSessionParams, error) {
 	token, hash, err := newToken()
 	if err != nil {
-		return Session{}, err
+		return Session{}, store.CreateSessionParams{}, err
 	}
 	now := s.now()
 	expires := expiry(now, now)
-	err = s.q.CreateSession(ctx, store.CreateSessionParams{
-		TokenHash: hash, UserID: userID, CreatedAt: timestamp(now), ExpiresAt: timestamp(expires),
-	})
-	if err != nil {
-		return Session{}, dbError(ctx, "create session", err)
-	}
-	return Session{Token: token, ExpiresAt: expires}, nil
+	return Session{Token: token, ExpiresAt: expires},
+		store.CreateSessionParams{TokenHash: hash, CreatedAt: timestamp(now), ExpiresAt: timestamp(expires)}, nil
 }
 
-// withHashSlot runs f once a hashing slot is free, or gives up when ctx ends.
+// withHashSlot runs f once a hashing slot is free. It gives up when ctx ends, or after
+// hashWait (as a timeout: the server is too busy).
 func (s *Service) withHashSlot(ctx context.Context, f func() error) error {
+	wait := time.NewTimer(hashWait)
+	defer wait.Stop()
 	select {
 	case s.hashSlots <- struct{}{}:
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-wait.C:
+		return fmt.Errorf("wait to hash a password: %w", context.DeadlineExceeded)
 	}
 	defer func() { <-s.hashSlots }()
 	return f()
@@ -325,13 +353,3 @@ var dummyHash = sync.OnceValue(func() string {
 	key := make([]byte, keyLen) // all zeros: no password derives it
 	return encode(current, salt, key)
 })
-
-// dbError says what failed, and why: when ctx has ended, Postgres's own error (a cancelled
-// statement) doesn't say whether it timed out or the caller went away, so ctx's reason is
-// added for callers to test with errors.Is.
-func dbError(ctx context.Context, what string, err error) error {
-	if ctxErr := ctx.Err(); ctxErr != nil && !errors.Is(err, ctxErr) {
-		return fmt.Errorf("%s: %w (%w)", what, err, ctxErr)
-	}
-	return fmt.Errorf("%s: %w", what, err)
-}

@@ -32,6 +32,8 @@ type fakeAuth struct {
 	renewed   *auth.Session
 	logoutErr error
 	calls     []string
+	// If set, Login fails with ErrBadCredentials for any other password.
+	onlyPassword string
 }
 
 func (f *fakeAuth) session() auth.Session {
@@ -50,6 +52,9 @@ func (f *fakeAuth) Login(_ context.Context, email, pw string) (contract.User, au
 	f.calls, f.email, f.pw = append(f.calls, "login"), email, pw
 	if f.err != nil {
 		return contract.User{}, auth.Session{}, f.err
+	}
+	if f.onlyPassword != "" && pw != f.onlyPassword {
+		return contract.User{}, auth.Session{}, auth.ErrBadCredentials
 	}
 	return testUser, f.session(), nil
 }
@@ -221,13 +226,15 @@ func TestLogoutWithoutASessionStillSucceeds(t *testing.T) {
 	}
 }
 
-func TestLogoutReportsAFailureButStillClearsTheCookie(t *testing.T) {
+func TestAFailedLogoutKeepsTheCookieSoItCanBeTriedAgain(t *testing.T) {
 	a := &fakeAuth{logoutErr: errors.New("connection refused")}
 	rec := send(t, authHandler(a), http.MethodPost, "/api/auth/logout", "", "Cookie", sessionCookie+"="+testToken)
 	if rec.Code != http.StatusInternalServerError {
 		t.Errorf("status = %d, want 500, so the app can say logging out didn't work", rec.Code)
 	}
-	assertCookieCleared(t, rec)
+	if c := sessionCookieSet(rec); c != nil {
+		t.Errorf("Set-Cookie = %q: the browser would lose a session that's still valid", rec.Header().Get("Set-Cookie"))
+	}
 }
 
 func TestMeReturnsTheSignedInUser(t *testing.T) {
@@ -311,6 +318,7 @@ func TestBadBodiesAreRefusedBeforeTheService(t *testing.T) {
 		{"empty", "application/json", ``, 400, "the body isn't the JSON this endpoint takes"},
 		{"a wrong type", "application/json", `{"email":"a","password":12345}`, 400, "password has the wrong type"},
 		{"too big", "application/json", `{"email":"a","password":"` + strings.Repeat("x", maxBodyBytes) + `"}`, 413, "the body can't be more than 16384 bytes"},
+		{"too big after the value", "application/json", credentials + strings.Repeat(" ", maxBodyBytes) + "x", 413, "the body can't be more than 16384 bytes"},
 	} {
 		a := &fakeAuth{}
 		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(tc.body))
@@ -337,7 +345,7 @@ func TestOnlyPOSTReachesTheAuthActions(t *testing.T) {
 		for _, method := range []string{http.MethodGet, http.MethodPut, http.MethodDelete} {
 			a := &fakeAuth{}
 			rec := send(t, authHandler(a), method, path, "")
-			// A GET finds the JSON 404 for unknown API paths; other methods get the router's 405.
+			// A GET finds the JSON 404 for unknown API paths; other methods get a 405.
 			want := map[string]int{http.MethodGet: http.StatusNotFound}[method]
 			if want == 0 {
 				want = http.StatusMethodNotAllowed
@@ -345,6 +353,7 @@ func TestOnlyPOSTReachesTheAuthActions(t *testing.T) {
 			if rec.Code != want || len(a.calls) != 0 {
 				t.Errorf("%s %s = %d, calls %v; want %d and no call", method, path, rec.Code, a.calls, want)
 			}
+			assertJSONError(t, rec.Body.String())
 		}
 	}
 }
@@ -354,7 +363,7 @@ func testLimits() *Limits {
 	return &Limits{
 		PerClient:     &ratelimit.Keyed{Rate: 1, Burst: 100, Now: clock},
 		AuthPerClient: &ratelimit.Keyed{Rate: rate.Every(time.Minute), Burst: 3, Now: clock},
-		LoginPerEmail: &ratelimit.Keyed{Rate: rate.Every(time.Minute), Burst: 2, Now: clock},
+		LoginFailures: &ratelimit.Keyed{Rate: rate.Every(time.Minute), Burst: 2, Now: clock},
 	}
 }
 
@@ -394,16 +403,87 @@ func TestSigningUpAndLoggingInAreLimitedPerClient(t *testing.T) {
 	}
 }
 
-func TestLoggingInIsLimitedPerEmailWhateverTheClient(t *testing.T) {
-	h := NewHandler(Services{DB: &fakeDB{}, Cards: &fakeCards{}, Auth: &fakeAuth{}, Limits: testLimits()})
-	post(t, h, "/api/auth/login", `{"email":"ann@example.com","password":"x"}`, fromClient("192.0.2.1"))
-	post(t, h, "/api/auth/login", `{"email":" ANN@example.com ","password":"x"}`, fromClient("192.0.2.2"))
-	rec := post(t, h, "/api/auth/login", `{"email":"Ann@Example.com","password":"x"}`, fromClient("192.0.2.3"))
-	if rec.Code != http.StatusTooManyRequests {
-		t.Errorf("3rd login to one account from a 3rd client = %d, want 429", rec.Code)
+func tryLogin(t *testing.T, h http.Handler, email, password, ip string) int {
+	t.Helper()
+	return post(t, h, "/api/auth/login", `{"email":"`+email+`","password":"`+password+`"}`, fromClient(ip)).Code
+}
+
+func TestFailedLoginsAreLimitedPerAccountAndClient(t *testing.T) {
+	l := testLimits()
+	l.AuthPerClient.Burst = 100
+	h := NewHandler(Services{DB: &fakeDB{}, Cards: &fakeCards{}, Auth: &fakeAuth{onlyPassword: testPassword}, Limits: l})
+	tryLogin(t, h, "ann@example.com", "wrong", "192.0.2.1")
+	tryLogin(t, h, " ANN@example.com ", "wrong", "192.0.2.1") // the same account, typed differently
+	if code := tryLogin(t, h, "Ann@Example.com", testPassword, "192.0.2.1"); code != http.StatusTooManyRequests {
+		t.Errorf("after 2 failures (the burst), even the right password from that client = %d, want 429", code)
 	}
-	if rec := post(t, h, "/api/auth/login", `{"email":"bob@example.com","password":"x"}`, fromClient("192.0.2.3")); rec.Code != http.StatusOK {
-		t.Errorf("another account was limited: %d", rec.Code)
+	if code := tryLogin(t, h, "ann@example.com", testPassword, "198.51.100.9"); code != http.StatusOK {
+		t.Errorf("the owner, from another client = %d, want 200: someone else's failures locked them out", code)
+	}
+	if code := tryLogin(t, h, "bob@example.com", "wrong", "192.0.2.1"); code != http.StatusUnauthorized {
+		t.Errorf("another account from the first client = %d, want 401 (not limited)", code)
+	}
+}
+
+func TestSuccessfulLoginsAndServerErrorsDontCountAsFailures(t *testing.T) {
+	l := testLimits()
+	l.AuthPerClient.Burst = 100
+	a := &fakeAuth{onlyPassword: testPassword}
+	h := NewHandler(Services{DB: &fakeDB{}, Cards: &fakeCards{}, Auth: a, Limits: l})
+	for i := range 5 {
+		if code := tryLogin(t, h, "ann@example.com", testPassword, "192.0.2.1"); code != http.StatusOK {
+			t.Fatalf("successful login %d = %d, want 200", i+1, code)
+		}
+	}
+	a.err = errors.New("connection refused")
+	for range 5 {
+		tryLogin(t, h, "ann@example.com", testPassword, "192.0.2.1")
+	}
+	a.err = nil
+	if code := tryLogin(t, h, "ann@example.com", "wrong", "192.0.2.1"); code != http.StatusUnauthorized {
+		t.Errorf("a first failure after 10 non-failures = %d, want 401", code)
+	}
+}
+
+func TestTheFailedLoginKeyIsShortWhateverTheEmail(t *testing.T) {
+	if k := loginKey(strings.Repeat("a", maxBodyBytes), "192.0.2.1:1"); len(k) != 32 {
+		t.Errorf("key is %d bytes, want a 32-byte hash", len(k))
+	}
+	if loginKey("ann@example.com", "192.0.2.1:1") == loginKey("ann@example.com", "192.0.2.2:1") {
+		t.Error("two clients share a key")
+	}
+	if loginKey("ann@example.com", "192.0.2.1:1") != loginKey(" ANN@Example.com", "192.0.2.1:9") {
+		t.Error("one account and client (another port) got two keys")
+	}
+}
+
+func TestRetryAfterRoundsUp(t *testing.T) {
+	for wait, want := range map[time.Duration]string{500 * time.Millisecond: "1", time.Second: "1", 1001 * time.Millisecond: "2", 0: ""} {
+		rec := httptest.NewRecorder()
+		tooMany(rec, wait)
+		if got := rec.Header().Get("Retry-After"); got != want || rec.Code != http.StatusTooManyRequests {
+			t.Errorf("wait %v: %d, Retry-After %q; want 429, %q", wait, rec.Code, got, want)
+		}
+	}
+}
+
+func TestAWrongMethodIsAJSON405(t *testing.T) {
+	for _, tc := range []struct{ method, path, allow string }{
+		{http.MethodPost, "/api/health", "GET, HEAD"},
+		{http.MethodDelete, "/api/auth/me", "GET, HEAD"},
+		{http.MethodPost, "/api/nope", "GET, HEAD"},
+		{http.MethodPut, "/api/cards/x", "GET, HEAD"},
+	} {
+		rec := send(t, authHandler(&fakeAuth{}), tc.method, tc.path, "")
+		if rec.Code != http.StatusMethodNotAllowed || rec.Header().Get("Content-Type") != "application/json; charset=utf-8" {
+			t.Errorf("%s %s = %d %q (%s)", tc.method, tc.path, rec.Code, rec.Body, rec.Header().Get("Content-Type"))
+		}
+		if got := assertJSONError(t, rec.Body.String()); got != "this endpoint doesn't take that method" {
+			t.Errorf("%s %s: error = %q", tc.method, tc.path, got)
+		}
+		if got := rec.Header().Get("Allow"); got != tc.allow {
+			t.Errorf("%s %s: Allow = %q, want %q", tc.method, tc.path, got, tc.allow)
+		}
 	}
 }
 
@@ -425,21 +505,19 @@ func TestEveryAPIRequestIsLimitedPerClient(t *testing.T) {
 	}
 }
 
-func TestTheDefaultLimitsAllowAPersonSearching(t *testing.T) {
+func TestTheDefaultLimits(t *testing.T) {
 	l := DefaultLimits()
-	for i := range 60 { // a burst of autocomplete requests, say
-		if ok, _ := l.PerClient.Allow("192.0.2.1"); !ok {
-			t.Fatalf("request %d of a burst of 60 was limited", i+1)
-		}
-	}
-	for name, k := range map[string]*ratelimit.Keyed{"auth": l.AuthPerClient, "login": l.LoginPerEmail} {
-		for i := range 10 {
-			if ok, _ := k.Allow("x"); !ok {
-				t.Fatalf("%s: attempt %d of 10 was limited", name, i+1)
-			}
-		}
-		if ok, _ := k.Allow("x"); ok {
-			t.Errorf("%s: an 11th attempt at once was allowed", name)
+	for name, tc := range map[string]struct {
+		k     *ratelimit.Keyed
+		rate  rate.Limit
+		burst int
+	}{
+		"every request": {l.PerClient, 20, 60},                              // a person searching, autocomplete and all
+		"auth":          {l.AuthPerClient, rate.Every(6 * time.Second), 10}, // 10 a minute
+		"failed logins": {l.LoginFailures, rate.Every(time.Minute), 10},     // 10, then 1 a minute
+	} {
+		if tc.k.Rate != tc.rate || tc.k.Burst != tc.burst {
+			t.Errorf("%s: rate %v, burst %d; want %v, %d", name, tc.k.Rate, tc.k.Burst, tc.rate, tc.burst)
 		}
 	}
 }

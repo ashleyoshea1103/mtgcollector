@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/scryfall"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/testdb"
@@ -425,7 +426,7 @@ func TestAnUnknownCardIsNotFound(t *testing.T) {
 }
 
 // What a query whose time runs out really returns, through the pool the server uses (pgx
-// cancels it, and Postgres says "canceling statement"): dbError must say it timed out.
+// cancels it, and Postgres says "canceling statement"): db.Error must say it timed out.
 func TestDBErrorSaysARealQueryTimedOut(t *testing.T) {
 	pool := testdb.New(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
@@ -434,7 +435,7 @@ func TestDBErrorSaysARealQueryTimedOut(t *testing.T) {
 	if err == nil {
 		t.Fatal("pg_sleep(5) finished within 200ms")
 	}
-	if err := dbError(ctx, "sleep", err); !errors.Is(err, context.DeadlineExceeded) {
-		t.Errorf("dbError = %v, which doesn't say it timed out", err)
+	if err := db.Error(ctx, "sleep", err); !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("db.Error = %v, which doesn't say it timed out", err)
 	}
 }

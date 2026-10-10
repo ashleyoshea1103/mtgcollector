@@ -26,7 +26,7 @@ npm run dev
 Open http://localhost:5173/dev/components to see the component gallery, and http://localhost:5173/api/health to check that the API can reach its database.
 
 ## API
-The API's own responses are JSON, shaped by the types in `backend/internal/contract` (and so `frontend/src/types.ts`); its errors are `{"error": "…"}` with a 4xx or 5xx status. (The router's answers to a wrong method, 405, and to an unclean path such as `//`, a redirect, are plain text.)
+The API's own responses are JSON, shaped by the types in `backend/internal/contract` (and so `frontend/src/types.ts`); its errors are `{"error": "…"}` with a 4xx or 5xx status. (The router's redirect from an unclean path, such as `//`, is plain text.)
 
 | Endpoint | Returns |
 |---|---|
@@ -42,11 +42,13 @@ The API's own responses are JSON, shaped by the types in `backend/internal/contr
 
 Pages hold 60 cards, up to page 50.
 
-**Signing in.** A session lasts 30 days from its last use, and 90 days at most; the browser holds it in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, and the database only the token's SHA-256. Passwords are hashed with argon2id. Request bodies are JSON (`Content-Type: application/json`, at most 16 KB, no unknown fields). Requests that change anything are refused (403) when a browser says they come from another site, by their `Sec-Fetch-Site` or `Origin` header.
+**Signing in.** A session lasts about 30 days from its last use (its expiry moves forward at most once a day), and 90 days at most; the browser holds it in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, and the database only the token's SHA-256. Passwords are hashed with argon2id. Request bodies are JSON (`Content-Type: application/json`, at most 16 KB, no unknown fields). Requests that change anything are refused (403) when a browser says they come from another site, by their `Sec-Fetch-Site` or `Origin` header.
 
-**Limits.** Each client (IP address, or IPv6 /64) may make 20 API requests a second, in bursts of up to 60, and sign up or log in 10 times a minute; each account may be logged in to 10 times a minute, whoever tries. Past that, the answer is 429 with `Retry-After`. The limits are kept in memory, per server.
+**Limits.** Each client (IP address, or IPv6 /56) may make 20 API requests a second, in bursts of up to 60, and sign up or log in 10 times a minute. After 10 failed logins to one account, that client may try it once a minute; failures from other clients don't count, so no one can lock an account's owner out. Past a limit, the answer is 429 with `Retry-After`. The limits are kept in memory, per server.
 
 After changing the Go structs in `backend/internal/contract`, or the SQL in `backend/internal/db` (migrations or queries), run `go generate ./...` in `backend/`. It regenerates the frontend's types with tygo and the database code in `backend/internal/store` with sqlc. The tools are pinned in their own module, `backend/tools/go.mod`, so their dependencies don't mix with the app's.
+
+In development the session cookie is `Secure` too, which browsers allow on `http://localhost`. If yours doesn't keep it (signing in works but `/api/auth/me` still says 401), use a browser that does, such as Chrome or Firefox.
 
 ## Running it for real
 Build the frontend (`npm run build` in `frontend/`) and point the server at it with `STATIC_DIR=frontend/dist`: it then serves the app as well as the API, with a Content-Security-Policy that allows no inline scripts and images only from Scryfall. Other settings, all environment variables (see `backend/cmd/server/main.go`):

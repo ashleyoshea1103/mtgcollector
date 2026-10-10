@@ -4,6 +4,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"errors"
 	"log/slog"
@@ -293,21 +294,100 @@ func TestTheSchemaRefusesBadRows(t *testing.T) {
 	}
 }
 
-func TestLoginTakesAboutAsLongWithOrWithoutAnAccount(t *testing.T) {
+// A login for an email with no account still checks the password, against the dummy hash, so
+// it takes as long as one with a wrong password and the time doesn't say which accounts exist.
+func TestEveryLoginChecksAPassword(t *testing.T) {
 	s, _, _ := newService(t)
 	s.Signup(t.Context(), "ann@example.com", password)
-	timeIt := func(email string) time.Duration {
-		best := time.Hour
-		for range 3 {
-			start := time.Now()
-			s.Login(t.Context(), email, "wrong password, but long")
-			best = min(best, time.Since(start))
-		}
-		return best
+	var checked []string
+	s.verify = func(encoded, pw string) (bool, bool, error) {
+		checked = append(checked, encoded)
+		return verifyPassword(encoded, pw)
 	}
-	known, unknown := timeIt("ann@example.com"), timeIt("nobody@example.com")
-	// Both hash once; a missing account skipping the hash would be many times faster.
-	if unknown < known/3 {
-		t.Errorf("an unknown email took %v, a known one %v: the difference says which accounts exist", unknown, known)
+	s.Login(t.Context(), "ann@example.com", "wrong, but long enough")
+	s.Login(t.Context(), "nobody@example.com", "wrong, but long enough")
+	if len(checked) != 2 || checked[0] == dummyHash() || checked[1] != dummyHash() {
+		t.Errorf("checked %d hashes; want ann's, then the dummy for the unknown email", len(checked))
+	}
+}
+
+// Sign-up creates the account and its session in one statement: if the session can't be
+// stored, there's no account either (else the user could never sign up again, nor log in).
+func TestAnAccountIsntCreatedWithoutItsSession(t *testing.T) {
+	_, pool, _ := newService(t)
+	q := store.New(pool)
+	now := timestamp(time.Now())
+	_, err := q.CreateUserWithSession(t.Context(), store.CreateUserWithSessionParams{
+		Email: "ann@example.com", PasswordHash: "$argon2id$x", TokenHash: []byte("too short"), CreatedAt: now, ExpiresAt: now,
+	})
+	if err == nil {
+		t.Fatal("a session with a bad token hash was stored")
+	}
+	var users int
+	pool.QueryRow(t.Context(), `SELECT count(*) FROM users`).Scan(&users)
+	if users != 0 {
+		t.Errorf("%d users created without their session", users)
+	}
+}
+
+func TestATakenEmailCreatesNoSession(t *testing.T) {
+	s, pool, _ := newService(t)
+	s.Signup(t.Context(), "ann@example.com", password)
+	s.Signup(t.Context(), "ann@example.com", password)
+	var sessions int
+	pool.QueryRow(t.Context(), `SELECT count(*) FROM sessions`).Scan(&sessions)
+	if sessions != 1 {
+		t.Errorf("%d sessions, want only the first sign-up's", sessions)
+	}
+}
+
+// A session that can't be renewed is still good for this request: it's renewed next time.
+func TestAFailedRenewalDoesntFailTheRequest(t *testing.T) {
+	s, pool, clock := newService(t)
+	var logs bytes.Buffer
+	s.log = slog.New(slog.NewTextHandler(&logs, nil))
+	user, sess, _ := s.Signup(t.Context(), "ann@example.com", password)
+	for _, sql := range []string{
+		`CREATE FUNCTION refuse() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'no updates'; END $$`,
+		`CREATE TRIGGER refuse BEFORE UPDATE ON sessions FOR EACH ROW EXECUTE FUNCTION refuse()`,
+	} {
+		if _, err := pool.Exec(t.Context(), sql); err != nil {
+			t.Fatal(err)
+		}
+	}
+	*clock = clock.Add(2 * renewAfter)
+	got, renewed, err := s.Authenticate(t.Context(), sess.Token)
+	if err != nil || got != user || renewed != nil {
+		t.Errorf("= %+v, renewed %v, %v; want the user, not renewed", got, renewed, err)
+	}
+	if !strings.Contains(logs.String(), "renew session") {
+		t.Errorf("logs = %q, want the failed renewal reported", logs.String())
+	}
+}
+
+func TestCleanupDeletesExpiredSessionsAndStopsWhenAsked(t *testing.T) {
+	s, pool, clock := newService(t)
+	s.Signup(t.Context(), "ann@example.com", password)
+	*clock = clock.Add(IdleTimeout)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { s.RunCleanup(ctx, time.Hour); close(done) }()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		var n int
+		pool.QueryRow(t.Context(), `SELECT count(*) FROM sessions`).Scan(&n)
+		if n == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the expired session wasn't deleted")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("RunCleanup didn't stop when its context ended, which would hang shutdown")
 	}
 }

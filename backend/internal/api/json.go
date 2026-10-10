@@ -26,8 +26,8 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	err := dec.Decode(dst)
 	if err == nil {
 		// Anything but the end of the body after the value is an error.
-		if dec.Decode(&struct{}{}) != io.EOF {
-			err = errors.New("more than one JSON value")
+		if extra := dec.Decode(&struct{}{}); extra != io.EOF {
+			err = errors.Join(errors.New("more than one JSON value"), extra) // keeps a MaxBytesError
 		}
 	}
 	if err == nil {

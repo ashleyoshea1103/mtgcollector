@@ -12,7 +12,7 @@ import (
 )
 
 // Limits are how often clients may call the API. A client is the request's remote IP (an
-// IPv6 /64): behind a reverse proxy every request comes from the proxy, so these would be
+// IPv6 /56): behind a reverse proxy every request comes from the proxy, so these would be
 // shared by everyone (see "Running it for real" in the README).
 type Limits struct {
 	// Every API request, by client: generous for a person searching, and it keeps a flood
@@ -20,9 +20,10 @@ type Limits struct {
 	PerClient *ratelimit.Keyed
 	// Signing up and logging in, by client: each is a deliberately slow password hash.
 	AuthPerClient *ratelimit.Keyed
-	// Logging in, by the email being logged in to: guessing one account's password from
-	// many addresses is slow too.
-	LoginPerEmail *ratelimit.Keyed
+	// Failed logins, by the account tried and the client: one client can't keep guessing an
+	// account's password. Only failures count, and only that client's, so no one can lock
+	// an account's owner out by failing to log in to it.
+	LoginFailures *ratelimit.Keyed
 }
 
 // DefaultLimits returns the limits the server uses.
@@ -30,7 +31,7 @@ func DefaultLimits() *Limits {
 	return &Limits{
 		PerClient:     &ratelimit.Keyed{Rate: 20, Burst: 60},
 		AuthPerClient: &ratelimit.Keyed{Rate: rate.Every(6 * time.Second), Burst: 10},
-		LoginPerEmail: &ratelimit.Keyed{Rate: rate.Every(time.Minute), Burst: 10},
+		LoginFailures: &ratelimit.Keyed{Rate: rate.Every(time.Minute), Burst: 10},
 	}
 }
 
@@ -47,12 +48,16 @@ func limit(l *ratelimit.Keyed, next http.Handler) http.Handler {
 // allow takes a request from key's allowance, or answers 429 and says when to try again.
 func allow(w http.ResponseWriter, l *ratelimit.Keyed, key string) bool {
 	ok, wait := l.Allow(key)
-	if ok {
-		return true
+	if !ok {
+		tooMany(w, wait)
 	}
+	return ok
+}
+
+// tooMany answers 429, saying when to try again (in whole seconds, rounded up) if that's known.
+func tooMany(w http.ResponseWriter, wait time.Duration) {
 	if wait > 0 {
 		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(wait.Seconds()))))
 	}
 	writeError(w, http.StatusTooManyRequests, "too many requests; try again shortly")
-	return false
 }

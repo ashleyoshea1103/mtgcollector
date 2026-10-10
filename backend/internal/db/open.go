@@ -20,7 +20,7 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := CheckTLS(cfg.ConnConfig.Config); err != nil {
+	if err := CheckTLS(&cfg.ConnConfig.Config); err != nil {
 		return nil, err
 	}
 	Configure(cfg)
@@ -42,25 +42,22 @@ func Configure(cfg *pgxpool.Config) {
 // connected to. With any other mode, something on the network between could read the
 // traffic or pose as the database. A database on this machine (a loopback address, or a
 // Unix socket) needs no TLS.
-func CheckTLS(cfg pgconn.Config) error {
-	targets := []struct {
-		host string
-		tls  *tls.Config
-	}{{cfg.Host, cfg.TLSConfig}}
-	for _, f := range cfg.Fallbacks {
-		targets = append(targets, struct {
-			host string
-			tls  *tls.Config
-		}{f.Host, f.TLSConfig})
+func CheckTLS(cfg *pgconn.Config) error {
+	if err := checkTLS(cfg.Host, cfg.TLSConfig); err != nil {
+		return err
 	}
-	for _, t := range targets {
-		if isLocal(t.host) {
-			continue
+	for _, f := range cfg.Fallbacks { // other hosts, or the same one with other TLS settings
+		if err := checkTLS(f.Host, f.TLSConfig); err != nil {
+			return err
 		}
-		// verify-full is the only mode pgx gives a TLS config that does the standard checks.
-		if t.tls == nil || t.tls.InsecureSkipVerify {
-			return fmt.Errorf("the database at %s is on another machine: connect to it with sslmode=verify-full", t.host)
-		}
+	}
+	return nil
+}
+
+func checkTLS(host string, cfg *tls.Config) error {
+	// verify-full is the only mode pgx gives a TLS config that does the standard checks.
+	if !isLocal(host) && (cfg == nil || cfg.InsecureSkipVerify) {
+		return fmt.Errorf("the database at %s is on another machine: connect to it with sslmode=verify-full", host)
 	}
 	return nil
 }

@@ -71,22 +71,71 @@ func TestABucketIsKeptWhileItIsStillRefilling(t *testing.T) {
 	}
 }
 
-func TestNewKeysShareABucketOnceTheLimitIsReached(t *testing.T) {
-	k := &Keyed{Rate: 1, Burst: 2, MaxKeys: 3, Now: newClock().now}
-	for i := range 3 {
-		k.Allow(fmt.Sprint(i))
+func TestPastMaxKeysTheLeastRecentlySeenKeyIsForgotten(t *testing.T) {
+	c := newClock()
+	k := &Keyed{Rate: 1, Burst: 1, MaxKeys: 3, Now: c.now}
+	for _, key := range []string{"a", "b", "c"} {
+		k.Allow(key)
+		c.advance(time.Millisecond)
 	}
-	if !allowed(k, "x") || !allowed(k, "y") {
-		t.Fatal("overflow keys were refused before the shared bucket was empty")
-	}
-	if allowed(k, "z") {
-		t.Error("a third overflow key was allowed: the overflow keys don't share a bucket")
+	k.Allow("a") // seen again: b is now the least recent
+	if !allowed(k, "d") {
+		t.Fatal("a new key was refused when the limit was reached")
 	}
 	if k.Len() != 3 {
 		t.Errorf("tracking %d keys, want the limit of 3", k.Len())
 	}
-	if !allowed(k, "0") {
-		t.Error("a tracked key was refused because the overflow bucket is empty")
+	if allowed(k, "a") || allowed(k, "c") {
+		t.Error("a recently seen key was forgotten, getting a fresh bucket")
+	}
+	if !allowed(k, "b") {
+		t.Error("b, the least recently seen, wasn't the one forgotten")
+	}
+}
+
+func TestAFloodOfNewKeysDoesntLimitOtherClients(t *testing.T) {
+	k := &Keyed{Rate: 1, Burst: 1, MaxKeys: 100, Now: newClock().now}
+	for i := range 10_000 {
+		k.Allow(fmt.Sprint("attacker-", i))
+	}
+	for i := range 50 {
+		if !allowed(k, fmt.Sprint("user-", i)) {
+			t.Fatalf("user %d was refused after a flood of other keys", i)
+		}
+	}
+}
+
+func TestSweepingDropsABucketOnlyOnceItIsFullAgain(t *testing.T) {
+	c := newClock()
+	start := c.t
+	k := &Keyed{Rate: 1, Burst: 10, Now: c.now} // refills in 10s
+	k.Allow("a")
+	c.t = start.Add(sweepEvery - 10*time.Second)
+	k.Allow("b") // idle exactly 10s at the sweep: full again
+	c.t = start.Add(sweepEvery - 10*time.Second + time.Millisecond)
+	k.Allow("c") // idle just under 10s: not yet
+	c.t = start.Add(sweepEvery)
+	k.Allow("d") // the sweep runs
+	if k.Len() != 2 {
+		t.Errorf("after the sweep, tracking %d keys, want c and d", k.Len())
+	}
+}
+
+func TestARefundGivesTheRequestBack(t *testing.T) {
+	k := &Keyed{Rate: 1, Burst: 1, Now: newClock().now}
+	ok, _, refund := k.Take("a")
+	if !ok {
+		t.Fatal("refused")
+	}
+	refund()
+	if !allowed(k, "a") {
+		t.Error("refused after the refund")
+	}
+	if allowed(k, "a") {
+		t.Error("allowed twice from a bucket of one")
+	}
+	if ok, _, refund := k.Take("a"); ok || refund != nil {
+		t.Error("a refused request came with a refund")
 	}
 }
 
@@ -101,10 +150,11 @@ func TestClientKeys(t *testing.T) {
 	for in, want := range map[string]string{
 		"192.0.2.7:51234":            "192.0.2.7",
 		"[::ffff:192.0.2.7]:80":      "192.0.2.7",
-		"[2001:db8:1:2:3:4:5:6]:443": "2001:db8:1:2::/64",
-		"[2001:db8:1:2:ffff::1]:443": "2001:db8:1:2::/64",
-		"[fe80::1%eth0]:80":          "fe80::/64",
-		"[::1]:8080":                 "::/64",
+		"[2001:db8:1:2:3:4:5:6]:443": "2001:db8:1::/56",
+		"[2001:db8:1:ff::1]:443":     "2001:db8:1::/56",
+		"[2001:db8:1:100::1]:443":    "2001:db8:1:100::/56",
+		"[fe80::1%eth0]:80":          "fe80::/56",
+		"[::1]:8080":                 "::/56",
 		"not an address":             "unknown",
 		"192.0.2.7":                  "unknown",
 	} {

@@ -1,11 +1,18 @@
 -- Queries for accounts and sessions (internal/auth). Times come from the caller's clock.
 
--- name: CreateUser :one
--- No row when the email is taken (emails are case-insensitive).
-INSERT INTO users (email, password_hash)
-VALUES (@email, @password_hash)
-ON CONFLICT (email) DO NOTHING
-RETURNING id, email;
+-- name: CreateUserWithSession :one
+-- Creates the account and its first session together, or neither: no row when the email is
+-- taken (emails are case-insensitive).
+WITH new_user AS (
+    INSERT INTO users (email, password_hash)
+    VALUES (@email, @password_hash)
+    ON CONFLICT (email) DO NOTHING
+    RETURNING id, email
+), new_session AS (
+    INSERT INTO sessions (token_hash, user_id, created_at, expires_at)
+    SELECT @token_hash, new_user.id, @created_at, @expires_at FROM new_user
+)
+SELECT id, email FROM new_user;
 
 -- name: UserCredentials :one
 SELECT id, email, password_hash FROM users WHERE email = @email;

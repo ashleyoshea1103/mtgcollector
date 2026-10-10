@@ -197,6 +197,25 @@ func TestFilesOutsideTheFrontendDirectoryCantBeReached(t *testing.T) {
 	}
 }
 
+// A directory, opened through os.Root as the server does, is never served as a file: a
+// path naming one is a page of the app.
+func TestADirectoryIsntServed(t *testing.T) {
+	dir := t.TempDir()
+	must(t, os.MkdirAll(filepath.Join(dir, "assets", "fonts"), 0o755))
+	must(t, os.WriteFile(filepath.Join(dir, "index.html"), []byte(indexHTML), 0o644))
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { root.Close() })
+	for _, p := range []string{"/assets", "/assets/fonts"} {
+		rec := do(t, New(api, root.FS()), http.MethodGet, p)
+		if rec.Code == http.StatusOK && rec.Body.String() != indexHTML {
+			t.Errorf("%s = %d %q: served the directory", p, rec.Code, rec.Body)
+		}
+	}
+}
+
 func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
