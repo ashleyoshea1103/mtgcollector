@@ -39,11 +39,21 @@ var fixedGroups = map[contract.GroupBy][]struct{ key, label string }{
 // A set code, as Scryfall writes them: lower-case letters and digits.
 var setCode = regexp.MustCompile(`^[a-z0-9]{1,8}$`)
 
-// Groups returns the user's groups for one way of grouping (none if not given), in order: by
-// set, newest set first (sets released the same day by name, those with no date last);
-// otherwise in the order of fixedGroups. Groups the user has no cards in are left out, but
-// for none's one group, which is always there.
+// Groups returns the groups of the user's collection for one way of grouping (none if not
+// given), in order: by set, newest set first (sets released the same day by name, those with no
+// date last); otherwise in the order of fixedGroups. Groups the user has no cards in are left
+// out, but for none's one group, which is always there.
 func (s *Service) Groups(ctx context.Context, userID int64, by contract.GroupBy) (contract.CollectionGroups, error) {
+	return s.groupsOf(ctx, userID, collectionGroup, by)
+}
+
+// collectionGroup is the listing_rows group_id of the collection itself: its entries, rather
+// than a custom group's members. (Custom groups' ids start at 1.)
+const collectionGroup = 0
+
+// groupsOf groups the collection (collectionGroup) or the members of one of the user's
+// custom groups.
+func (s *Service) groupsOf(ctx context.Context, userID, groupID int64, by contract.GroupBy) (contract.CollectionGroups, error) {
 	if by == "" {
 		by = contract.GroupByNone
 	}
@@ -52,7 +62,7 @@ func (s *Service) Groups(ctx context.Context, userID int64, by contract.GroupBy)
 	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	rows, err := s.Q.GroupTotals(ctx, store.GroupTotalsParams{UserID: userID, GroupBy: string(by)})
+	rows, err := s.q().GroupTotals(ctx, store.GroupTotalsParams{UserID: userID, GroupID: groupID, GroupBy: string(by)})
 	if err != nil {
 		return contract.CollectionGroups{}, db.Error(ctx, "group collection", err)
 	}
@@ -62,7 +72,8 @@ func (s *Service) Groups(ctx context.Context, userID int64, by contract.GroupBy)
 	}
 	groups := []contract.GroupSummary{}
 	if by == contract.GroupByNone && len(rows) == 0 {
-		// The one group is always there, so an empty collection still shows its (zero) totals.
+		// The one group is always there, so an empty collection (or custom group) still shows
+		// its (zero) totals.
 		totals["all"] = store.GroupTotalsRow{Key: "all"}
 	}
 	if by == contract.GroupBySet {
@@ -84,7 +95,7 @@ func (s *Service) setGroups(ctx context.Context, totals map[string]store.GroupTo
 	for code := range totals {
 		codes = append(codes, code)
 	}
-	sets, err := s.Q.SetsByCode(ctx, codes)
+	sets, err := s.q().SetsByCode(ctx, codes)
 	if err != nil {
 		return nil, db.Error(ctx, "find sets", err)
 	}
@@ -123,10 +134,28 @@ type EntryQuery struct {
 	Key     string
 	Sort    contract.SortBy
 	Cursor  string
+	// The collection (collectionGroup) or a custom group, set by Entries or Members.
+	group int64
 }
 
 // Entries returns a page of one group's entries.
 func (s *Service) Entries(ctx context.Context, userID int64, q EntryQuery) (contract.EntryPage, error) {
+	q.group = collectionGroup
+	rows, next, err := s.listing(ctx, userID, q)
+	if err != nil {
+		return contract.EntryPage{}, err
+	}
+	page := contract.EntryPage{Entries: make([]contract.CollectionEntry, len(rows)), NextCursor: next}
+	for i, r := range rows {
+		if page.Entries[i], err = toEntry(r.ListingRow, r.CardListing); err != nil {
+			return contract.EntryPage{}, err
+		}
+	}
+	return page, nil
+}
+
+// listing reads a page of q's listing: its rows, and the cursor for the next page if there is one.
+func (s *Service) listing(ctx context.Context, userID int64, q EntryQuery) ([]store.EntriesByNameRow, *string, error) {
 	if q.GroupBy == "" {
 		q.GroupBy = contract.GroupByNone
 	}
@@ -134,19 +163,19 @@ func (s *Service) Entries(ctx context.Context, userID int64, q EntryQuery) (cont
 		q.Sort = contract.SortByName
 	}
 	if err := checkEnum(q.GroupBy); err != nil {
-		return contract.EntryPage{}, invalid("%s", err)
+		return nil, nil, invalid("%s", err)
 	}
 	if err := checkEnum(q.Sort); err != nil {
-		return contract.EntryPage{}, invalid("%s", err)
+		return nil, nil, invalid("%s", err)
 	}
 	if err := checkKey(&q); err != nil {
-		return contract.EntryPage{}, err
+		return nil, nil, err
 	}
 	var after *cursor
 	if q.Cursor != "" {
 		c, err := decodeCursor(q.Cursor, q)
 		if err != nil {
-			return contract.EntryPage{}, err
+			return nil, nil, err
 		}
 		after = &c
 	}
@@ -154,22 +183,13 @@ func (s *Service) Entries(ctx context.Context, userID int64, q EntryQuery) (cont
 	defer cancel()
 	rows, err := s.page(ctx, userID, q, after)
 	if err != nil {
-		return contract.EntryPage{}, db.Error(ctx, "list entries", err)
+		return nil, nil, db.Error(ctx, "list entries", err)
 	}
-	page := contract.EntryPage{Entries: make([]contract.CollectionEntry, 0, min(len(rows), PageSize))}
-	for i, r := range rows {
-		if i == PageSize {
-			next := cursorAfter(q, rows[i-1].EntryPrice).encode()
-			page.NextCursor = &next
-			break
-		}
-		e, err := toEntry(r.EntryPrice, r.CardListing)
-		if err != nil {
-			return contract.EntryPage{}, err
-		}
-		page.Entries = append(page.Entries, e)
+	if len(rows) <= PageSize {
+		return rows, nil, nil
 	}
-	return page, nil
+	next := cursorAfter(q, rows[PageSize-1].ListingRow).encode()
+	return rows[:PageSize], &next, nil
 }
 
 // checkKey checks a group key is one grouping by q.GroupBy gives, so only such keys reach the
@@ -210,34 +230,34 @@ func (s *Service) page(ctx context.Context, userID int64, q EntryQuery, after *c
 	afterID := pgtype.Int8{Int64: c.ID, Valid: after != nil}
 	switch q.Sort {
 	case contract.SortByPrice:
-		rows, err := s.Q.EntriesByPrice(ctx, store.EntriesByPriceParams{
-			UserID: userID, GroupBy: string(q.GroupBy), GroupKey: q.Key, RowLimit: limit, AfterID: afterID,
+		rows, err := s.q().EntriesByPrice(ctx, store.EntriesByPriceParams{
+			UserID: userID, GroupID: q.group, GroupBy: string(q.GroupBy), GroupKey: q.Key, RowLimit: limit, AfterID: afterID,
 			AfterUnpriced: pgtype.Bool{Bool: c.Unpriced, Valid: after != nil}, AfterPrice: c.Price,
 		})
 		return sameRows(rows, err)
 	case contract.SortByCMC:
-		rows, err := s.Q.EntriesByCMC(ctx, store.EntriesByCMCParams{
-			UserID: userID, GroupBy: string(q.GroupBy), GroupKey: q.Key, RowLimit: limit, AfterID: afterID,
+		rows, err := s.q().EntriesByCMC(ctx, store.EntriesByCMCParams{
+			UserID: userID, GroupID: q.group, GroupBy: string(q.GroupBy), GroupKey: q.Key, RowLimit: limit, AfterID: afterID,
 			AfterCmc: c.CMC, AfterName: pgtype.Text{String: c.Name, Valid: after != nil},
 		})
 		return sameRows(rows, err)
 	case contract.SortByAdded:
-		rows, err := s.Q.EntriesByAdded(ctx, store.EntriesByAddedParams{
-			UserID: userID, GroupBy: string(q.GroupBy), GroupKey: q.Key, RowLimit: limit, AfterID: afterID,
+		rows, err := s.q().EntriesByAdded(ctx, store.EntriesByAddedParams{
+			UserID: userID, GroupID: q.group, GroupBy: string(q.GroupBy), GroupKey: q.Key, RowLimit: limit, AfterID: afterID,
 			AfterAdded: pgtype.Timestamptz{Time: c.Added, Valid: after != nil},
 		})
 		return sameRows(rows, err)
 	default:
-		return s.Q.EntriesByName(ctx, store.EntriesByNameParams{
-			UserID: userID, GroupBy: string(q.GroupBy), GroupKey: q.Key, RowLimit: limit, AfterID: afterID,
+		return s.q().EntriesByName(ctx, store.EntriesByNameParams{
+			UserID: userID, GroupID: q.group, GroupBy: string(q.GroupBy), GroupKey: q.Key, RowLimit: limit, AfterID: afterID,
 			AfterName: pgtype.Text{String: c.Name, Valid: after != nil},
 		})
 	}
 }
 
-// sameRows gives every order's rows one type: each is an entry and its card.
+// sameRows gives every order's rows one type: each is a listed entry and its card.
 func sameRows[R ~struct {
-	EntryPrice  store.EntryPrice
+	ListingRow  store.ListingRow
 	CardListing store.CardListing
 }](rows []R, err error) ([]store.EntriesByNameRow, error) {
 	out := make([]store.EntriesByNameRow, len(rows))
@@ -251,7 +271,7 @@ func sameRows[R ~struct {
 func (s *Service) Stats(ctx context.Context, userID int64) (contract.CollectionStats, error) {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	rows, err := s.Q.CollectionStats(ctx, userID)
+	rows, err := s.q().CollectionStats(ctx, userID)
 	if err != nil {
 		return contract.CollectionStats{}, db.Error(ctx, "collection totals", err)
 	}

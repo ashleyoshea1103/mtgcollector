@@ -18,7 +18,6 @@ import (
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
-	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/testdb"
 )
 
@@ -30,6 +29,7 @@ type testCard struct {
 	identity, finishes          []string
 	eur, eurFoil                *float64
 	gone                        bool
+	noImages                    bool // a card with no images (most have them)
 }
 
 func euros(v float64) *float64 { return &v }
@@ -43,7 +43,7 @@ type fixture struct {
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	pool := testdb.New(t)
-	f := &fixture{s: &Service{Q: store.New(pool)}, pool: pool}
+	f := &fixture{s: &Service{Pool: pool}, pool: pool}
 	for _, u := range []*int64{&f.ann, &f.bob} {
 		email := uuid(t) + "@example.com"
 		if err := pool.QueryRow(t.Context(),
@@ -92,17 +92,27 @@ func (f *fixture) card(t *testing.T, c testCard) string {
 		c.finishes = []string{"nonfoil", "foil"}
 	}
 	id := uuid(t)
+	var images []byte // jsonb: null for a card with no images
+	if !c.noImages {
+		images, _ = json.Marshal(contract.CardImages{
+			Small: smallImage(id), Normal: "https://cards.scryfall.io/normal/" + id + ".jpg",
+			Large: "https://cards.scryfall.io/large/" + id + ".jpg", ArtCrop: "https://cards.scryfall.io/art_crop/" + id + ".jpg",
+		})
+	}
 	_, err := f.pool.Exec(t.Context(),
 		`INSERT INTO cards (id, oracle_id, name, lang, set_code, collector_number, rarity, layout, mana_cost, cmc,
-		                    type_line, colors, color_identity, finishes, price_eur, price_eur_foil, released_at, gone_since)
+		                    type_line, colors, color_identity, finishes, price_eur, price_eur_foil, released_at, gone_since, images)
 		 VALUES ($1, $2, $3, 'en', $4, '1', $5, 'normal', '', $6, $7, $8, $8, $9, $10, $11, '2020-01-01',
-		         CASE WHEN $12 THEN now() END)`,
-		id, uuid(t), c.name, c.set, c.rarity, c.cmc, c.typeLine, c.identity, c.finishes, c.eur, c.eurFoil, c.gone)
+		         CASE WHEN $12 THEN now() END, $13)`,
+		id, uuid(t), c.name, c.set, c.rarity, c.cmc, c.typeLine, c.identity, c.finishes, c.eur, c.eurFoil, c.gone, images)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return id
 }
+
+// smallImage is the small image URL the fixture gives a card.
+func smallImage(cardID string) string { return "https://cards.scryfall.io/small/" + cardID + ".jpg" }
 
 func cmpOr(s, def string) string {
 	if s == "" {
@@ -353,7 +363,7 @@ func TestACollectionHoldsAtMostMaxEntries(t *testing.T) {
 	if _, _, err := f.s.Add(t.Context(), f.bob, fourth); err != nil {
 		t.Errorf("Bob's first entry: %v", err)
 	}
-	if f2 := (&Service{Q: f.s.Q}); f2.maxEntries() != contract.MaxEntries {
+	if f2 := (&Service{Pool: f.pool}); f2.maxEntries() != contract.MaxEntries {
 		t.Errorf("the default limit is %d, want contract.MaxEntries", f2.maxEntries())
 	}
 }

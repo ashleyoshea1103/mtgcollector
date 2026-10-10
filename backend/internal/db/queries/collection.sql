@@ -47,21 +47,23 @@ RETURNING id;
 DELETE FROM collection_entries WHERE user_id = @user_id AND id = @id;
 
 -- name: GetEntry :one
+-- One entry of the collection (group 0), or one member of a group.
 SELECT sqlc.embed(p), sqlc.embed(v)
-  FROM entry_prices p
+  FROM listing_rows p
   JOIN card_listing v ON v.id = p.card_id
- WHERE p.user_id = @user_id AND p.id = @id;
+ WHERE p.group_id = @group_id AND p.user_id = @user_id AND p.id = @id;
 
 -- name: GroupTotals :many
--- The groups of the user's collection for one way of grouping, with their totals. Cards
+-- The groups of the user's collection (group 0) or one of their custom groups, for one way of
+-- grouping, with their totals: of the copies listed (a member's, in a custom group). Cards
 -- with no price are counted apart from the value.
 SELECT card_group(@group_by, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc)::text AS key,
        count(*)::integer AS entry_count,
-       sum(p.quantity)::integer AS card_count,
-       coalesce(sum(p.value), 0)::numeric AS value_eur,
-       coalesce(sum(p.quantity) FILTER (WHERE p.unit_price IS NULL), 0)::integer AS unpriced_count
-  FROM entry_prices p
- WHERE p.user_id = @user_id
+       sum(p.count)::integer AS card_count,
+       coalesce(sum(p.count_value), 0)::numeric AS value_eur,
+       coalesce(sum(p.count) FILTER (WHERE p.unit_price IS NULL), 0)::integer AS unpriced_count
+  FROM listing_rows p
+ WHERE p.group_id = @group_id AND p.user_id = @user_id
  GROUP BY 1;
 
 -- name: CollectionStats :many
@@ -84,15 +86,16 @@ SELECT GROUPING(g.color, g.rarity)::integer AS totals_of,
 -- The sets with these codes: the groups when grouping by set.
 SELECT code, name, icon_svg_uri, released_at FROM sets WHERE code = ANY (@codes::text[]);
 
--- A page of one group's entries, in one order. Each order is its own query, so each can
--- page by keyset: the page after the row whose sort key is the cursor's. The group is the
--- one card_group gives the key for; group_by 'none' is every entry ('all').
+-- A page of the entries of the collection (group_id 0) or the members of a custom group, in
+-- one of the groups card_group makes of them (group_by 'none' is every one: key 'all'), in one
+-- order. Each order is its own query, so each can page by keyset: the page after the row
+-- whose sort key is the cursor's.
 
 -- name: EntriesByName :many
 SELECT sqlc.embed(p), sqlc.embed(v)
-  FROM entry_prices p
+  FROM listing_rows p
   JOIN card_listing v ON v.id = p.card_id
- WHERE p.user_id = @user_id
+ WHERE p.group_id = @group_id AND p.user_id = @user_id
    AND card_group(@group_by, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = @group_key
    AND (sqlc.narg(after_id)::bigint IS NULL
         OR (p.name COLLATE "unicode", p.id) > (sqlc.narg(after_name)::text COLLATE "unicode", sqlc.narg(after_id)::bigint))
@@ -102,9 +105,9 @@ SELECT sqlc.embed(p), sqlc.embed(v)
 -- name: EntriesByPrice :many
 -- Most valuable copy first; those with no price last.
 SELECT sqlc.embed(p), sqlc.embed(v)
-  FROM entry_prices p
+  FROM listing_rows p
   JOIN card_listing v ON v.id = p.card_id
- WHERE p.user_id = @user_id
+ WHERE p.group_id = @group_id AND p.user_id = @user_id
    AND card_group(@group_by, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = @group_key
    AND (sqlc.narg(after_id)::bigint IS NULL
         OR (p.unit_price IS NULL, -coalesce(p.unit_price, 0), p.id)
@@ -114,9 +117,9 @@ SELECT sqlc.embed(p), sqlc.embed(v)
 
 -- name: EntriesByCMC :many
 SELECT sqlc.embed(p), sqlc.embed(v)
-  FROM entry_prices p
+  FROM listing_rows p
   JOIN card_listing v ON v.id = p.card_id
- WHERE p.user_id = @user_id
+ WHERE p.group_id = @group_id AND p.user_id = @user_id
    AND card_group(@group_by, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = @group_key
    AND (sqlc.narg(after_id)::bigint IS NULL
         OR (p.cmc, p.name COLLATE "unicode", p.id)
@@ -125,13 +128,13 @@ SELECT sqlc.embed(p), sqlc.embed(v)
  LIMIT @row_limit;
 
 -- name: EntriesByAdded :many
--- Newest first.
+-- Newest first: added to the collection, or to the group.
 SELECT sqlc.embed(p), sqlc.embed(v)
-  FROM entry_prices p
+  FROM listing_rows p
   JOIN card_listing v ON v.id = p.card_id
- WHERE p.user_id = @user_id
+ WHERE p.group_id = @group_id AND p.user_id = @user_id
    AND card_group(@group_by, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = @group_key
    AND (sqlc.narg(after_id)::bigint IS NULL
-        OR (p.added_at, p.id) < (sqlc.narg(after_added)::timestamptz, sqlc.narg(after_id)::bigint))
- ORDER BY p.added_at DESC, p.id DESC
+        OR (p.listed_at, p.id) < (sqlc.narg(after_added)::timestamptz, sqlc.narg(after_id)::bigint))
+ ORDER BY p.listed_at DESC, p.id DESC
  LIMIT @row_limit;

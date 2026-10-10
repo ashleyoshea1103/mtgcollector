@@ -24,8 +24,9 @@ type Services struct {
 	DB    Pinger
 	Cards Cards
 	Auth  Auth
-	// The signed-in user's collection.
-	Collection Collection
+	// The signed-in user's collection, and their custom groups.
+	Collection   Collection
+	CustomGroups CustomGroups
 	// Limits on how often clients may call the API; nil means DefaultLimits().
 	Limits *Limits
 }
@@ -52,6 +53,15 @@ func NewHandler(s Services) http.Handler {
 	mux.HandleFunc("POST /api/collection/entries", requireUser(s.Auth, addEntry(s.Collection)))
 	mux.HandleFunc("PATCH /api/collection/entries/{id}", requireUser(s.Auth, changeEntry(s.Collection)))
 	mux.HandleFunc("DELETE /api/collection/entries/{id}", requireUser(s.Auth, deleteEntry(s.Collection)))
+	mux.HandleFunc("GET /api/groups", requireUser(s.Auth, listGroups(s.CustomGroups)))
+	mux.HandleFunc("POST /api/groups", requireUser(s.Auth, createGroup(s.CustomGroups)))
+	mux.HandleFunc("GET /api/groups/{id}", requireUser(s.Auth, getGroup(s.CustomGroups)))
+	mux.HandleFunc("PATCH /api/groups/{id}", requireUser(s.Auth, changeGroup(s.CustomGroups)))
+	mux.HandleFunc("DELETE /api/groups/{id}", requireUser(s.Auth, deleteGroup(s.CustomGroups)))
+	mux.HandleFunc("GET /api/groups/{id}/groups", requireUser(s.Auth, groupGroups(s.CustomGroups)))
+	mux.HandleFunc("GET /api/groups/{id}/members", requireUser(s.Auth, groupMembers(s.CustomGroups)))
+	mux.HandleFunc("PUT /api/groups/{id}/members/{entry_id}", requireUser(s.Auth, setMember(s.CustomGroups)))
+	mux.HandleFunc("DELETE /api/groups/{id}/members/{entry_id}", requireUser(s.Auth, removeMember(s.CustomGroups)))
 	// Anything else under /api/ is a JSON 404, like every other API error.
 	// (GET only: a wrong method on a real route still gets 405.)
 	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, r *http.Request) {

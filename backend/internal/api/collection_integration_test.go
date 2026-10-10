@@ -18,16 +18,19 @@ import (
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/testdb"
 )
 
-// Two browsers, through the real services and database: each sees and changes only its own
-// collection.
-func TestTwoUsersCollectionsAgainstARealDatabase(t *testing.T) {
+// A Lightning Bolt printing the live servers' databases have.
+const bolt = "0b8fe8b3-0000-4000-8000-000000000001"
+
+// liveServer serves the API from the real services, over TLS (the session cookie is Secure),
+// with one card in its database. newBrowser signs a new user up in a browser of their own.
+func liveServer(t *testing.T) (srv *httptest.Server, newBrowser func(email string) browser) {
+	t.Helper()
 	pool := testdb.New(t)
-	q := store.New(pool)
-	srv := httptest.NewTLSServer(NewHandler(Services{
-		DB: pool, Auth: auth.NewService(q), Collection: &collection.Service{Q: q},
+	owned := &collection.Service{Pool: pool}
+	srv = httptest.NewTLSServer(NewHandler(Services{
+		DB: pool, Auth: auth.NewService(store.New(pool)), Collection: owned, CustomGroups: owned,
 	}))
 	t.Cleanup(srv.Close)
-	const bolt = "0b8fe8b3-0000-4000-8000-000000000001"
 	for _, sql := range []string{
 		`INSERT INTO sets (code, scryfall_id, name, set_type, released_at) VALUES ('m10', gen_random_uuid(), 'Magic 2010', 'core', '2009-07-17')`,
 		`INSERT INTO cards (id, oracle_id, name, lang, set_code, collector_number, rarity, layout, mana_cost, cmc, type_line,
@@ -39,15 +42,18 @@ func TestTwoUsersCollectionsAgainstARealDatabase(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
-	newBrowser := func(email string) browser {
-		c := srv.Client()
+	return srv, func(email string) browser {
 		jar, _ := cookiejar.New(nil)
-		c = &http.Client{Transport: c.Transport, Jar: jar}
-		b := browser{c}
+		b := browser{&http.Client{Transport: srv.Client().Transport, Jar: jar}}
 		b.do(t, srv.URL, "POST", "/api/auth/signup", `{"email":"`+email+`","password":"correct horse battery staple"}`, 201, nil)
 		return b
 	}
+}
+
+// Two browsers, through the real services and database: each sees and changes only its own
+// collection.
+func TestTwoUsersCollectionsAgainstARealDatabase(t *testing.T) {
+	srv, newBrowser := liveServer(t)
 	ann, bob := newBrowser("ann@example.com"), newBrowser("bob@example.com")
 
 	var added contract.CollectionEntry

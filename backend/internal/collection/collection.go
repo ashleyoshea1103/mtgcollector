@@ -4,6 +4,7 @@
 package collection
 
 import (
+	"cmp"
 	"context"
 	"encoding"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
@@ -42,10 +44,14 @@ func invalid(format string, args ...any) error {
 // Service does the work, for one user at a time: every call takes the user's id, and every
 // query is limited to that user's entries.
 type Service struct {
-	Q *store.Queries
+	Pool *pgxpool.Pool
 	// The most entries a collection can hold; zero means contract.MaxEntries.
 	MaxEntries int
+	// The most custom groups a user can have; zero means contract.MaxGroups.
+	MaxGroups int
 }
+
+func (s *Service) q() *store.Queries { return store.New(s.Pool) }
 
 func (s *Service) maxEntries() int {
 	if s.MaxEntries > 0 {
@@ -64,31 +70,52 @@ func (s *Service) Add(ctx context.Context, userID int64, e contract.NewEntry) (c
 	if err := checkEntry(e.Quantity, e.Finish, e.Condition, e.Language); err != nil {
 		return contract.CollectionEntry{}, false, err
 	}
-	if e.GroupID != nil {
-		// Custom groups come in a later change; until then, no id is one of the user's.
-		return contract.CollectionEntry{}, false, invalid("there's no group with that id")
-	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	row, err := s.Q.AddEntry(ctx, store.AddEntryParams{
-		UserID: userID, CardID: cardID, Quantity: int32(e.Quantity),
-		Finish: string(e.Finish), Condition: string(e.Condition), Language: string(e.Language),
-		MaxEntries: int32(s.maxEntries()), MaxQuantity: contract.MaxQuantity,
+	// With a group, the copies go in it too: both or neither.
+	var row store.AddEntryRow
+	err = pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := store.New(tx)
+		if e.GroupID != nil {
+			if ok, err := q.GroupExists(ctx, store.GroupExistsParams{UserID: userID, ID: *e.GroupID}); err != nil || !ok {
+				return cmp.Or(err, invalid("there's no group with that id"))
+			}
+		}
+		var err error
+		row, err = q.AddEntry(ctx, store.AddEntryParams{
+			UserID: userID, CardID: cardID, Quantity: int32(e.Quantity),
+			Finish: string(e.Finish), Condition: string(e.Condition), Language: string(e.Language),
+			MaxEntries: int32(s.maxEntries()), MaxQuantity: contract.MaxQuantity,
+		})
+		if err != nil || e.GroupID == nil {
+			return err
+		}
+		return q.AddToGroup(ctx, store.AddToGroupParams{
+			UserID: userID, GroupID: *e.GroupID, EntryID: row.ID, Quantity: int32(e.Quantity),
+		})
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return contract.CollectionEntry{}, false, s.whyNotAdded(ctx, userID, cardID, e)
 	}
 	if err != nil {
-		return contract.CollectionEntry{}, false, db.Error(ctx, "add entry", err)
+		return contract.CollectionEntry{}, false, dbError(ctx, "add entry", err)
 	}
 	entry, err := s.get(ctx, userID, row.ID)
 	return entry, row.Created, err
 }
 
+// dbError is db.Error for an error that may be a caller's mistake instead, which is returned as it is.
+func dbError(ctx context.Context, what string, err error) error {
+	if apperr.KindOf(err) != 0 {
+		return err
+	}
+	return db.Error(ctx, what, err)
+}
+
 // whyNotAdded says why AddEntry added nothing: there's no such card, it doesn't come in
 // that finish, there would be too many copies, or too many entries.
 func (s *Service) whyNotAdded(ctx context.Context, userID int64, cardID pgtype.UUID, e contract.NewEntry) error {
-	finishes, err := s.Q.CardFinishes(ctx, cardID)
+	finishes, err := s.q().CardFinishes(ctx, cardID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return invalid("there's no card with that id")
 	}
@@ -98,7 +125,7 @@ func (s *Service) whyNotAdded(ctx context.Context, userID int64, cardID pgtype.U
 	if err := checkFinish(e.Finish, finishes); err != nil {
 		return err
 	}
-	has, err := s.Q.HasEntry(ctx, store.HasEntryParams{
+	has, err := s.q().HasEntry(ctx, store.HasEntryParams{
 		UserID: userID, CardID: cardID, Finish: string(e.Finish), Condition: string(e.Condition), Language: string(e.Language),
 	})
 	if err != nil {
@@ -117,7 +144,7 @@ func (s *Service) Change(ctx context.Context, userID, id int64, c contract.Entry
 	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	cur, err := s.Q.EntryCard(ctx, store.EntryCardParams{UserID: userID, ID: id})
+	cur, err := s.q().EntryCard(ctx, store.EntryCardParams{UserID: userID, ID: id})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return contract.CollectionEntry{}, ErrNotFound
 	}
@@ -150,7 +177,7 @@ func (s *Service) Change(ctx context.Context, userID, id int64, c contract.Entry
 			return contract.CollectionEntry{}, err
 		}
 	}
-	_, err = s.Q.UpdateEntry(ctx, next)
+	_, err = s.q().UpdateEntry(ctx, next)
 	var pgErr *pgconn.PgError
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
@@ -167,7 +194,7 @@ func (s *Service) Change(ctx context.Context, userID, id int64, c contract.Entry
 func (s *Service) Delete(ctx context.Context, userID, id int64) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	n, err := s.Q.DeleteEntry(ctx, store.DeleteEntryParams{UserID: userID, ID: id})
+	n, err := s.q().DeleteEntry(ctx, store.DeleteEntryParams{UserID: userID, ID: id})
 	if err != nil {
 		return db.Error(ctx, "delete entry", err)
 	}
@@ -178,14 +205,14 @@ func (s *Service) Delete(ctx context.Context, userID, id int64) error {
 }
 
 func (s *Service) get(ctx context.Context, userID, id int64) (contract.CollectionEntry, error) {
-	row, err := s.Q.GetEntry(ctx, store.GetEntryParams{UserID: userID, ID: id})
+	row, err := s.q().GetEntry(ctx, store.GetEntryParams{GroupID: collectionGroup, UserID: userID, ID: id})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return contract.CollectionEntry{}, ErrNotFound
 	}
 	if err != nil {
 		return contract.CollectionEntry{}, db.Error(ctx, "get entry", err)
 	}
-	return toEntry(row.EntryPrice, row.CardListing)
+	return toEntry(row.ListingRow, row.CardListing)
 }
 
 // checkEntry checks what an entry is: values the JSON decoder hasn't already checked
@@ -220,7 +247,7 @@ func checkFinish(f contract.Finish, finishes []string) error {
 }
 
 // toEntry is an entry and its card as the API shows them.
-func toEntry(r store.EntryPrice, v store.CardListing) (contract.CollectionEntry, error) {
+func toEntry(r store.ListingRow, v store.CardListing) (contract.CollectionEntry, error) {
 	card, err := cards.Summary(v)
 	if err != nil {
 		return contract.CollectionEntry{}, err

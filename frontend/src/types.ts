@@ -266,6 +266,10 @@ export interface GroupMember {
    * quantity × entry.unit_price_eur; null when there's no price.
    */
   value_eur: number | null;
+  /**
+   * When it joined the group (RFC 3339, UTC).
+   */
+  added_at: string;
 }
 /**
  * One page of a custom group's members.
@@ -289,6 +293,43 @@ export interface CustomGroup extends ValueTotal {
   description: string;
   preview_images: string[];
 }
+/**
+ * GET /api/groups: the user's custom groups, by name.
+ */
+export interface CustomGroupList {
+  groups: CustomGroup[];
+}
+/**
+ * POST /api/groups: a new custom group.
+ */
+export interface NewGroup {
+  name: string;
+  kind: CustomGroupKind;
+  description: string;
+}
+/**
+ * PATCH /api/groups/{id}: what to change about a group. Leave out what stays.
+ */
+export interface GroupChange {
+  name?: string;
+  kind?: CustomGroupKind;
+  description?: string;
+}
+/**
+ * PUT /api/groups/{id}/members/{entry_id}: how many of the entry's copies are in the group.
+ */
+export interface MemberQuantity {
+  quantity: number /* int */;
+}
+/**
+ * The longest a group's name and description can be, in characters.
+ */
+export const MaxGroupNameLength = 100;
+export const MaxGroupDescriptionLength = 1000;
+/**
+ * The most custom groups one user can have.
+ */
+export const MaxGroups = 500;
 /**
  * Totals for the whole collection. Values are EUR only: Cardmarket is the reference market.
  */
