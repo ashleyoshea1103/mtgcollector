@@ -68,7 +68,7 @@ Pages hold 60 cards, up to page 50.
 | `rarity` | `mythic`, `rare`, `uncommon`, `common`, `special`, `bonus` |
 | `cmc` | mana value, rounded down: `0` to `6`, then `7` for 7 or more |
 
-**Custom groups.** A group (binder, deck, box) holds some of your entries: of each, 1 to all of its copies. One entry can be in several groups (a deck can list cards that live in a binder). Lowering an entry's quantity lowers its copies in groups with it, and adding cards with a `group_id` puts them in that group as well, both or neither. A user has at most 500 groups (`MaxGroups`). Another user's group, or a member of it, is a 404.
+**Custom groups.** A group (binder, deck, box) holds some of your entries: of each, 1 to all of its copies. One entry can be in several groups (a deck can list cards that live in a binder). Lowering an entry's quantity lowers its copies in groups with it, and adding cards with a `group_id` puts them in that group as well, both or neither. A user has at most 500 groups (`MaxGroups`), holding at most 100,000 entries between them (`MaxMembers`). Changes to a group or an entry change only the fields given, so two at once don't undo each other. Another user's group, or a member of it, is a 404.
 
 **Signing in.** A session lasts about 30 days from its last use (its expiry moves forward at most once a day), and 90 days at most; the browser holds it in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, and the database only the token's SHA-256. Passwords are hashed with argon2id. Request bodies are JSON (`Content-Type: application/json`, at most 16 KB, no unknown fields). Requests that change anything are refused (403) when a browser says they come from another site, by their `Sec-Fetch-Site` or `Origin` header.
 

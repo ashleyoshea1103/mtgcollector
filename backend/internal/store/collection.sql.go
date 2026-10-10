@@ -805,21 +805,28 @@ func (q *Queries) SetsByCode(ctx context.Context, codes []string) ([]SetsByCodeR
 }
 
 const updateEntry = `-- name: UpdateEntry :one
-UPDATE collection_entries
-   SET quantity = $1, finish = $2, condition = $3, language = $4
- WHERE user_id = $5 AND id = $6
-RETURNING id
+UPDATE collection_entries e
+   SET quantity = coalesce($1::integer, e.quantity),
+       finish = coalesce($2::text, e.finish),
+       condition = coalesce($3::text, e.condition),
+       language = coalesce($4::text, e.language)
+ WHERE e.user_id = $5 AND e.id = $6
+   AND ($2::text IS NULL
+        OR EXISTS (SELECT 1 FROM cards c WHERE c.id = e.card_id AND $2::text = ANY (c.finishes)))
+RETURNING e.id
 `
 
 type UpdateEntryParams struct {
-	Quantity  int32
-	Finish    string
-	Condition string
-	Language  string
+	Quantity  pgtype.Int4
+	Finish    pgtype.Text
+	Condition pgtype.Text
+	Language  pgtype.Text
 	UserID    int64
 	ID        int64
 }
 
+// Changes only what's given, so two changes at once don't undo each other. No row when there's
+// no such entry, or its card doesn't come in the finish given.
 func (q *Queries) UpdateEntry(ctx context.Context, arg UpdateEntryParams) (int64, error) {
 	row := q.db.QueryRow(ctx, updateEntry,
 		arg.Quantity,

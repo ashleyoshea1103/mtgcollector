@@ -11,32 +11,40 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const addToGroup = `-- name: AddToGroup :exec
+const addToGroup = `-- name: AddToGroup :execrows
 INSERT INTO group_members AS m (group_id, entry_id, user_id, quantity)
 SELECT g.id, e.id, g.user_id, least($1::integer, e.quantity)
   FROM custom_groups g, collection_entries e
  WHERE g.id = $2 AND g.user_id = $3 AND e.id = $4 AND e.user_id = $3
+   AND ((SELECT count(*) FROM group_members c WHERE c.user_id = $3) < $5::integer
+        OR EXISTS (SELECT 1 FROM group_members x WHERE x.group_id = $2 AND x.entry_id = $4))
 ON CONFLICT (group_id, entry_id) DO UPDATE SET quantity = least(m.quantity + excluded.quantity,
     (SELECT quantity FROM collection_entries WHERE id = excluded.entry_id))
 `
 
 type AddToGroupParams struct {
-	Quantity int32
-	GroupID  int64
-	UserID   int64
-	EntryID  int64
+	Quantity   int32
+	GroupID    int64
+	UserID     int64
+	EntryID    int64
+	MaxMembers int32
 }
 
 // Puts copies just added to an entry in a group too (or more of them, if they're there): never
-// more than the entry has.
-func (q *Queries) AddToGroup(ctx context.Context, arg AddToGroupParams) error {
-	_, err := q.db.Exec(ctx, addToGroup,
+// more than the entry has. No row when there's no such group (deleted meanwhile), or it would be
+// a new member and the user already has max_members.
+func (q *Queries) AddToGroup(ctx context.Context, arg AddToGroupParams) (int64, error) {
+	result, err := q.db.Exec(ctx, addToGroup,
 		arg.Quantity,
 		arg.GroupID,
 		arg.UserID,
 		arg.EntryID,
+		arg.MaxMembers,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const createGroup = `-- name: CreateGroup :one
@@ -123,66 +131,61 @@ func (q *Queries) GroupExists(ctx context.Context, arg GroupExistsParams) (bool,
 	return exists, err
 }
 
-const groupPreviews = `-- name: GroupPreviews :many
-SELECT x.group_id, x.images
-  FROM (SELECT d.group_id, d.images,
-               row_number() OVER (PARTITION BY d.group_id
-                                  ORDER BY d.unit_price DESC NULLS LAST, d.added_at, d.card_id) AS n
-          FROM (SELECT DISTINCT ON (m.group_id, p.card_id) m.group_id, p.card_id, c.images, p.unit_price, m.added_at
-                  FROM group_members m
-                  JOIN entry_prices p ON p.id = m.entry_id
-                  JOIN cards c ON c.id = p.card_id
-                 WHERE m.user_id = $1
-                   AND ($2::bigint IS NULL OR m.group_id = $2::bigint)
-                   AND c.images IS NOT NULL
-                 ORDER BY m.group_id, p.card_id, p.unit_price DESC NULLS LAST, m.added_at) d) x
- WHERE x.n <= 4
- ORDER BY x.group_id, x.n
+const hasMember = `-- name: HasMember :one
+SELECT EXISTS (SELECT 1 FROM group_members WHERE user_id = $1 AND group_id = $2 AND entry_id = $3)
 `
 
-type GroupPreviewsParams struct {
+type HasMemberParams struct {
 	UserID  int64
-	GroupID pgtype.Int8
-}
-
-type GroupPreviewsRow struct {
 	GroupID int64
-	Images  []byte
+	EntryID int64
 }
 
-// Up to four card images for each of the user's groups (or the one with group_id): its most
-// valuable cards', each card once.
-func (q *Queries) GroupPreviews(ctx context.Context, arg GroupPreviewsParams) ([]GroupPreviewsRow, error) {
-	rows, err := q.db.Query(ctx, groupPreviews, arg.UserID, arg.GroupID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GroupPreviewsRow
-	for rows.Next() {
-		var i GroupPreviewsRow
-		if err := rows.Scan(&i.GroupID, &i.Images); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) HasMember(ctx context.Context, arg HasMemberParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasMember, arg.UserID, arg.GroupID, arg.EntryID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const listGroups = `-- name: ListGroups :many
+WITH totals AS (
+    SELECT m.group_id,
+           sum(m.quantity)::integer AS card_count,
+           sum(line_value(p.unit_price, m.quantity))::numeric AS value_eur,
+           coalesce(sum(m.quantity) FILTER (WHERE p.unit_price IS NULL), 0)::integer AS unpriced_count
+      FROM group_members m
+      JOIN entry_prices p ON p.id = m.entry_id
+     WHERE m.user_id = $1
+       AND ($2::bigint IS NULL OR m.group_id = $2::bigint)
+     GROUP BY m.group_id
+), previews AS (
+    SELECT r.group_id, array_agg(r.small ORDER BY r.rank) AS images
+      FROM (SELECT d.group_id, d.small,
+                   row_number() OVER (PARTITION BY d.group_id
+                                      ORDER BY d.unit_price DESC NULLS LAST, d.added_at, d.card_id) AS rank
+              FROM (SELECT DISTINCT ON (m.group_id, p.card_id)
+                           m.group_id, p.card_id, c.images ->> 'small' AS small, p.unit_price, m.added_at
+                      FROM group_members m
+                      JOIN entry_prices p ON p.id = m.entry_id
+                      JOIN cards c ON c.id = p.card_id
+                     WHERE m.user_id = $1
+                       AND ($2::bigint IS NULL OR m.group_id = $2::bigint)
+                       AND c.images ->> 'small' <> ''
+                     ORDER BY m.group_id, p.card_id, p.unit_price DESC NULLS LAST, m.added_at) d) r
+     WHERE r.rank <= 4
+     GROUP BY r.group_id
+)
 SELECT g.id, g.name, g.kind, g.description,
-       coalesce(sum(m.quantity), 0)::integer AS card_count,
-       coalesce(sum(line_value(p.unit_price, m.quantity)), 0)::numeric AS value_eur,
-       coalesce(sum(m.quantity) FILTER (WHERE m.entry_id IS NOT NULL AND p.unit_price IS NULL), 0)::integer AS unpriced_count
+       coalesce(t.card_count, 0)::integer AS card_count,
+       coalesce(t.value_eur, 0)::numeric AS value_eur,
+       coalesce(t.unpriced_count, 0)::integer AS unpriced_count,
+       coalesce(pv.images, '{}')::text[] AS preview_images
   FROM custom_groups g
-  LEFT JOIN group_members m ON m.group_id = g.id
-  LEFT JOIN entry_prices p ON p.id = m.entry_id
+  LEFT JOIN totals t ON t.group_id = g.id
+  LEFT JOIN previews pv ON pv.group_id = g.id
  WHERE g.user_id = $1
    AND ($2::bigint IS NULL OR g.id = $2::bigint)
- GROUP BY g.id
  ORDER BY g.name COLLATE "unicode", g.id
 `
 
@@ -199,10 +202,13 @@ type ListGroupsRow struct {
 	CardCount     int32
 	ValueEur      pgtype.Numeric
 	UnpricedCount int32
+	PreviewImages []string
 }
 
-// The user's groups (or the one with group_id), by name, with their totals: of the copies in
-// each, priced as the collection's are.
+// The user's groups (or the one with group_id), by name, with their totals (of the copies in
+// each, priced as the collection's are) and previews: the small images of up to four of its
+// cards, most valuable first, each card once. Totals and previews are worked out for all the
+// groups at once, not group by group, which would read the user's entries once per group.
 func (q *Queries) ListGroups(ctx context.Context, arg ListGroupsParams) ([]ListGroupsRow, error) {
 	rows, err := q.db.Query(ctx, listGroups, arg.UserID, arg.GroupID)
 	if err != nil {
@@ -220,6 +226,7 @@ func (q *Queries) ListGroups(ctx context.Context, arg ListGroupsParams) ([]ListG
 			&i.CardCount,
 			&i.ValueEur,
 			&i.UnpricedCount,
+			&i.PreviewImages,
 		); err != nil {
 			return nil, err
 		}
@@ -253,32 +260,37 @@ const setMember = `-- name: SetMember :one
 WITH entry AS (
     SELECT e.id, e.quantity
       FROM collection_entries e
-     WHERE e.id = $4 AND e.user_id = $3
+     WHERE e.id = $5 AND e.user_id = $3
        FOR SHARE
 )
 INSERT INTO group_members AS m (group_id, entry_id, user_id, quantity)
 SELECT g.id, entry.id, g.user_id, $1
   FROM entry, custom_groups g
  WHERE g.id = $2 AND g.user_id = $3 AND entry.quantity >= $1::integer
+   AND ((SELECT count(*) FROM group_members c WHERE c.user_id = $3) < $4::integer
+        OR EXISTS (SELECT 1 FROM group_members x WHERE x.group_id = $2 AND x.entry_id = $5))
 ON CONFLICT (group_id, entry_id) DO UPDATE SET quantity = excluded.quantity
 RETURNING (xmax = 0)::boolean AS created
 `
 
 type SetMemberParams struct {
-	Quantity int32
-	GroupID  int64
-	UserID   int64
-	EntryID  int64
+	Quantity   int32
+	GroupID    int64
+	UserID     int64
+	MaxMembers int32
+	EntryID    int64
 }
 
 // Puts quantity copies of one of the user's entries in one of their groups (or sets how many
 // are there). Reads the entry FOR SHARE first, so a change to its quantity can't slip in
-// between. No row when there's no such group or entry, or the entry has fewer copies.
+// between. No row when there's no such group or entry, the entry has fewer copies, or it
+// would be a new member and the user already has max_members (approximate, as max_groups).
 func (q *Queries) SetMember(ctx context.Context, arg SetMemberParams) (bool, error) {
 	row := q.db.QueryRow(ctx, setMember,
 		arg.Quantity,
 		arg.GroupID,
 		arg.UserID,
+		arg.MaxMembers,
 		arg.EntryID,
 	)
 	var created bool
@@ -287,19 +299,23 @@ func (q *Queries) SetMember(ctx context.Context, arg SetMemberParams) (bool, err
 }
 
 const updateGroup = `-- name: UpdateGroup :one
-UPDATE custom_groups SET name = $1, kind = $2, description = $3
+UPDATE custom_groups
+   SET name = coalesce($1, name),
+       kind = coalesce($2, kind),
+       description = coalesce($3, description)
  WHERE user_id = $4 AND id = $5
 RETURNING id
 `
 
 type UpdateGroupParams struct {
-	Name        string
-	Kind        string
-	Description string
+	Name        pgtype.Text
+	Kind        pgtype.Text
+	Description pgtype.Text
 	UserID      int64
 	ID          int64
 }
 
+// Changes only what's given, so two changes at once don't undo each other.
 func (q *Queries) UpdateGroup(ctx context.Context, arg UpdateGroupParams) (int64, error) {
 	row := q.db.QueryRow(ctx, updateGroup,
 		arg.Name,

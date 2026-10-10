@@ -2,7 +2,6 @@ package collection
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -25,8 +24,12 @@ var (
 	ErrMemberNotFound = apperr.New(apperr.NotFound, "that entry isn't in this group")
 )
 
-// How many card images a group's preview has, at most.
-const previewImages = 4
+func (s *Service) maxMembers() int {
+	if s.MaxMembers > 0 {
+		return s.MaxMembers
+	}
+	return contract.MaxMembers
+}
 
 func (s *Service) maxGroups() int {
 	if s.MaxGroups > 0 {
@@ -62,32 +65,18 @@ func (s *Service) group(ctx context.Context, userID, id int64) (contract.CustomG
 }
 
 // customGroups returns the user's groups (or the one only names), with their totals and
-// previews: built here from the cards' stored images, never from anything a client sent.
+// previews: the stored small images of their cards, never anything a client sent.
 func (s *Service) customGroups(ctx context.Context, userID int64, only pgtype.Int8) ([]contract.CustomGroup, error) {
 	rows, err := s.q().ListGroups(ctx, store.ListGroupsParams{UserID: userID, GroupID: only})
 	if err != nil {
 		return nil, db.Error(ctx, "list groups", err)
-	}
-	previews, err := s.q().GroupPreviews(ctx, store.GroupPreviewsParams{UserID: userID, GroupID: only})
-	if err != nil {
-		return nil, db.Error(ctx, "group previews", err)
-	}
-	images := map[int64][]string{}
-	for _, p := range previews {
-		var img contract.CardImages
-		if err := json.Unmarshal(p.Images, &img); err != nil {
-			return nil, err
-		}
-		if img.Small != "" && len(images[p.GroupID]) < previewImages {
-			images[p.GroupID] = append(images[p.GroupID], img.Small)
-		}
 	}
 	groups := make([]contract.CustomGroup, len(rows))
 	for i, r := range rows {
 		groups[i] = contract.CustomGroup{
 			ValueTotal: contract.ValueTotal{CardCount: int(r.CardCount), UnpricedCount: int(r.UnpricedCount)},
 			ID:         r.ID, Name: r.Name, Kind: contract.CustomGroupKind(r.Kind), Description: r.Description,
-			PreviewImages: images[r.ID],
+			PreviewImages: r.PreviewImages,
 		}
 		if v := cards.Number(r.ValueEur); v != nil {
 			groups[i].ValueEUR = *v
@@ -124,34 +113,36 @@ func (s *Service) ChangeGroup(ctx context.Context, userID, id int64, c contract.
 	if c == (contract.GroupChange{}) {
 		return contract.CustomGroup{}, invalid("give at least one of name, kind and description to change")
 	}
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
-	defer cancel()
-	cur, err := s.group(ctx, userID, id)
-	if err != nil {
-		return contract.CustomGroup{}, err
-	}
-	next := contract.NewGroup{Name: cur.Name, Kind: cur.Kind, Description: cur.Description}
+	// Only what's given is checked and written, so two changes at once don't undo each other.
+	next := store.UpdateGroupParams{UserID: userID, ID: id}
 	if c.Name != nil {
-		next.Name = *c.Name
+		name, err := checkName(*c.Name)
+		if err != nil {
+			return contract.CustomGroup{}, err
+		}
+		next.Name = pgtype.Text{String: name, Valid: true}
 	}
 	if c.Kind != nil {
-		next.Kind = *c.Kind
+		if err := checkEnum(*c.Kind); err != nil {
+			return contract.CustomGroup{}, invalid("%s", err)
+		}
+		next.Kind = pgtype.Text{String: string(*c.Kind), Valid: true}
 	}
 	if c.Description != nil {
-		next.Description = *c.Description
+		description, err := checkDescription(*c.Description)
+		if err != nil {
+			return contract.CustomGroup{}, err
+		}
+		next.Description = pgtype.Text{String: description, Valid: true}
 	}
-	name, description, err := checkGroup(next.Name, next.Kind, next.Description)
-	if err != nil {
-		return contract.CustomGroup{}, err
-	}
-	_, err = s.q().UpdateGroup(ctx, store.UpdateGroupParams{
-		UserID: userID, ID: id, Name: name, Kind: string(next.Kind), Description: description,
-	})
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+	_, err := s.q().UpdateGroup(ctx, next)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return contract.CustomGroup{}, ErrGroupNotFound // deleted meanwhile
+		return contract.CustomGroup{}, ErrGroupNotFound
 	}
 	if err != nil {
-		return contract.CustomGroup{}, groupWriteError(ctx, name, err)
+		return contract.CustomGroup{}, groupWriteError(ctx, next.Name.String, err)
 	}
 	return s.group(ctx, userID, id)
 }
@@ -217,10 +208,10 @@ func (s *Service) SetMember(ctx context.Context, userID, groupID, entryID int64,
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 	created, err := s.q().SetMember(ctx, store.SetMemberParams{
-		UserID: userID, GroupID: groupID, EntryID: entryID, Quantity: int32(quantity),
+		UserID: userID, GroupID: groupID, EntryID: entryID, Quantity: int32(quantity), MaxMembers: int32(s.maxMembers()),
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return contract.GroupMember{}, false, s.whyNotSet(ctx, userID, groupID, entryID)
+		return contract.GroupMember{}, false, s.whyNotSet(ctx, userID, groupID, entryID, quantity)
 	}
 	if err != nil {
 		return contract.GroupMember{}, false, db.Error(ctx, "set member", err)
@@ -229,9 +220,9 @@ func (s *Service) SetMember(ctx context.Context, userID, groupID, entryID int64,
 	return m, created, err
 }
 
-// whyNotSet says why SetMember set nothing: there's no such group or entry, or the entry has
-// fewer copies.
-func (s *Service) whyNotSet(ctx context.Context, userID, groupID, entryID int64) error {
+// whyNotSet says why SetMember set nothing: there's no such group or entry, the entry has
+// fewer copies, or the user has as many members as they can.
+func (s *Service) whyNotSet(ctx context.Context, userID, groupID, entryID int64, quantity int) error {
 	if err := s.ownGroup(ctx, userID, groupID); err != nil {
 		return err
 	}
@@ -242,7 +233,23 @@ func (s *Service) whyNotSet(ctx context.Context, userID, groupID, entryID int64)
 	if err != nil {
 		return db.Error(ctx, "find entry", err)
 	}
-	return invalid("that entry has %d copies, so the group can hold 1 to %d of them", have, have)
+	if int(have) < quantity {
+		return invalid("that entry has %d copies, so the group can hold 1 to %d of them", have, have)
+	}
+	return s.whyNotGrouped(ctx, s.q(), userID, groupID)
+}
+
+// whyNotGrouped says why an entry that's the user's couldn't join one of their groups: the
+// group is gone, or the user has as many members as they can.
+func (s *Service) whyNotGrouped(ctx context.Context, q *store.Queries, userID, groupID int64) error {
+	ok, err := q.GroupExists(ctx, store.GroupExistsParams{UserID: userID, ID: groupID})
+	if err != nil {
+		return db.Error(ctx, "find group", err)
+	}
+	if !ok {
+		return invalid("there's no group with that id")
+	}
+	return invalid("your groups hold %d entries between them, the most they can; take some out to put others in", s.maxMembers())
 }
 
 // RemoveMember takes an entry out of a group. It stays in the collection.
@@ -302,25 +309,39 @@ func toMember(r store.ListingRow, v store.CardListing) (contract.GroupMember, er
 // checkGroup checks a group's name, kind and description, and returns the name and
 // description to store: with spaces trimmed from their ends.
 func checkGroup(name string, kind contract.CustomGroupKind, description string) (string, string, error) {
-	name, description = strings.TrimSpace(name), strings.TrimSpace(description)
-	switch n := utf8.RuneCountInString(name); {
-	case n == 0:
-		return "", "", invalid("give the group a name")
-	case n > contract.MaxGroupNameLength:
-		return "", "", invalid("a group's name can't be longer than %d characters", contract.MaxGroupNameLength)
-	case !plainText(name, false):
-		return "", "", invalid("a group's name can only have printable characters")
+	name, err := checkName(name)
+	if err != nil {
+		return "", "", err
 	}
 	if err := checkEnum(kind); err != nil {
 		return "", "", invalid("%s", err)
 	}
+	description, err = checkDescription(description)
+	return name, description, err
+}
+
+func checkName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	switch n := utf8.RuneCountInString(name); {
+	case n == 0:
+		return "", invalid("give the group a name")
+	case n > contract.MaxGroupNameLength:
+		return "", invalid("a group's name can't be longer than %d characters", contract.MaxGroupNameLength)
+	case !plainText(name, false):
+		return "", invalid("a group's name can only have printable characters")
+	}
+	return name, nil
+}
+
+func checkDescription(description string) (string, error) {
+	description = strings.TrimSpace(description)
 	if utf8.RuneCountInString(description) > contract.MaxGroupDescriptionLength {
-		return "", "", invalid("a group's description can't be longer than %d characters", contract.MaxGroupDescriptionLength)
+		return "", invalid("a group's description can't be longer than %d characters", contract.MaxGroupDescriptionLength)
 	}
 	if !plainText(description, true) {
-		return "", "", invalid("a group's description can only have printable characters and line breaks")
+		return "", invalid("a group's description can only have printable characters and line breaks")
 	}
-	return name, description, nil
+	return description, nil
 }
 
 // plainText reports whether s is valid UTF-8 with no control characters (Postgres can't

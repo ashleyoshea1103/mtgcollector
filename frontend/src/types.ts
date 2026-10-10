@@ -331,6 +331,11 @@ export const MaxGroupDescriptionLength = 1000;
  */
 export const MaxGroups = 500;
 /**
+ * The most group members (an entry in a group) one user can have, over all their groups: it
+ * bounds the work of listing the groups, which totals every member.
+ */
+export const MaxMembers = 100_000;
+/**
  * Totals for the whole collection. Values are EUR only: Cardmarket is the reference market.
  */
 export interface CollectionStats extends ValueTotal {

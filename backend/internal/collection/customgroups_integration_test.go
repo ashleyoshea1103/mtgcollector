@@ -4,6 +4,7 @@ package collection
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -109,6 +110,29 @@ func TestAUserHasAtMostMaxGroups(t *testing.T) {
 	}
 }
 
+// Each group's totals are its own members'.
+func TestEachGroupsTotalsAreItsOwn(t *testing.T) {
+	f := newFixture(t)
+	a, b, empty := f.group(t, f.ann, "A"), f.group(t, f.ann, "B"), f.group(t, f.ann, "C")
+	bolt := f.add(t, f.ann, newEntry(f.card(t, testCard{eur: euros(2)}), 4))
+	elves := f.add(t, f.ann, newEntry(f.card(t, testCard{}), 3)) // no price
+	f.member(t, f.ann, a.ID, bolt.ID, 4)
+	f.member(t, f.ann, b.ID, bolt.ID, 1)
+	f.member(t, f.ann, b.ID, elves.ID, 2)
+	list, err := f.s.ListGroups(t.Context(), f.ann)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[int64]contract.ValueTotal{
+		a.ID: {CardCount: 4, ValueEUR: 8}, b.ID: {CardCount: 3, ValueEUR: 2, UnpricedCount: 2}, empty.ID: {},
+	}
+	for _, g := range list.Groups {
+		if g.ValueTotal != want[g.ID] {
+			t.Errorf("%s: totals %+v, want %+v", g.Name, g.ValueTotal, want[g.ID])
+		}
+	}
+}
+
 func TestListingGroups(t *testing.T) {
 	f := newFixture(t)
 	for _, name := range []string{"zebra deck", "Æther binder", "aether box", "Bulk"} {
@@ -146,6 +170,11 @@ func TestChangingAGroup(t *testing.T) {
 	got, _ = f.s.ChangeGroup(t.Context(), f.ann, g.ID, contract.GroupChange{Name: &only})
 	if got.Kind != deck || got.Description != desc {
 		t.Errorf("changing only the name changed more: %+v", got)
+	}
+	box := contract.CustomGroupKindBox
+	got, _ = f.s.ChangeGroup(t.Context(), f.ann, g.ID, contract.GroupChange{Kind: &box})
+	if got.Name != only || got.Description != desc || got.Kind != box {
+		t.Errorf("changing only the kind = %+v", got)
 	}
 	taken, blank, bad := "deck", " ", contract.CustomGroupKind("cube")
 	if _, err := f.s.ChangeGroup(t.Context(), f.ann, g.ID, contract.GroupChange{Name: &taken}); apperr.KindOf(err) != apperr.Conflict {
@@ -528,5 +557,140 @@ func TestMembersAndTheirEntryChangingAtOnce(t *testing.T) {
 		`SELECT count(*) FROM group_members m JOIN collection_entries e ON e.id = m.entry_id WHERE m.quantity > e.quantity`).Scan(&over)
 	if over != 0 {
 		t.Errorf("%d members hold more copies than their entry", over)
+	}
+}
+
+func TestAUserHasAtMostMaxMembers(t *testing.T) {
+	f := newFixture(t)
+	f.s.MaxMembers = 2
+	a, b := f.group(t, f.ann, "A"), f.group(t, f.ann, "B")
+	e1, e2 := f.add(t, f.ann, newEntry(f.card(t, testCard{}), 3)), f.add(t, f.ann, newEntry(f.card(t, testCard{}), 3))
+	f.member(t, f.ann, a.ID, e1.ID, 1)
+	f.member(t, f.ann, b.ID, e1.ID, 1) // the limit is over all groups
+	_, _, err := f.s.SetMember(t.Context(), f.ann, a.ID, e2.ID, 1)
+	if !isInputError(err) || !strings.Contains(err.Error(), "the most they can") {
+		t.Errorf("a third member = %v, want the limit", err)
+	}
+	// Changing a member there is fine.
+	if m, _, err := f.s.SetMember(t.Context(), f.ann, a.ID, e1.ID, 3); err != nil || m.Quantity != 3 {
+		t.Errorf("changing a member at the limit = %+v, %v", m, err)
+	}
+	// Cards added straight to a group at the limit: refused, and not added to the collection either.
+	card := f.card(t, testCard{})
+	e := newEntry(card, 1)
+	e.GroupID = &a.ID
+	if _, _, err := f.s.Add(t.Context(), f.ann, e); !isInputError(err) || !strings.Contains(err.Error(), "the most they can") {
+		t.Errorf("adding to a group at the limit = %v, want the limit", err)
+	}
+	if page, _ := f.s.Entries(t.Context(), f.ann, EntryQuery{}); len(page.Entries) != 2 {
+		t.Errorf("Ann has %d entries after the refused add, want 2: the entry was added without its group", len(page.Entries))
+	}
+	// More copies of an entry already in the group are fine at the limit.
+	more := newEntry(e1.Card.ID, 1)
+	more.GroupID = &a.ID
+	if _, _, err := f.s.Add(t.Context(), f.ann, more); err != nil {
+		t.Errorf("adding copies of a member at the limit: %v", err)
+	}
+	// Bob's limit is his own.
+	bobs := f.group(t, f.bob, "Bob's")
+	f.member(t, f.bob, bobs.ID, f.add(t, f.bob, newEntry(card, 1)).ID, 1)
+	if (&Service{Pool: f.pool}).maxMembers() != contract.MaxMembers {
+		t.Error("the default limit isn't contract.MaxMembers")
+	}
+}
+
+// Changes of different things at the same moment both stay: each writes only what it changes.
+func TestChangesAtOnceDontUndoEachOther(t *testing.T) {
+	f := newFixture(t)
+	g := f.group(t, f.ann, "Binder")
+	e := f.add(t, f.ann, newEntry(f.card(t, testCard{}), 1))
+	for i := range 20 {
+		name, desc := fmt.Sprintf("Binder %d", i), fmt.Sprintf("Version %d", i)
+		q, cond := 1+i%9, []contract.Condition{contract.ConditionNM, contract.ConditionEX}[i%2]
+		var wg sync.WaitGroup
+		wg.Go(func() { f.s.ChangeGroup(t.Context(), f.ann, g.ID, contract.GroupChange{Name: &name}) })
+		wg.Go(func() { f.s.ChangeGroup(t.Context(), f.ann, g.ID, contract.GroupChange{Description: &desc}) })
+		wg.Go(func() { f.s.Change(t.Context(), f.ann, e.ID, contract.EntryChange{Quantity: &q}) })
+		wg.Go(func() { f.s.Change(t.Context(), f.ann, e.ID, contract.EntryChange{Condition: &cond}) })
+		wg.Wait()
+		got, _ := f.s.Group(t.Context(), f.ann, g.ID)
+		entry, _ := f.s.get(t.Context(), f.ann, e.ID)
+		if got.Name != name || got.Description != desc || entry.Quantity != q || entry.Condition != cond {
+			t.Fatalf("round %d: group %q / %q, entry %d %s; want %q / %q, %d %s", i, got.Name, got.Description, entry.Quantity, entry.Condition, name, desc, q, cond)
+		}
+	}
+}
+
+// Group names clash whatever their case, by Unicode's rules rather than the database's.
+func TestGroupNamesClashInAnyCase(t *testing.T) {
+	f := newFixture(t)
+	f.group(t, f.ann, "Älteste Karten")
+	for _, name := range []string{"älteste karten", "ÄLTESTE KARTEN"} {
+		if _, err := f.s.CreateGroup(t.Context(), f.ann, contract.NewGroup{Name: name, Kind: "box"}); apperr.KindOf(err) != apperr.Conflict {
+			t.Errorf("%q = %v, want a conflict with \"Älteste Karten\"", name, err)
+		}
+	}
+}
+
+// A card whose images have no small one is skipped, and the next card's shown instead.
+func TestPreviewsSkipCardsWithNoSmallImage(t *testing.T) {
+	f := newFixture(t)
+	g := f.group(t, f.ann, "Binder")
+	var smalls []string
+	for i, price := range []float64{9, 8, 7, 6, 5} {
+		c := f.card(t, testCard{eur: euros(price)})
+		if i == 0 {
+			if _, err := f.pool.Exec(t.Context(), `UPDATE cards SET images = images || '{"small": ""}' WHERE id = $1`, c); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			smalls = append(smalls, smallImage(c))
+		}
+		f.member(t, f.ann, g.ID, f.add(t, f.ann, newEntry(c, 1)).ID, 1)
+	}
+	if got, _ := f.s.Group(t.Context(), f.ann, g.ID); !slices.Equal(got.PreviewImages, smalls) {
+		t.Errorf("previews = %q, want the four cards with small images: %q", got.PreviewImages, smalls)
+	}
+}
+
+// An entry stays in its groups when its finish, condition or language changes, and when a
+// change is refused as a clash with another entry.
+func TestMembershipsOutliveChangesToTheirEntry(t *testing.T) {
+	f := newFixture(t)
+	g := f.group(t, f.ann, "Binder")
+	card := f.card(t, testCard{finishes: []string{"nonfoil", "foil"}})
+	e := f.add(t, f.ann, newEntry(card, 2))
+	f.member(t, f.ann, g.ID, e.ID, 2)
+	foil, ex, de := contract.FinishFoil, contract.ConditionEX, contract.LanguageGerman
+	if _, err := f.s.Change(t.Context(), f.ann, e.ID, contract.EntryChange{Finish: &foil, Condition: &ex, Language: &de}); err != nil {
+		t.Fatal(err)
+	}
+	if m, err := f.s.member(t.Context(), f.ann, g.ID, e.ID); err != nil || m.Quantity != 2 || m.Entry.Finish != foil {
+		t.Errorf("after the change, member = %+v, %v", m, err)
+	}
+	f.add(t, f.ann, newEntry(card, 1)) // nonfoil NM en
+	nonfoil, nm, en := contract.FinishNonfoil, contract.ConditionNM, contract.LanguageEnglish
+	if _, err := f.s.Change(t.Context(), f.ann, e.ID, contract.EntryChange{Finish: &nonfoil, Condition: &nm, Language: &en}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("a clashing change = %v, want ErrConflict", err)
+	}
+	if m, err := f.s.member(t.Context(), f.ann, g.ID, e.ID); err != nil || m.Quantity != 2 {
+		t.Errorf("after the refused change, member = %+v, %v", m, err)
+	}
+}
+
+// Deleting a user deletes their groups and members (and leaves everyone else's).
+func TestDeletingAUserDeletesTheirGroups(t *testing.T) {
+	f := newFixture(t)
+	g := f.group(t, f.ann, "Binder")
+	f.member(t, f.ann, g.ID, f.add(t, f.ann, newEntry(f.card(t, testCard{}), 1)).ID, 1)
+	bobs := f.group(t, f.bob, "Bob's")
+	f.member(t, f.bob, bobs.ID, f.add(t, f.bob, newEntry(f.card(t, testCard{}), 1)).ID, 1)
+	if _, err := f.pool.Exec(t.Context(), `DELETE FROM users WHERE id = $1`, f.ann); err != nil {
+		t.Fatal(err)
+	}
+	var groups, members int
+	f.pool.QueryRow(t.Context(), `SELECT (SELECT count(*) FROM custom_groups), (SELECT count(*) FROM group_members)`).Scan(&groups, &members)
+	if groups != 1 || members != 1 {
+		t.Errorf("%d groups and %d members left, want Bob's one of each", groups, members)
 	}
 }

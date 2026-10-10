@@ -38,10 +38,17 @@ SELECT e.quantity, e.finish, e.condition, e.language, c.finishes
  WHERE e.user_id = @user_id AND e.id = @id;
 
 -- name: UpdateEntry :one
-UPDATE collection_entries
-   SET quantity = @quantity, finish = @finish, condition = @condition, language = @language
- WHERE user_id = @user_id AND id = @id
-RETURNING id;
+-- Changes only what's given, so two changes at once don't undo each other. No row when there's
+-- no such entry, or its card doesn't come in the finish given.
+UPDATE collection_entries e
+   SET quantity = coalesce(sqlc.narg(quantity)::integer, e.quantity),
+       finish = coalesce(sqlc.narg(finish)::text, e.finish),
+       condition = coalesce(sqlc.narg(condition)::text, e.condition),
+       language = coalesce(sqlc.narg(language)::text, e.language)
+ WHERE e.user_id = @user_id AND e.id = @id
+   AND (sqlc.narg(finish)::text IS NULL
+        OR EXISTS (SELECT 1 FROM cards c WHERE c.id = e.card_id AND sqlc.narg(finish)::text = ANY (c.finishes)))
+RETURNING e.id;
 
 -- name: DeleteEntry :execrows
 DELETE FROM collection_entries WHERE user_id = @user_id AND id = @id;

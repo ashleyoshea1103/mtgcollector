@@ -9,8 +9,9 @@ CREATE TABLE custom_groups (
     created_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (id, user_id) -- for group_members' foreign key, which makes a member its group's owner's
 );
--- One group of a name per user, whatever its case.
-CREATE UNIQUE INDEX custom_groups_user_name ON custom_groups (user_id, lower(name));
+-- One group of a name per user, whatever its case: lowered by Unicode's rules (the "unicode"
+-- collation), not the database's, which may only lower A to Z.
+CREATE UNIQUE INDEX custom_groups_user_name ON custom_groups (user_id, lower(name COLLATE "unicode"));
 
 ALTER TABLE collection_entries ADD CONSTRAINT collection_entries_id_user_id UNIQUE (id, user_id);
 
@@ -29,6 +30,7 @@ CREATE TABLE group_members (
     FOREIGN KEY (entry_id, user_id) REFERENCES collection_entries (id, user_id) ON DELETE CASCADE
 );
 CREATE INDEX group_members_entry_id ON group_members (entry_id);
+CREATE INDEX group_members_user_id ON group_members (user_id); -- counting a user's (contract.MaxMembers)
 
 -- A member never holds more copies than its entry has. Setting a member reads its entry FOR
 -- SHARE, so it waits for a change to the entry to commit and sees the new quantity; and
