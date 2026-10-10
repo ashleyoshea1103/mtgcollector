@@ -20,6 +20,28 @@ export const ConditionLP = "LP";
 export const ConditionPL = "PL";
 export const ConditionPO = "PO";
 export type Condition = typeof ConditionMT | typeof ConditionNM | typeof ConditionEX | typeof ConditionGD | typeof ConditionLP | typeof ConditionPL | typeof ConditionPO;
+/**
+ * The languages Scryfall prints cards in (https://scryfall.com/docs/api/languages).
+ */
+export const LanguageEnglish = "en";
+export const LanguageGerman = "de";
+export const LanguageFrench = "fr";
+export const LanguageItalian = "it";
+export const LanguageSpanish = "es";
+export const LanguagePortuguese = "pt";
+export const LanguageJapanese = "ja";
+export const LanguageKorean = "ko";
+export const LanguageRussian = "ru";
+export const LanguageSimplifiedChinese = "zhs";
+export const LanguageTraditionalChinese = "zht";
+export const LanguageHebrew = "he";
+export const LanguageLatin = "la";
+export const LanguageAncientGreek = "grc";
+export const LanguageArabic = "ar";
+export const LanguageSanskrit = "sa";
+export const LanguagePhyrexian = "ph";
+export const LanguageQuenya = "qya";
+export type Language = typeof LanguageEnglish | typeof LanguageGerman | typeof LanguageFrench | typeof LanguageItalian | typeof LanguageSpanish | typeof LanguagePortuguese | typeof LanguageJapanese | typeof LanguageKorean | typeof LanguageRussian | typeof LanguageSimplifiedChinese | typeof LanguageTraditionalChinese | typeof LanguageHebrew | typeof LanguageLatin | typeof LanguageAncientGreek | typeof LanguageArabic | typeof LanguageSanskrit | typeof LanguagePhyrexian | typeof LanguageQuenya;
 export const RarityCommon = "common";
 export const RarityUncommon = "uncommon";
 export const RarityRare = "rare";
@@ -160,7 +182,7 @@ export interface CollectionEntry {
   quantity: number /* int */;
   finish: Finish;
   condition: Condition;
-  language: string;
+  language: Language;
   added_at: string;
   /**
    * EUR price of one copy in this finish, set by the server; null when there's no price.
@@ -215,6 +237,13 @@ export interface GroupSummary extends ValueTotal {
    * Number of collection entries (distinct printing/finish/condition/language rows).
    */
   entry_count: number /* int */;
+}
+/**
+ * GET /api/collection/groups: the collection's groups, in order, for one way of grouping.
+ */
+export interface CollectionGroups {
+  group_by: GroupBy;
+  groups: GroupSummary[];
 }
 /**
  * One page of collection entries; pass next_cursor back to get the next page.
@@ -288,9 +317,22 @@ export interface NewEntry {
   quantity: number /* int */;
   finish: Finish;
   condition: Condition;
-  language: string;
+  language: Language;
   group_id: number | null;
 }
+/**
+ * PATCH /api/collection/entries/{id}: what to change about an entry. Leave out what stays.
+ */
+export interface EntryChange {
+  quantity?: number /* int */;
+  finish?: Finish;
+  condition?: Condition;
+  language?: Language;
+}
+/**
+ * The most copies one entry can hold.
+ */
+export const MaxQuantity = 999;
 /**
  * The signed-in user: GET /api/auth/me, and the reply to signing up or logging in.
  */

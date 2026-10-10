@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { CONDITIONS, FINISHES, labelFor, LANGUAGES } from '../lib/labels';
 import { defaultFinish } from '../lib/price';
 import { MAX_QUANTITY, parseQuantity } from '../lib/quantity';
-import type { CardSummary, Condition, CustomGroup, Finish, NewEntry } from '../types';
+import type { CardSummary, Condition, CustomGroup, Finish, Language, NewEntry } from '../types';
 import { Button, Field, NumberInput, Select } from '../ui';
 import { Price } from './Price';
 import { SetSymbol } from './SetSymbol';
@@ -15,24 +15,28 @@ interface Props {
 }
 
 const CONDITION_OPTIONS = Object.entries(CONDITIONS).map(([code, label]) => ({ value: code as Condition, label: `${code}: ${label}` }));
-const LANGUAGE_OPTIONS = Object.entries(LANGUAGES).map(([code, label]) => ({ value: code, label }));
+const LANGUAGE_OPTIONS = Object.entries(LANGUAGES).map(([code, label]) => ({ value: code as Language, label }));
+
+function isLanguage(code: string): code is Language {
+  return Object.hasOwn(LANGUAGES, code);
+}
 
 /** Collects quantity, finish, condition, language and an optional group for one printing. */
 export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = false }: Props) {
   // Quantity, finish and language belong to the printing being added: they start from
   // its defaults and are forgotten when the form is given another card. Condition and
   // group stay as they are, so sorting a pile into one binder keeps those settings.
-  const [choice, setChoice] = useState<{ cardId: string; quantity?: string; finish?: Finish; language?: string }>({
+  const [choice, setChoice] = useState<{ cardId: string; quantity?: string; finish?: Finish; language?: Language }>({
     cardId: card.id,
   });
   const chosen = choice.cardId === card.id ? choice : { cardId: card.id };
   // Kept as typed so the field can be cleared and retyped; parsed and clamped on submit.
   const quantity = chosen.quantity ?? '1';
   const finish = chosen.finish && card.finishes.includes(chosen.finish) ? chosen.finish : defaultFinish(card);
-  const language = chosen.language ?? (Object.hasOwn(LANGUAGES, card.lang) ? card.lang : 'en');
+  const language = chosen.language ?? (isLanguage(card.lang) ? card.lang : 'en');
   const setQuantity = (q: string) => setChoice({ ...chosen, quantity: q });
   const setFinish = (f: Finish) => setChoice({ ...chosen, finish: f });
-  const setLanguage = (l: string) => setChoice({ ...chosen, language: l });
+  const setLanguage = (l: Language) => setChoice({ ...chosen, language: l });
   const [condition, setCondition] = useState<Condition>('NM');
   const [chosenGroupId, setGroupId] = useState<number | null>(null);
   // Likewise the chosen group may have been deleted since it was picked.

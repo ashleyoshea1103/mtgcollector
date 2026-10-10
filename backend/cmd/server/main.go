@@ -32,6 +32,7 @@ import (
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/api"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/auth"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/collection"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/scryfall"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
@@ -122,7 +123,7 @@ func run(ctx context.Context, cfg config) error {
 	q := store.New(pool)
 	accounts := auth.NewService(q)
 	handler := web.AllowHosts(cfg.AllowedHosts, web.New(api.NewHandler(api.Services{
-		DB: pool, Cards: &cards.Searcher{Q: q}, Auth: accounts,
+		DB: pool, Cards: &cards.Searcher{Q: q}, Auth: accounts, Collection: &collection.Service{Q: q},
 	}), static))
 
 	background := func(ctx context.Context) {

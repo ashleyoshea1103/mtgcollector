@@ -96,8 +96,8 @@ func TestTheLongestCardNameCanBeSearched(t *testing.T) {
 
 func TestParseIDAcceptsScryfallIDs(t *testing.T) {
 	for _, id := range []string{"0b8fe8b3-0000-4000-8000-000000000000", "0B8FE8B3-ABCD-4000-8000-00000000000F"} {
-		if _, err := parseID(id); err != nil {
-			t.Errorf("parseID(%q): %v", id, err)
+		if _, err := ParseID(id); err != nil {
+			t.Errorf("ParseID(%q): %v", id, err)
 		}
 	}
 }

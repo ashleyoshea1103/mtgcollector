@@ -8,6 +8,7 @@ packages:
     enum_style: union
     exclude_files:
       - doc.go
+      - enums.go
     frontmatter: |
       // The JSON shapes the API sends and receives, generated from the Go structs in
       // backend/internal/contract. Edit those, then run `go generate ./...` in backend/.

@@ -47,7 +47,7 @@ describe('CollectionEntryTable', () => {
   });
 
   it('shows unknown or hostile codes from the server as-is instead of crashing', () => {
-    const odd = { ...entries.bolts, language: '__proto__', condition: 'constructor' as never };
+    const odd = { ...entries.bolts, language: '__proto__' as never, condition: 'constructor' as never };
     render(<CollectionEntryTable entries={[odd]} />);
     const cells = cellsByColumn(rowFor(odd.card.name));
     expect(cells.Language).toHaveTextContent('__proto__');

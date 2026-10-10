@@ -1,5 +1,7 @@
-/** Most copies one collection entry can hold. The server enforces the same limit. */
-export const MAX_QUANTITY = 999;
+import { MaxQuantity } from '../types';
+
+/** Most copies one collection entry can hold: the server's limit, from the contract. */
+export const MAX_QUANTITY = MaxQuantity;
 
 /** Parses a typed quantity: a whole number from 1 to MAX_QUANTITY; anything empty or invalid counts as 1. */
 export function parseQuantity(input: string): number {

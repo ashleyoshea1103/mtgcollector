@@ -1,4 +1,4 @@
-import type { Condition, CustomGroupKind, Finish, Rarity } from '../types';
+import type { Condition, CustomGroupKind, Finish, Language, Rarity } from '../types';
 
 export const CONDITIONS: Record<Condition, string> = {
   MT: 'Mint',
@@ -42,8 +42,8 @@ export const COLORS: Record<string, string> = {
   M: 'Multicolor',
 };
 
-/** Every language code Scryfall uses (https://scryfall.com/docs/api/languages). */
-export const LANGUAGES: Record<string, string> = {
+/** Every language code Scryfall uses (https://scryfall.com/docs/api/languages): the contract's Language. */
+export const LANGUAGES: Record<Language, string> = {
   en: 'English',
   de: 'German',
   fr: 'French',

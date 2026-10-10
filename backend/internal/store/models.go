@@ -98,6 +98,17 @@ type CardsStaging struct {
 	UpdatedAt       pgtype.Timestamptz
 }
 
+type CollectionEntry struct {
+	ID        int64
+	UserID    int64
+	CardID    pgtype.UUID
+	Quantity  int32
+	Finish    string
+	Condition string
+	Language  string
+	AddedAt   pgtype.Timestamptz
+}
+
 type ScryfallSync struct {
 	ID            int64
 	StartedAt     pgtype.Timestamptz

@@ -24,6 +24,8 @@ type Services struct {
 	DB    Pinger
 	Cards Cards
 	Auth  Auth
+	// The signed-in user's collection.
+	Collection Collection
 	// Limits on how often clients may call the API; nil means DefaultLimits().
 	Limits *Limits
 }
@@ -44,6 +46,12 @@ func NewHandler(s Services) http.Handler {
 	mux.Handle("POST /api/auth/login", limit(l.AuthPerClient, login(s.Auth, l.LoginFailures)))
 	mux.HandleFunc("POST /api/auth/logout", logout(s.Auth))
 	mux.HandleFunc("GET /api/auth/me", requireUser(s.Auth, me))
+	mux.HandleFunc("GET /api/collection/groups", requireUser(s.Auth, collectionGroups(s.Collection)))
+	mux.HandleFunc("GET /api/collection/entries", requireUser(s.Auth, collectionEntries(s.Collection)))
+	mux.HandleFunc("GET /api/collection/stats", requireUser(s.Auth, collectionStats(s.Collection)))
+	mux.HandleFunc("POST /api/collection/entries", requireUser(s.Auth, addEntry(s.Collection)))
+	mux.HandleFunc("PATCH /api/collection/entries/{id}", requireUser(s.Auth, changeEntry(s.Collection)))
+	mux.HandleFunc("DELETE /api/collection/entries/{id}", requireUser(s.Auth, deleteEntry(s.Collection)))
 	// Anything else under /api/ is a JSON 404, like every other API error.
 	// (GET only: a wrong method on a real route still gets 405.)
 	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, r *http.Request) {
