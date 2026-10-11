@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestDatabasesElsewhereNeedVerifiedTLS(t *testing.T) {
@@ -44,5 +45,16 @@ func TestOpenRefusesAnUnverifiedRemoteDatabase(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "sslmode=verify-full") {
 		t.Errorf("err = %v, want it to say what to use", err)
+	}
+}
+
+func TestConnectionsPlanEachQueryForItsParameters(t *testing.T) {
+	cfg, err := pgxpool.ParseConfig(DefaultURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	Configure(cfg)
+	if got := cfg.ConnConfig.RuntimeParams["plan_cache_mode"]; got != "force_custom_plan" {
+		t.Errorf("plan_cache_mode = %q, want force_custom_plan", got)
 	}
 }

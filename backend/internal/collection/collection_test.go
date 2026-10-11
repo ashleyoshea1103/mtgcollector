@@ -44,8 +44,8 @@ func TestKeys(t *testing.T) {
 	}
 }
 
-func row(id int64, name string, price, cmc string, added time.Time) store.EntryPrice {
-	r := store.EntryPrice{ID: id, Name: name, AddedAt: pgtype.Timestamptz{Time: added, Valid: true}}
+func row(id int64, name string, price, cmc string, added time.Time) store.ListingRow {
+	r := store.ListingRow{ID: id, Name: name, ListedAt: pgtype.Timestamptz{Time: added, Valid: true}}
 	if price != "" {
 		r.UnitPrice.Scan(price)
 	}

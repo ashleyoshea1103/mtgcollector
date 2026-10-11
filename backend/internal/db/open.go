@@ -27,14 +27,20 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	return pgxpool.NewWithConfig(ctx, cfg)
 }
 
-// Configure sets how the app's connections behave. When a query's context is cancelled,
-// the server is asked to cancel the query, and the connection is only dropped if that
-// doesn't work within a second. pgx's default drops the connection straight away, which
-// leaves the query (and any locks it holds) running on the server until it finishes.
+// Configure sets how the app's connections behave:
+//   - When a query's context is cancelled, the server is asked to cancel the query, and the
+//     connection is only dropped if that doesn't work within a second. pgx's default drops
+//     the connection straight away, which leaves the query (and any locks it holds) running
+//     on the server until it finishes.
+//   - Every query is planned for its own parameters. pgx prepares statements, and after five
+//     runs Postgres may keep one plan for any parameters: for a listing first run on a
+//     50,000-card group, a plan that then takes 80 ms on a group of 100 instead of 2 ms.
+//     Planning each time costs about a millisecond.
 func Configure(cfg *pgxpool.Config) {
 	cfg.ConnConfig.BuildContextWatcherHandler = func(conn *pgconn.PgConn) ctxwatch.Handler {
 		return &pgconn.CancelRequestContextWatcherHandler{Conn: conn, DeadlineDelay: time.Second}
 	}
+	cfg.ConnConfig.RuntimeParams["plan_cache_mode"] = "force_custom_plan"
 }
 
 // CheckTLS refuses a connection to a database on another machine unless it uses

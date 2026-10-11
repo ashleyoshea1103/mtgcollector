@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/collection"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
@@ -28,18 +27,15 @@ func collectionGroups(c Collection) func(http.ResponseWriter, *http.Request, con
 			by = contract.GroupByNone
 		}
 		res, err := c.Groups(r.Context(), user.ID, by)
-		collectionResult(w, r, http.StatusOK, res, err)
+		result(w, r, http.StatusOK, res, err)
 	}
 }
 
 // GET /api/collection/entries?group_by=&key=&sort=&cursor=: a page of one group's entries.
 func collectionEntries(c Collection) func(http.ResponseWriter, *http.Request, contract.User) {
 	return func(w http.ResponseWriter, r *http.Request, user contract.User) {
-		q := r.URL.Query()
-		res, err := c.Entries(r.Context(), user.ID, collection.EntryQuery{
-			GroupBy: contract.GroupBy(q.Get("group_by")), Key: q.Get("key"), Sort: contract.SortBy(q.Get("sort")), Cursor: q.Get("cursor"),
-		})
-		collectionResult(w, r, http.StatusOK, res, err)
+		res, err := c.Entries(r.Context(), user.ID, entryQuery(r))
+		result(w, r, http.StatusOK, res, err)
 	}
 }
 
@@ -47,7 +43,7 @@ func collectionEntries(c Collection) func(http.ResponseWriter, *http.Request, co
 func collectionStats(c Collection) func(http.ResponseWriter, *http.Request, contract.User) {
 	return func(w http.ResponseWriter, r *http.Request, user contract.User) {
 		res, err := c.Stats(r.Context(), user.ID)
-		collectionResult(w, r, http.StatusOK, res, err)
+		result(w, r, http.StatusOK, res, err)
 	}
 }
 
@@ -63,14 +59,14 @@ func addEntry(c Collection) func(http.ResponseWriter, *http.Request, contract.Us
 		if created {
 			status = http.StatusCreated
 		}
-		collectionResult(w, r, status, res, err)
+		result(w, r, status, res, err)
 	}
 }
 
 // PATCH /api/collection/entries/{id} (EntryChange): the changed entry.
 func changeEntry(c Collection) func(http.ResponseWriter, *http.Request, contract.User) {
 	return func(w http.ResponseWriter, r *http.Request, user contract.User) {
-		id, ok := entryID(w, r)
+		id, ok := pathID(w, r, "id", collection.ErrNotFound)
 		if !ok {
 			return
 		}
@@ -79,41 +75,43 @@ func changeEntry(c Collection) func(http.ResponseWriter, *http.Request, contract
 			return
 		}
 		res, err := c.Change(r.Context(), user.ID, id, change)
-		collectionResult(w, r, http.StatusOK, res, err)
+		result(w, r, http.StatusOK, res, err)
 	}
 }
 
 // DELETE /api/collection/entries/{id}: 204.
 func deleteEntry(c Collection) func(http.ResponseWriter, *http.Request, contract.User) {
 	return func(w http.ResponseWriter, r *http.Request, user contract.User) {
-		id, ok := entryID(w, r)
+		id, ok := pathID(w, r, "id", collection.ErrNotFound)
 		if !ok {
 			return
 		}
-		if err := c.Delete(r.Context(), user.ID, id); err != nil {
-			collectionResult(w, r, 0, nil, err)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
+		noContent(w, r, c.Delete(r.Context(), user.ID, id))
 	}
 }
 
-// entryID reads the {id} in the path. One that can't be an entry's is a 404, like one that
-// isn't the user's.
-func entryID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || id < 1 {
-		writeError(w, http.StatusNotFound, collection.ErrNotFound.Error())
-		return 0, false
+// entryQuery reads which entries to list from ?group_by=&key=&sort=&cursor=.
+func entryQuery(r *http.Request) collection.EntryQuery {
+	q := r.URL.Query()
+	return collection.EntryQuery{
+		GroupBy: contract.GroupBy(q.Get("group_by")), Key: q.Get("key"), Sort: contract.SortBy(q.Get("sort")), Cursor: q.Get("cursor"),
 	}
-	return id, true
 }
 
-// collectionResult writes a result with status, or the error as its status.
-func collectionResult(w http.ResponseWriter, r *http.Request, status int, res any, err error) {
+// result writes a result with status, or the error as its status.
+func result(w http.ResponseWriter, r *http.Request, status int, res any, err error) {
 	if err != nil {
 		fail(w, r, err)
 		return
 	}
 	writeJSON(w, status, res)
+}
+
+// noContent answers 204 for a change that has nothing to send back, or the error as its status.
+func noContent(w http.ResponseWriter, r *http.Request, err error) {
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -109,6 +109,15 @@ type CollectionEntry struct {
 	AddedAt   pgtype.Timestamptz
 }
 
+type CustomGroup struct {
+	ID          int64
+	UserID      int64
+	Name        string
+	Kind        string
+	Description string
+	CreatedAt   pgtype.Timestamptz
+}
+
 type EntryPrice struct {
 	ID            int64
 	UserID        int64
@@ -126,6 +135,37 @@ type EntryPrice struct {
 	Cmc           pgtype.Numeric
 	UnitPrice     pgtype.Numeric
 	Value         pgtype.Numeric
+}
+
+type GroupMember struct {
+	GroupID  int64
+	EntryID  int64
+	UserID   int64
+	Quantity int32
+	AddedAt  pgtype.Timestamptz
+}
+
+type ListingRow struct {
+	GroupID       int64
+	ID            int64
+	UserID        int64
+	CardID        pgtype.UUID
+	Quantity      int32
+	Finish        string
+	Condition     string
+	Language      string
+	AddedAt       pgtype.Timestamptz
+	Name          string
+	SetCode       string
+	ColorIdentity []string
+	TypeLine      string
+	Rarity        string
+	Cmc           pgtype.Numeric
+	UnitPrice     pgtype.Numeric
+	Value         pgtype.Numeric
+	Count         int32
+	CountValue    pgtype.Numeric
+	ListedAt      pgtype.Timestamptz
 }
 
 type ScryfallSync struct {
