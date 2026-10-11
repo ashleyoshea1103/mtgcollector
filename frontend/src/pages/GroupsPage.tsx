@@ -4,6 +4,7 @@ import { useCreateGroup, useCustomGroups } from '../api/queries';
 import { CustomGroupCard } from '../components/CustomGroupCard';
 import { GroupForm } from '../components/GroupForm';
 import { errorMessage } from '../lib/messages';
+import { groupPath } from '../lib/paths';
 import { Button, Cluster, Dialog, EmptyState, ErrorState, Grid, Loading, Stack, toast } from '../ui';
 
 /** The user's binders, decks and boxes, and a way to make another. */
@@ -45,7 +46,7 @@ export function GroupsPage() {
               <CustomGroupCard
                 group={g}
                 actions={
-                  <Link to={`/groups/${g.id}`} aria-label={`Open ${g.name}`}>
+                  <Link to={groupPath(g.id)} aria-label={`Open ${g.name}`}>
                     Open
                   </Link>
                 }
@@ -64,7 +65,7 @@ export function GroupsPage() {
               create.mutate(values, {
                 onSuccess: (group) => {
                   toast({ title: `Made ${group.name}`, tone: 'success' });
-                  navigate(`/groups/${group.id}`);
+                  navigate(groupPath(group.id));
                 },
               })
             }

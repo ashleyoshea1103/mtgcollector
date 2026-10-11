@@ -26,9 +26,13 @@ describe('SearchPage', () => {
 
   it('searches as you type, keeping the search in the URL', async () => {
     const { api, user, location } = renderApp('/search', { ...signedOut, ...searchApi });
-    await user.type(await main().findByRole('searchbox', { name: 'Card name' }), 'bolt');
+    const box = await main().findByRole('searchbox', { name: 'Card name' });
+    await user.type(box, 'bolt');
     expect(await main().findByRole('heading', { name: lightningBolt.name })).toBeInTheDocument();
     expect(location().search).toBe('?q=bolt');
+    // Writing the URL doesn't start the form afresh: the box keeps its text and focus.
+    expect(box).toHaveValue('bolt');
+    expect(box).toHaveFocus();
     expect(api.sent('GET /api/cards/search').map((r) => r.query.toString())).toEqual(['q=bolt&page=1']);
     expect(main().getByRole('link', { name: `Details of ${lightningBolt.name}` })).toHaveAttribute('href', `/cards/${lightningBolt.id}`);
   });
@@ -97,6 +101,31 @@ describe('SearchPage', () => {
     await router.navigate(-2);
     await main().findByRole('heading', { name: lightningBolt.name });
     expect(main().getByRole('searchbox', { name: 'Card name' })).toHaveValue('bolt');
+  });
+
+  it('starts the text boxes afresh when a link leads to another search', async () => {
+    const { user, location } = renderApp('/search?q=bolt&set=m10', { ...signedOut, ...searchApi });
+    await main().findByRole('heading', { name: lightningBolt.name });
+    await user.click(within(screen.getByRole('banner')).getByRole('link', { name: 'Search' }));
+    await waitFor(() => expect(location().search).toBe(''));
+    expect(main().getByRole('searchbox', { name: 'Card name' })).toHaveValue('');
+    expect(main().getByRole('searchbox', { name: 'Set code' })).toHaveValue('');
+  });
+
+  it('puts back the text of a search typed earlier when going back to it', async () => {
+    const { user, router } = renderApp('/search', { ...signedOut, ...searchApi });
+    await user.type(await main().findByRole('searchbox', { name: 'Card name' }), 'bolt');
+    await main().findByRole('heading', { name: lightningBolt.name });
+    await user.click(within(screen.getByRole('banner')).getByRole('link', { name: 'Search' }));
+    await waitFor(() => expect(main().getByRole('searchbox', { name: 'Card name' })).toHaveValue(''));
+    await router.navigate(-1);
+    await waitFor(() => expect(main().getByRole('searchbox', { name: 'Card name' })).toHaveValue('bolt'));
+  });
+
+  it('says to correct a set code that cannot be one, rather than to type a name', async () => {
+    renderApp('/search?q=bolt&set=mh-2', { ...signedOut, ...searchApi });
+    expect(await main().findByText('Correct the set code to search.')).toBeInTheDocument();
+    expect(main().queryByText(/Type at least/)).not.toBeInTheDocument();
   });
 
   it('asks visitors to log in to add cards', async () => {

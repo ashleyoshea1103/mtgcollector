@@ -51,8 +51,8 @@ export function useCopies(cardId: string, enabled: boolean) {
   return useQuery({ queryKey: keys.copies(cardId), queryFn: ({ signal }) => api.cardCopies(cardId, signal), enabled });
 }
 
-export function useCustomGroups(enabled = true) {
-  return useQuery({ queryKey: keys.groupList, queryFn: ({ signal }) => api.customGroups(signal), select: (d) => d.groups, enabled });
+export function useCustomGroups() {
+  return useQuery({ queryKey: keys.groupList, queryFn: ({ signal }) => api.customGroups(signal), select: (d) => d.groups });
 }
 
 export function useCustomGroup(id: number) {

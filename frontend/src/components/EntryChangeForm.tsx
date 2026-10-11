@@ -3,7 +3,7 @@ import { entryChange } from '../lib/entries';
 import { CONDITIONS, FINISHES, labelFor, LANGUAGES } from '../lib/labels';
 import { MAX_QUANTITY, parseQuantity } from '../lib/quantity';
 import type { CollectionEntry, Condition, EntryChange, Finish, Language } from '../types';
-import { Button, Cluster, Field, NumberInput, Select, Stack } from '../ui';
+import { Button, Cluster, Field, FormError, NumberInput, Select, Stack } from '../ui';
 
 interface Props {
   entry: CollectionEntry;
@@ -48,11 +48,7 @@ export function EntryChangeForm({ entry, onSubmit, onCancel, submitting = false,
         <Field label="Language">
           <Select options={LANGUAGE_OPTIONS} value={language} onChange={setLanguage} />
         </Field>
-        {error && (
-          <p className="entry-change-form__error" role="alert">
-            {error}
-          </p>
-        )}
+        {error && <FormError className="entry-change-form__error">{error}</FormError>}
         <Cluster as="footer" className="entry-change-form__actions">
           {onCancel && <Button onPress={onCancel}>Cancel</Button>}
           <Button type="submit" variant="primary" busy={submitting}>

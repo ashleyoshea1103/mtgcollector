@@ -11,7 +11,7 @@ import { GROUP_KINDS, labelFor } from '../lib/labels';
 import { readListing, writeListing } from '../lib/listingParams';
 import { errorMessage, isNotFound } from '../lib/messages';
 import type { CustomGroup } from '../types';
-import { Button, Cluster, Dialog, EmptyState, ErrorState, Loading, Stack, toast } from '../ui';
+import { Button, Cluster, Dialog, EmptyState, ErrorState, FormError, Loading, Stack, toast } from '../ui';
 import { Listing } from './Listing';
 import { MemberActions } from './MemberActions';
 import { NotFoundPage } from './NotFoundPage';
@@ -53,7 +53,8 @@ function GroupView({ id }: { id: number }) {
         </Cluster>
         {g.description && <p className="group-page__description">{g.description}</p>}
       </header>
-      <ListingControls value={listing} onChange={(next) => setParams(writeListing(params, next), { replace: true })} />
+      {/* The same page, so it stays where it's scrolled to. */}
+      <ListingControls value={listing} onChange={(next) => setParams(writeListing(params, next), { replace: true, preventScrollReset: true })} />
       <Listing
         listing={id}
         params={listing}
@@ -115,7 +116,7 @@ function GroupChanges({ group }: { group: CustomGroup }) {
         <Dialog role="alertdialog" title={`Delete ${group.name}?`} isOpen onOpenChange={(o) => !o && close()}>
           <Stack>
             <p>The group goes; its cards stay in your collection.</p>
-            {remove.isError && <p role="alert">{errorMessage(remove.error)}</p>}
+            {remove.isError && <FormError>{errorMessage(remove.error)}</FormError>}
             <Cluster>
               <Button onPress={close}>Cancel</Button>
               <Button

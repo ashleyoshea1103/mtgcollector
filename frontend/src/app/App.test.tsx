@@ -32,6 +32,11 @@ describe('the app frame', () => {
     expect(header().queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument();
   });
 
+  it("offers logging in when it can't tell who's signed in", async () => {
+    renderApp('/search', { 'GET /api/auth/me': { status: 503, body: { error: 'that took too long; try again' } } });
+    expect(await header().findByRole('link', { name: 'Log in' })).toBeInTheDocument();
+  });
+
   it('lets keyboard users skip to the page', async () => {
     renderApp('/search', signedOut);
     expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveAttribute('href', '#main');
@@ -144,6 +149,19 @@ describe('signing in', () => {
     await user.type(screen.getByLabelText('Password'), 'a long enough password');
     await user.click(screen.getByRole('button', { name: 'Create account' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('An account with that email already exists.');
+  });
+
+  it("doesn't carry a failed login's message to the sign-up page and back", async () => {
+    const { user } = renderApp('/login', { ...signedOut, 'POST /api/auth/login': { status: 401, body: { error: 'email or password is incorrect' } } });
+    await user.type(await screen.findByRole('textbox', { name: 'Email' }), 'ann@example.com');
+    await user.type(screen.getByLabelText('Password'), 'wrong password typed here');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+    await screen.findByRole('alert');
+    await user.click(within(screen.getByRole('main')).getByRole('link', { name: 'Sign up' }));
+    await user.click(within(screen.getByRole('main')).getByRole('link', { name: 'Log in' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Log in' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveValue('');
   });
 
   it('links between logging in and signing up, keeping the next page', async () => {

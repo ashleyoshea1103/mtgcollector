@@ -25,7 +25,8 @@ export function CollectionPage() {
       ) : (
         <CollectionSummary stats={stats.data} />
       )}
-      <ListingControls value={listing} onChange={(next) => setParams(writeListing(params, next), { replace: true })} />
+      {/* The same page, so it stays where it's scrolled to. */}
+      <ListingControls value={listing} onChange={(next) => setParams(writeListing(params, next), { replace: true, preventScrollReset: true })} />
       <Listing
         listing={null}
         params={listing}

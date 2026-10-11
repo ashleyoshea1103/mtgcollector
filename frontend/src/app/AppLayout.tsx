@@ -44,7 +44,8 @@ export function AppLayout() {
               )}
             </Cluster>
           </nav>
-          {/* Nothing until it's known who's signed in, rather than a flash of the wrong links. */}
+          {/* Nothing until it's known who's signed in, rather than a flash of the wrong links; if that
+              can't be found out, the links to log in (the login page sends anyone signed in on). */}
           {user ? (
             <Cluster className="app-header__account">
               <span className="app-header__email">{user.email}</span>
@@ -53,7 +54,7 @@ export function AppLayout() {
               </Button>
             </Cluster>
           ) : (
-            user === null && (
+            (user === null || me.isError) && (
               <Cluster className="app-header__account">
                 <NavLink to="/login">Log in</NavLink>
                 <NavLink to="/signup">Sign up</NavLink>

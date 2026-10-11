@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ApiError, NetworkError } from './client';
 import { keys } from './keys';
 import { createQueryClient, forgetCachedUser, switchUser } from './queryClient';
@@ -25,7 +25,7 @@ describe('createQueryClient', () => {
     client.setQueryData(keys.me, ann);
     client.setQueryData(keys.stats, { card_count: 3 });
     await client.fetchQuery({ queryKey: keys.groupList, queryFn: fail(new ApiError(401, 'not signed in')) }).catch(() => {});
-    expect(client.getQueryData(keys.me)).toBeNull();
+    await vi.waitFor(() => expect(client.getQueryData(keys.me)).toBeNull());
     expect(client.getQueryData(keys.stats)).toBeUndefined();
   });
 
@@ -37,7 +37,7 @@ describe('createQueryClient', () => {
       .build(client, { mutationFn: fail(new ApiError(401, 'not signed in')) })
       .execute(undefined)
       .catch(() => {});
-    expect(client.getQueryData(keys.me)).toBeNull();
+    await vi.waitFor(() => expect(client.getQueryData(keys.me)).toBeNull());
   });
 
   it("leaves everything when nobody was signed in (a wrong password is a 401 too) or it wasn't a 401", async () => {
@@ -54,25 +54,39 @@ describe('createQueryClient', () => {
 });
 
 describe('switchUser', () => {
-  it("keeps the user's own query, updated, so whatever watches it sees the change", () => {
+  it("keeps the user's own query, updated, so whatever watches it sees the change", async () => {
     const client = createQueryClient();
     client.setQueryData(keys.me, null);
     const me = client.getQueryCache().find({ queryKey: keys.me });
     client.setQueryData(keys.stats, { card_count: 3 });
-    switchUser(client, ann);
+    await switchUser(client, ann);
     expect(client.getQueryCache().find({ queryKey: keys.me })).toBe(me);
     expect(client.getQueryData(keys.me)).toEqual(ann);
     expect(client.getQueryData(keys.stats)).toBeUndefined();
   });
 });
 
+describe('switchUser, racing a fetch of who is signed in', () => {
+  it("isn't undone by the older answer arriving afterwards", async () => {
+    const client = createQueryClient({ queries: { retry: false } });
+    client.setQueryData(keys.me, null);
+    const stale = client
+      .fetchQuery({ queryKey: keys.me, queryFn: () => new Promise((resolve) => setTimeout(() => resolve(null), 30)), staleTime: 0 })
+      .catch(() => {});
+    await switchUser(client, ann);
+    await stale;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(client.getQueryData(keys.me)).toEqual(ann);
+  });
+});
+
 describe('forgetCachedUser', () => {
-  it('drops everything cached and records that nobody is signed in', () => {
+  it('drops everything cached and records that nobody is signed in', async () => {
     const client = createQueryClient();
     client.setQueryData(keys.me, ann);
     client.setQueryData(keys.group(4), { id: 4 });
     client.setQueryData(keys.search({ q: 'bolt', set: '', type: '', rarity: '', colors: '', extras: false }), { pages: [] });
-    forgetCachedUser(client);
+    await forgetCachedUser(client);
     expect(client.getQueryCache().getAll().map((q) => q.queryKey)).toEqual([keys.me]);
     expect(client.getQueryData(keys.me)).toBeNull();
   });

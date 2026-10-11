@@ -14,6 +14,7 @@ import {
   ErrorBoundary,
   ErrorState,
   Field,
+  FormError,
   Grid,
   IconButton,
   Loading,
@@ -181,13 +182,14 @@ export function PrimitivesGallery() {
         </Grid>
       </Section>
 
-      <Section name="Loading / Skeleton / ErrorState / EmptyState">
+      <Section name="Loading / Skeleton / ErrorState / EmptyState / FormError">
         <Loading label="Loading cards…" />
         <Skeleton lines={3} width="60%" />
         <ErrorState message="Couldn't load your collection." onRetry={() => toast({ title: 'Retrying…' })} />
         <EmptyState title="No cards yet" action={<Button variant="primary">Add cards</Button>}>
           Search for a card to add it to your collection.
         </EmptyState>
+        <FormError>You already have a group with that name.</FormError>
       </Section>
 
       <Section name="DataTable" note="A real table: the name column is the row header; the actions header is for screen readers only.">

@@ -70,7 +70,7 @@ export async function send<T>(method: Method, path: string, { query, body, signa
     if (signal?.aborted) throw err;
     throw new NetworkError();
   }
-  if (!res.ok) throw await errorOf(res);
+  if (!res.ok) throw await errorOf(res, signal);
   if (res.status === 204) return { status: res.status, body: undefined as T };
   try {
     return { status: res.status, body: (await res.json()) as T };
@@ -86,13 +86,14 @@ export async function request<T>(method: Method, path: string, options?: Request
 }
 
 /** The error an error answer stands for: the API's own message, or a stand-in when it has none. */
-async function errorOf(res: Response): Promise<ApiError> {
+async function errorOf(res: Response, signal?: AbortSignal): Promise<ApiError> {
   let message = '';
   try {
     const body: unknown = await res.json();
     if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string') message = body.error;
-  } catch {
-    // Not the API's JSON: a proxy or gateway answered.
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    // Otherwise not the API's JSON: a proxy or gateway answered.
   }
   return new ApiError(res.status, message || fallbackMessage(res.status));
 }

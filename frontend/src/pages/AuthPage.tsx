@@ -30,8 +30,6 @@ export function AuthPage({ mode }: Props) {
       <title>{`${mode === 'login' ? 'Log in' : 'Sign up'} · mtgcollector`}</title>
       <h1>{mode === 'login' ? 'Log in' : 'Create an account'}</h1>
       <AuthForm
-        // A fresh form for each page, so a password typed on one isn't carried to the other.
-        key={mode}
         mode={mode}
         onSubmit={(c: Credentials) => attempt.mutate(c)}
         submitting={attempt.isPending}

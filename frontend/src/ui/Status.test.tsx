@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { EmptyState, ErrorState, Loading, Skeleton } from './Status';
+import { EmptyState, ErrorState, FormError, Loading, Skeleton } from './Status';
 
 describe('Loading', () => {
   it('is a status message, with a default label', () => {
@@ -58,5 +58,14 @@ describe('EmptyState', () => {
     expect(screen.getByText('No cards yet')).toBeInTheDocument();
     expect(screen.getByText('Search for a card to add it.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add cards' })).toBeInTheDocument();
+  });
+});
+
+describe('FormError', () => {
+  it('announces why the form failed', () => {
+    render(<FormError className="group-form__error">You already have a group with that name.</FormError>);
+    const error = screen.getByRole('alert');
+    expect(error).toHaveTextContent('You already have a group with that name.');
+    expect(error).toHaveClass('form-error', 'group-form__error');
   });
 });

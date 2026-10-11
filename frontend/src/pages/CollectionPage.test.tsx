@@ -48,6 +48,18 @@ describe('CollectionPage', () => {
     expect(await within(section(/^Red/)).findByRole('table')).toBeInTheDocument();
   });
 
+  it('stays where it is scrolled to when the grouping or view changes', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo');
+    const { user } = renderApp('/collection', collection);
+    await main().findByRole('heading', { name: entries.bolts.card.name });
+    scrollTo.mockClear();
+    await user.selectOptions(main().getByRole('combobox', { name: 'Group by' }), 'Color');
+    await screen.findByRole('button', { name: /^Blue/ });
+    await user.click(main().getByRole('radio', { name: 'List' }));
+    expect(scrollTo).not.toHaveBeenCalled();
+    scrollTo.mockRestore();
+  });
+
   it('opens only the first of many groups, and fetches others as they open', async () => {
     const many = Array.from({ length: 12 }, (_, i) => makeGroup(`s${i}`, `Set ${i}`, [makeEntry(100 + i, cards.lightningBolt)]));
     const { api, user } = renderApp('/collection?group_by=set', {

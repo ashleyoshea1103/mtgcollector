@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { groupProblems } from '../lib/groups';
 import { GROUP_KINDS } from '../lib/labels';
 import { MaxGroupDescriptionLength, MaxGroupNameLength, type CustomGroupKind, type NewGroup } from '../types';
-import { Button, Cluster, Field, Select, Stack, TextArea, TextInput } from '../ui';
+import { Button, Cluster, Field, FormError, Select, Stack, TextArea, TextInput } from '../ui';
 
 interface Props {
   /** The group being changed; leave out to make a new one. */
@@ -45,11 +45,7 @@ export function GroupForm({ group, onSubmit, onCancel, submitting = false, error
         <Field label="Description" description={`Optional. Up to ${MaxGroupDescriptionLength} characters.`} error={problems.description}>
           <TextArea rows={3} value={values.description} onChange={(e) => setValues({ ...values, description: e.target.value })} />
         </Field>
-        {error && (
-          <p className="group-form__error" role="alert">
-            {error}
-          </p>
-        )}
+        {error && <FormError className="group-form__error">{error}</FormError>}
         <Cluster as="footer" className="group-form__actions">
           {onCancel && <Button onPress={onCancel}>Cancel</Button>}
           <Button type="submit" variant="primary" busy={submitting}>

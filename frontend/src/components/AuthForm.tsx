@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { passwordProblem } from '../lib/auth';
 import { MaxPasswordLength, MinPasswordLength, type Credentials } from '../types';
-import { Button, Field, Stack, TextInput } from '../ui';
+import { Button, Field, FormError, Stack, TextInput } from '../ui';
 
 interface Props {
   /** Logging in to an account, or making one. */
@@ -48,11 +48,7 @@ export function AuthForm({ mode, onSubmit, submitting = false, error }: Props) {
         >
           <TextInput type="password" autoComplete={text.password} required value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
-        {error && (
-          <p className="auth-form__error" role="alert">
-            {error}
-          </p>
-        )}
+        {error && <FormError className="auth-form__error">{error}</FormError>}
         <Button type="submit" variant="primary" busy={submitting}>
           {submitting ? text.busy : text.submit}
         </Button>

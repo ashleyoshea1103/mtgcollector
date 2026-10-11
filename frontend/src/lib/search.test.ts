@@ -29,6 +29,14 @@ describe('readSearch', () => {
 
   it('cuts names and types to the longest the API takes', () => {
     expect(readSearch(q(`q=${'x'.repeat(MaxSearchLength + 9)}`)).q).toHaveLength(MaxSearchLength);
+    expect(readSearch(q(`type=${'y'.repeat(MaxSearchLength + 1)}`)).type).toHaveLength(MaxSearchLength);
+  });
+
+  it('cuts between characters, never inside one', () => {
+    const emoji = '🃏';
+    const cut = readSearch(new URLSearchParams({ q: emoji.repeat(MaxSearchLength + 1) })).q;
+    // Whole emoji only: no half of a surrogate pair left at the end.
+    expect(cut).toBe(emoji.repeat(MaxSearchLength));
   });
 });
 

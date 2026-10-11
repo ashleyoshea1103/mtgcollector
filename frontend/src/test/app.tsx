@@ -49,6 +49,19 @@ function matchPath(pattern: string, path: string): Record<string, string> | null
   return params;
 }
 
+/** The route for a request: of those matching, the one with the fewest :params (the most literal). */
+function bestMatch(routes: Routes, method: string, path: string) {
+  let best: { handler: Handler; params: Record<string, string>; loose: number } | null = null;
+  for (const [route, handler] of Object.entries(routes)) {
+    const [m, pattern] = route.split(' ');
+    const params = m === method ? matchPath(pattern, path) : null;
+    if (!params) continue;
+    const loose = Object.keys(params).length;
+    if (!best || loose < best.loose) best = { handler, params, loose };
+  }
+  return best;
+}
+
 function respond({ status, body }: Reply): Response {
   if (body === undefined) return new Response(null, { status: status ?? 204 });
   return new Response(JSON.stringify(body), { status: status ?? 200, headers: { 'Content-Type': 'application/json' } });
@@ -74,12 +87,10 @@ export function fakeApi(routes: Routes) {
         params: {},
       };
       requests.push(req);
-      for (const [route, handler] of Object.entries(routes)) {
-        const [m, pattern] = route.split(' ');
-        const params = m === method ? matchPath(pattern, url.pathname) : null;
-        if (!params) continue;
-        req.params = params;
-        return respond(typeof handler === 'function' ? await handler(req) : handler);
+      const match = bestMatch(routes, method, url.pathname);
+      if (match) {
+        req.params = match.params;
+        return respond(typeof match.handler === 'function' ? await match.handler(req) : match.handler);
       }
       unhandled.push(`${method} ${url.pathname}${url.search}`);
       return respond({ status: 404, body: { error: 'no such API endpoint' } });

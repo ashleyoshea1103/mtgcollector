@@ -69,10 +69,8 @@ function Section({ listing, group, params, defaultOpen, renderActions }: Section
       view={params.view}
       open={open}
       onOpenChange={setOpen}
-      // Opening fetches by itself (the query is enabled while open); this is the retry.
-      onLoad={() => {
-        if (entries.isError) void entries.refetch();
-      }}
+      // Opening fetches by itself: the query is enabled while the section is open.
+      onRetry={() => void entries.refetch()}
       onLoadMore={entries.hasNextPage ? () => void loadMore() : undefined}
       loadingMore={entries.isFetchingNextPage}
       loadFailed={entries.isError && rows === undefined}

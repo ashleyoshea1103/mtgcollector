@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigationType, useSearchParams } from 'react-router';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import { useCardSearch, useMe } from '../api/queries';
 import { CardTile } from '../components/CardTile';
 import { SearchFilters } from '../components/SearchFilters';
 import { errorMessage } from '../lib/messages';
 import { loginUrl } from '../lib/nextPath';
-import { canSearch, readSearch, writeSearch } from '../lib/search';
+import { cardPath } from '../lib/paths';
+import { canSearch, isSetCode, readSearch, writeSearch } from '../lib/search';
 import { MinSearchWord, type CardSummary } from '../types';
 import { Button, EmptyState, ErrorState, Grid, Loading, Stack, VisuallyHidden } from '../ui';
 import { AddCardDialog } from './AddCardDialog';
@@ -20,24 +21,34 @@ export function SearchPage() {
   const results = useCardSearch(search, ready);
   const [adding, setAdding] = useState<CardSummary | null>(null);
 
-  // The text boxes keep what's typed. Going back or forward to another search starts them
-  // afresh from the URL; the search's own changes (replacing the URL as you type) don't.
-  const navigation = useNavigationType();
-  const [formKey, setFormKey] = useState(location.key);
-  if (navigation === 'POP' && formKey !== location.key) setFormKey(location.key);
+  // The text boxes keep what's typed, and the page writes it to the URL. A URL the page didn't
+  // write (going back or forward, or a link to another search) starts them afresh from it.
+  // `own` is the page's last write: the URL changes a render after it's asked for, so it's
+  // recognised when it arrives rather than assumed at once.
+  const now = params.toString();
+  const [form, setForm] = useState<{ key: string; search: string; own: string | null }>({ key: location.key, search: now, own: null });
+  if (now !== form.search) setForm(now === form.own ? { ...form, search: now } : { key: location.key, search: now, own: null });
+  const changeSearch = (next: typeof search) => {
+    const written = writeSearch(next);
+    setForm((f) => ({ ...f, own: written.toString() }));
+    // The same page, so it stays where it's scrolled to.
+    setParams(written, { replace: true, preventScrollReset: true });
+  };
 
   return (
     <Stack as="section" className="search-page" gap={5}>
       <title>Search · mtgcollector</title>
       <h1>Search cards</h1>
-      <SearchFilters key={formKey} value={search} onChange={(next) => setParams(writeSearch(next), { replace: true })} />
+      <SearchFilters key={form.key} value={search} onChange={changeSearch} />
       {me.data === null && (
         <p className="search-page__login">
           <Link to={loginUrl(location.pathname + location.search)}>Log in</Link> to add cards to your collection.
         </p>
       )}
       {!ready ? (
-        <p className="search-page__hint">Type at least {MinSearchWord} letters of a card's name, or a set code.</p>
+        <p className="search-page__hint">
+          {search.set !== '' && !isSetCode(search.set) ? 'Correct the set code to search.' : `Type at least ${MinSearchWord} letters of a card's name, or a set code.`}
+        </p>
       ) : results.isPending ? (
         <Loading label="Searching…" />
       ) : results.isError ? (
@@ -54,7 +65,7 @@ export function SearchPage() {
                   card={card}
                   actions={
                     <>
-                      <Link to={`/cards/${encodeURIComponent(card.id)}`}>
+                      <Link to={cardPath(card.id)}>
                         Details <VisuallyHidden>of {card.name}</VisuallyHidden>
                       </Link>
                       {me.data && (

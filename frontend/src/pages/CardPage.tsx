@@ -5,8 +5,9 @@ import { useCard, useCopies, useMe, usePrintings } from '../api/queries';
 import { CardDetail } from '../components/CardDetail';
 import { NoLongerListed } from '../components/NoLongerListed';
 import { SetSymbol } from '../components/SetSymbol';
-import { errorMessage } from '../lib/messages';
+import { errorMessage, isNotFound } from '../lib/messages';
 import { loginUrl } from '../lib/nextPath';
+import { cardPath } from '../lib/paths';
 import { Button, ErrorState, Loading, Stack } from '../ui';
 import { AddCardDialog } from './AddCardDialog';
 import { NotFoundPage } from './NotFoundPage';
@@ -23,7 +24,7 @@ export function CardPage() {
   if (card.isPending) return <Loading />;
   if (card.isError) {
     // A 400 is an id that isn't a Scryfall id at all: no such card either.
-    if (card.error instanceof ApiError && (card.error.status === 404 || card.error.status === 400)) {
+    if (isNotFound(card.error) || (card.error instanceof ApiError && card.error.status === 400)) {
       return <NotFoundPage thing="card" back={{ to: '/search', label: 'Search for cards' }} />;
     }
     return <ErrorState message={errorMessage(card.error)} onRetry={() => void card.refetch()} />;
@@ -72,7 +73,7 @@ function OtherPrintings({ id }: { id: string }) {
                   <SetSymbol set={p.set} rarity={p.rarity} nameShown /> {p.set.name} #{p.collector_number} (this one)
                 </span>
               ) : (
-                <Link to={`/cards/${encodeURIComponent(p.id)}`}>
+                <Link to={cardPath(p.id)}>
                   <SetSymbol set={p.set} rarity={p.rarity} nameShown /> {p.set.name} #{p.collector_number}
                 </Link>
               )}{' '}

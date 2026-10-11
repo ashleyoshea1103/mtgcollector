@@ -6,7 +6,7 @@ import { MemberForm } from '../components/MemberForm';
 import { describeEntry } from '../lib/entries';
 import { errorMessage } from '../lib/messages';
 import type { CollectionEntry } from '../types';
-import { Button, Cluster, Dialog, EmptyState, ErrorState, Loading, Menu, MenuItem, Stack, toast, VisuallyHidden } from '../ui';
+import { Button, Cluster, Dialog, EmptyState, ErrorState, FormError, Loading, Menu, MenuItem, Stack, toast, VisuallyHidden } from '../ui';
 
 type Action = 'change' | 'group' | 'remove';
 
@@ -120,7 +120,7 @@ function RemoveEntryDialog({ entry, onClose }: DialogProps) {
     <Dialog role="alertdialog" title={`Remove ${entry.card.name}?`} isOpen onOpenChange={(open) => !open && onClose()}>
       <Stack>
         <p>{describeEntry(entry)} will leave your collection, and any groups they're in.</p>
-        {remove.isError && <p role="alert">{errorMessage(remove.error)}</p>}
+        {remove.isError && <FormError>{errorMessage(remove.error)}</FormError>}
         <Cluster>
           <Button onPress={onClose}>Cancel</Button>
           <Button

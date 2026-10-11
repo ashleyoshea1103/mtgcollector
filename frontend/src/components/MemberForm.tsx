@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { countOf } from '../lib/format';
 import { parseQuantity } from '../lib/quantity';
 import type { CollectionEntry, CustomGroup } from '../types';
-import { Button, Cluster, Field, NumberInput, Select, Stack } from '../ui';
+import { Button, Cluster, Field, FormError, NumberInput, Select, Stack } from '../ui';
 
 interface Props {
   /** The entry whose copies go in the group: its quantity is the most the group can hold. */
@@ -49,11 +49,7 @@ export function MemberForm({ entry, groups, groupId, onGroupChange, current, onS
         <Field label="Copies in the group" description={`Up to ${countOf(entry.quantity, 'copy', 'copies')}, all you have.${held}`}>
           <NumberInput min={1} max={entry.quantity} value={quantity} onChange={(e) => setTyped({ groupId, value: e.target.value })} />
         </Field>
-        {error && (
-          <p className="member-form__error" role="alert">
-            {error}
-          </p>
-        )}
+        {error && <FormError className="member-form__error">{error}</FormError>}
         <Cluster as="footer" className="member-form__actions">
           {onCancel && <Button onPress={onCancel}>Cancel</Button>}
           <Button type="submit" variant="primary" busy={submitting} isDisabled={groupId === null}>

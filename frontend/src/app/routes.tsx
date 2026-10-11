@@ -25,8 +25,9 @@ export const routes: RouteObject[] = [
           { index: true, element: <Home /> },
           { path: 'search', element: <SearchPage /> },
           { path: 'cards/:id', element: <CardPage /> },
-          { path: 'login', element: <AuthPage mode="login" /> },
-          { path: 'signup', element: <AuthPage mode="signup" /> },
+          // Keyed, so each is its own page: nothing typed or failed on one shows on the other.
+          { path: 'login', element: <AuthPage key="login" mode="login" /> },
+          { path: 'signup', element: <AuthPage key="signup" mode="signup" /> },
           {
             element: <RequireAuth />,
             children: [

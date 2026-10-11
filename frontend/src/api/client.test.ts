@@ -91,6 +91,18 @@ describe('send', () => {
     await expect(request('GET', '/api/x')).rejects.toThrow(new NetworkError("the server's answer couldn't be read"));
   });
 
+  it('passes a cancellation through while an error body is being read', async () => {
+    const controller = new AbortController();
+    const abort = new DOMException('aborted', 'AbortError');
+    const res = new Response('{}', { status: 500 });
+    vi.spyOn(res, 'json').mockImplementation(() => {
+      controller.abort();
+      return Promise.reject(abort);
+    });
+    stubFetch(res);
+    await expect(request('GET', '/api/x', { signal: controller.signal })).rejects.toBe(abort);
+  });
+
   it('passes a cancellation through as itself, not as a failure', async () => {
     const controller = new AbortController();
     const abort = new DOMException('aborted', 'AbortError');

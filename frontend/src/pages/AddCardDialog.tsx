@@ -4,7 +4,7 @@ import { AddToCollectionForm } from '../components/AddToCollectionForm';
 import { PrintingOption } from '../components/PrintingOption';
 import { errorMessage } from '../lib/messages';
 import type { CardSummary } from '../types';
-import { Button, Dialog, ErrorState, Loading, Stack, toast } from '../ui';
+import { Button, Dialog, ErrorState, FormError, Loading, Stack, toast } from '../ui';
 
 interface Props {
   card: CardSummary;
@@ -62,11 +62,7 @@ export function AddCardDialog({ card, pickPrinting = false, onClose }: Props) {
             })
           }
         />
-        {add.isError && (
-          <p className="add-card-dialog__error" role="alert">
-            {errorMessage(add.error)}
-          </p>
-        )}
+        {add.isError && <FormError className="add-card-dialog__error">{errorMessage(add.error)}</FormError>}
         <Button className="add-card-dialog__cancel" onPress={onClose}>
           Cancel
         </Button>

@@ -11,7 +11,7 @@ export { useDisclosureState } from './useDisclosureState';
 export { Checkbox, Field, NumberInput, SearchInput, Select, TextArea, TextInput, type SelectOption } from './Field';
 export { Cluster, Grid, Stack, type Space } from './Layout';
 export { Menu, MenuItem, Popover } from './Menu';
-export { EmptyState, ErrorState, Loading, Skeleton } from './Status';
+export { EmptyState, ErrorState, FormError, Loading, Skeleton } from './Status';
 export { SegmentedControl, Tabs, type SegmentOption, type TabItem } from './Tabs';
 // Not the Toaster: the app loads it from ./Toast through LazyToaster, in a chunk of its own,
 // which an export here would undo (any page importing this index would bundle it).

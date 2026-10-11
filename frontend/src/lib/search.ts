@@ -7,14 +7,17 @@ export const EMPTY_SEARCH: CardSearch = { q: '', set: '', type: '', rarity: '', 
 /** The colors a search can ask for, in WUBRG order; "C" (colourless) can't be combined with them. */
 export const SEARCH_COLORS = ['W', 'U', 'B', 'R', 'G'] as const;
 
+/** At most the longest search the API takes, cut between characters (not inside an emoji). */
+const capped = (s: string) => [...s].slice(0, MaxSearchLength).join('');
+
 /** The search in a URL's query. Values the API would refuse are dropped rather than sent. */
 export function readSearch(params: URLSearchParams): CardSearch {
   const rarity = params.get('rarity') ?? '';
   const colors = (params.get('colors') ?? '').toUpperCase();
   return {
-    q: (params.get('q') ?? '').slice(0, MaxSearchLength),
+    q: capped(params.get('q') ?? ''),
     set: (params.get('set') ?? '').trim().toLowerCase(),
-    type: (params.get('type') ?? '').slice(0, MaxSearchLength),
+    type: capped(params.get('type') ?? ''),
     rarity: Object.hasOwn(RARITIES, rarity) ? (rarity as Rarity) : '',
     colors: colors === 'C' ? 'C' : SEARCH_COLORS.filter((c) => colors.includes(c)).join(''),
     extras: params.get('extras') === 'true',

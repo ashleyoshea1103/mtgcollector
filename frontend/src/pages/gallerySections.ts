@@ -8,7 +8,7 @@ export const PRIMITIVE_SECTIONS = [
   'Badge / Chip',
   'Disclosure',
   'Stack / Cluster / Grid',
-  'Loading / Skeleton / ErrorState / EmptyState',
+  'Loading / Skeleton / ErrorState / EmptyState / FormError',
   'ErrorBoundary',
   'DataTable',
   'Tooltip / TooltipText',
