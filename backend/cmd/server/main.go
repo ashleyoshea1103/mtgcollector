@@ -122,8 +122,9 @@ func run(ctx context.Context, cfg config) error {
 
 	q := store.New(pool)
 	accounts := auth.NewService(q)
+	owned := &collection.Service{Pool: pool} // the collection and custom groups
 	handler := web.AllowHosts(cfg.AllowedHosts, web.New(api.NewHandler(api.Services{
-		DB: pool, Cards: &cards.Searcher{Q: q}, Auth: accounts, Collection: &collection.Service{Q: q},
+		DB: pool, Cards: &cards.Searcher{Q: q}, Auth: accounts, Collection: owned, CustomGroups: owned,
 	}), static))
 
 	background := func(ctx context.Context) {

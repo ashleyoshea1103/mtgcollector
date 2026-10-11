@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
@@ -42,10 +43,16 @@ func invalid(format string, args ...any) error {
 // Service does the work, for one user at a time: every call takes the user's id, and every
 // query is limited to that user's entries.
 type Service struct {
-	Q *store.Queries
+	Pool *pgxpool.Pool
 	// The most entries a collection can hold; zero means contract.MaxEntries.
 	MaxEntries int
+	// The most custom groups a user can have; zero means contract.MaxGroups.
+	MaxGroups int
+	// The most group members a user can have; zero means contract.MaxMembers.
+	MaxMembers int
 }
+
+func (s *Service) q() *store.Queries { return store.New(s.Pool) }
 
 func (s *Service) maxEntries() int {
 	if s.MaxEntries > 0 {
@@ -64,31 +71,60 @@ func (s *Service) Add(ctx context.Context, userID int64, e contract.NewEntry) (c
 	if err := checkEntry(e.Quantity, e.Finish, e.Condition, e.Language); err != nil {
 		return contract.CollectionEntry{}, false, err
 	}
-	if e.GroupID != nil {
-		// Custom groups come in a later change; until then, no id is one of the user's.
-		return contract.CollectionEntry{}, false, invalid("there's no group with that id")
-	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	row, err := s.Q.AddEntry(ctx, store.AddEntryParams{
-		UserID: userID, CardID: cardID, Quantity: int32(e.Quantity),
-		Finish: string(e.Finish), Condition: string(e.Condition), Language: string(e.Language),
-		MaxEntries: int32(s.maxEntries()), MaxQuantity: contract.MaxQuantity,
-	})
+	var row store.AddEntryRow
+	add := func(q *store.Queries) (err error) {
+		row, err = q.AddEntry(ctx, store.AddEntryParams{
+			UserID: userID, CardID: cardID, Quantity: int32(e.Quantity),
+			Finish: string(e.Finish), Condition: string(e.Condition), Language: string(e.Language),
+			MaxEntries: int32(s.maxEntries()), MaxQuantity: contract.MaxQuantity,
+		})
+		return err
+	}
+	if e.GroupID == nil {
+		err = add(s.q())
+	} else {
+		// The copies go in the group too: both or neither.
+		err = pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+			q := store.New(tx)
+			if err := add(q); err != nil {
+				return err
+			}
+			n, err := q.AddToGroup(ctx, store.AddToGroupParams{
+				UserID: userID, GroupID: *e.GroupID, EntryID: row.ID, Quantity: int32(e.Quantity), MaxMembers: int32(s.maxMembers()),
+			})
+			if err == nil && n == 0 {
+				err = s.whyNotGrouped(ctx, q, userID, *e.GroupID)
+			}
+			return err
+		})
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return contract.CollectionEntry{}, false, s.whyNotAdded(ctx, userID, cardID, e)
 	}
+	if e.GroupID != nil && isForeignKeyViolation(err) { // the group was deleted just as the copies went in
+		return contract.CollectionEntry{}, false, s.whyNotGrouped(ctx, s.q(), userID, *e.GroupID)
+	}
 	if err != nil {
-		return contract.CollectionEntry{}, false, db.Error(ctx, "add entry", err)
+		return contract.CollectionEntry{}, false, dbError(ctx, "add entry", err)
 	}
 	entry, err := s.get(ctx, userID, row.ID)
 	return entry, row.Created, err
 }
 
+// dbError is db.Error for an error that may be a caller's mistake instead, which is returned as it is.
+func dbError(ctx context.Context, what string, err error) error {
+	if apperr.KindOf(err) != 0 {
+		return err
+	}
+	return db.Error(ctx, what, err)
+}
+
 // whyNotAdded says why AddEntry added nothing: there's no such card, it doesn't come in
 // that finish, there would be too many copies, or too many entries.
 func (s *Service) whyNotAdded(ctx context.Context, userID int64, cardID pgtype.UUID, e contract.NewEntry) error {
-	finishes, err := s.Q.CardFinishes(ctx, cardID)
+	finishes, err := s.q().CardFinishes(ctx, cardID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return invalid("there's no card with that id")
 	}
@@ -98,7 +134,7 @@ func (s *Service) whyNotAdded(ctx context.Context, userID int64, cardID pgtype.U
 	if err := checkFinish(e.Finish, finishes); err != nil {
 		return err
 	}
-	has, err := s.Q.HasEntry(ctx, store.HasEntryParams{
+	has, err := s.q().HasEntry(ctx, store.HasEntryParams{
 		UserID: userID, CardID: cardID, Finish: string(e.Finish), Condition: string(e.Condition), Language: string(e.Language),
 	})
 	if err != nil {
@@ -110,51 +146,39 @@ func (s *Service) whyNotAdded(ctx context.Context, userID int64, cardID pgtype.U
 	return invalid("your collection has %d entries, the most it can hold; remove some to add others", s.maxEntries())
 }
 
-// Change changes an entry's quantity, finish, condition or language.
+// Change changes an entry's quantity, finish, condition or language: only those given, so two
+// changes at once don't undo each other.
 func (s *Service) Change(ctx context.Context, userID, id int64, c contract.EntryChange) (contract.CollectionEntry, error) {
 	if c == (contract.EntryChange{}) {
 		return contract.CollectionEntry{}, invalid("give at least one of quantity, finish, condition and language to change")
 	}
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
-	defer cancel()
-	cur, err := s.Q.EntryCard(ctx, store.EntryCardParams{UserID: userID, ID: id})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return contract.CollectionEntry{}, ErrNotFound
-	}
-	if err != nil {
-		return contract.CollectionEntry{}, db.Error(ctx, "find entry", err)
-	}
-	next := store.UpdateEntryParams{
-		UserID: userID, ID: id, Quantity: cur.Quantity, Finish: cur.Finish, Condition: cur.Condition, Language: cur.Language,
-	}
+	next := store.UpdateEntryParams{UserID: userID, ID: id}
 	if c.Quantity != nil {
 		if *c.Quantity < 1 || *c.Quantity > contract.MaxQuantity {
 			return contract.CollectionEntry{}, invalid("quantity must be from 1 to %d", contract.MaxQuantity)
 		}
-		next.Quantity = int32(*c.Quantity)
+		next.Quantity = pgtype.Int4{Int32: int32(*c.Quantity), Valid: true}
 	}
+	var err error
 	if c.Finish != nil {
-		next.Finish = string(*c.Finish)
+		next.Finish, err = enumParam(*c.Finish)
 	}
-	if c.Condition != nil {
-		next.Condition = string(*c.Condition)
+	if err == nil && c.Condition != nil {
+		next.Condition, err = enumParam(*c.Condition)
 	}
-	if c.Language != nil {
-		next.Language = string(*c.Language)
+	if err == nil && c.Language != nil {
+		next.Language, err = enumParam(*c.Language)
 	}
-	if err := checkEntry(int(next.Quantity), contract.Finish(next.Finish), contract.Condition(next.Condition), contract.Language(next.Language)); err != nil {
-		return contract.CollectionEntry{}, err
+	if err != nil {
+		return contract.CollectionEntry{}, invalid("%s", err)
 	}
-	if c.Finish != nil {
-		if err := checkFinish(*c.Finish, cur.Finishes); err != nil {
-			return contract.CollectionEntry{}, err
-		}
-	}
-	_, err = s.Q.UpdateEntry(ctx, next)
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+	_, err = s.q().UpdateEntry(ctx, next)
 	var pgErr *pgconn.PgError
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
-		return contract.CollectionEntry{}, ErrNotFound // deleted meanwhile
+		return contract.CollectionEntry{}, s.whyNotChanged(ctx, userID, id, c)
 	case errors.As(err, &pgErr) && pgErr.Code == "23505": // unique_violation
 		return contract.CollectionEntry{}, ErrConflict
 	case err != nil:
@@ -163,11 +187,40 @@ func (s *Service) Change(ctx context.Context, userID, id int64, c contract.Entry
 	return s.get(ctx, userID, id)
 }
 
+// whyNotChanged says why UpdateEntry changed nothing: there's no such entry, or its card
+// doesn't come in the finish asked for.
+func (s *Service) whyNotChanged(ctx context.Context, userID, id int64, c contract.EntryChange) error {
+	cur, err := s.q().EntryCard(ctx, store.EntryCardParams{UserID: userID, ID: id})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return db.Error(ctx, "find entry", err)
+	}
+	if c.Finish != nil {
+		if err := checkFinish(*c.Finish, cur.Finishes); err != nil {
+			return err
+		}
+	}
+	return ErrNotFound // deleted and remade meanwhile, say: try again
+}
+
+// enumParam is an enum's value as a query parameter, if it's one of the enum's values.
+func enumParam[T ~string, P interface {
+	*T
+	encoding.TextUnmarshaler
+}](v T) (pgtype.Text, error) {
+	if err := checkEnum[T, P](v); err != nil {
+		return pgtype.Text{}, err
+	}
+	return pgtype.Text{String: string(v), Valid: true}, nil
+}
+
 // Delete removes an entry.
 func (s *Service) Delete(ctx context.Context, userID, id int64) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	n, err := s.Q.DeleteEntry(ctx, store.DeleteEntryParams{UserID: userID, ID: id})
+	n, err := s.q().DeleteEntry(ctx, store.DeleteEntryParams{UserID: userID, ID: id})
 	if err != nil {
 		return db.Error(ctx, "delete entry", err)
 	}
@@ -178,14 +231,14 @@ func (s *Service) Delete(ctx context.Context, userID, id int64) error {
 }
 
 func (s *Service) get(ctx context.Context, userID, id int64) (contract.CollectionEntry, error) {
-	row, err := s.Q.GetEntry(ctx, store.GetEntryParams{UserID: userID, ID: id})
+	row, err := s.q().GetEntry(ctx, store.GetEntryParams{GroupID: collectionGroup, UserID: userID, ID: id})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return contract.CollectionEntry{}, ErrNotFound
 	}
 	if err != nil {
 		return contract.CollectionEntry{}, db.Error(ctx, "get entry", err)
 	}
-	return toEntry(row.EntryPrice, row.CardListing)
+	return toEntry(row.ListingRow, row.CardListing)
 }
 
 // checkEntry checks what an entry is: values the JSON decoder hasn't already checked
@@ -220,7 +273,7 @@ func checkFinish(f contract.Finish, finishes []string) error {
 }
 
 // toEntry is an entry and its card as the API shows them.
-func toEntry(r store.EntryPrice, v store.CardListing) (contract.CollectionEntry, error) {
+func toEntry(r store.ListingRow, v store.CardListing) (contract.CollectionEntry, error) {
 	card, err := cards.Summary(v)
 	if err != nil {
 		return contract.CollectionEntry{}, err

@@ -25,6 +25,7 @@ const maxCursorLength = 1024
 // entries differently.
 type cursor struct {
 	Version int              `json:"v"`
+	Group   int64            `json:"grp,omitempty"` // the custom group, or 0: the collection
 	GroupBy contract.GroupBy `json:"g"`
 	Key     string           `json:"k"`
 	Sort    contract.SortBy  `json:"s"`
@@ -38,15 +39,15 @@ type cursor struct {
 }
 
 // cursorAfter is the cursor for the page after the one ending with r.
-func cursorAfter(q EntryQuery, r store.EntryPrice) cursor {
-	c := cursor{Version: cursorVersion, GroupBy: q.GroupBy, Key: q.Key, Sort: q.Sort, ID: r.ID}
+func cursorAfter(q EntryQuery, r store.ListingRow) cursor {
+	c := cursor{Version: cursorVersion, Group: q.group, GroupBy: q.GroupBy, Key: q.Key, Sort: q.Sort, ID: r.ID}
 	switch q.Sort {
 	case contract.SortByPrice:
 		c.Unpriced, c.Price = !r.UnitPrice.Valid, r.UnitPrice
 	case contract.SortByCMC:
 		c.CMC, c.Name = r.Cmc, r.Name
 	case contract.SortByAdded:
-		c.Added = r.AddedAt.Time
+		c.Added = r.ListedAt.Time
 	default:
 		c.Name = r.Name
 	}
@@ -80,7 +81,7 @@ func decodeCursor(s string, q EntryQuery) (cursor, error) {
 	if err := json.Unmarshal(b, &c); err != nil {
 		return cursor{}, bad
 	}
-	if c.Version != cursorVersion || c.GroupBy != q.GroupBy || c.Key != q.Key || c.Sort != q.Sort {
+	if c.Version != cursorVersion || c.Group != q.group || c.GroupBy != q.GroupBy || c.Key != q.Key || c.Sort != q.Sort {
 		return cursor{}, bad
 	}
 	// Postgres text can't hold a NUL, so a name with one would fail the query (a 500).

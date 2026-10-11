@@ -235,6 +235,8 @@ type GroupMember struct {
 	Quantity int `json:"quantity"`
 	// quantity × entry.unit_price_eur; null when there's no price.
 	ValueEUR *float64 `json:"value_eur" tstype:"number | null,required"`
+	// When it joined the group (RFC 3339, UTC).
+	AddedAt string `json:"added_at"`
 }
 
 // One page of a custom group's members.
@@ -261,6 +263,44 @@ type CustomGroup struct {
 	Description   string          `json:"description"`
 	PreviewImages []string        `json:"preview_images"`
 }
+
+// GET /api/groups: the user's custom groups, by name.
+type CustomGroupList struct {
+	Groups []CustomGroup `json:"groups"`
+}
+
+// POST /api/groups: a new custom group.
+type NewGroup struct {
+	Name        string          `json:"name"`
+	Kind        CustomGroupKind `json:"kind"`
+	Description string          `json:"description"`
+}
+
+// PATCH /api/groups/{id}: what to change about a group. Leave out what stays.
+type GroupChange struct {
+	Name        *string          `json:"name,omitempty"`
+	Kind        *CustomGroupKind `json:"kind,omitempty"`
+	Description *string          `json:"description,omitempty"`
+}
+
+// PUT /api/groups/{id}/members/{entry_id}: how many of the entry's copies are in the group.
+type MemberQuantity struct {
+	Quantity int `json:"quantity"`
+}
+
+// The longest a group's name and description can be, in characters: Unicode code points, after
+// trimming and NFC normalisation. (In JavaScript, count [...s].length, not s.length, which
+// counts UTF-16 units.)
+const MaxGroupNameLength = 100
+
+const MaxGroupDescriptionLength = 1000
+
+// The most custom groups one user can have.
+const MaxGroups = 500
+
+// The most group members (an entry in a group) one user can have, over all their groups: it
+// bounds the work of listing the groups, which totals every member.
+const MaxMembers = 100_000
 
 // Totals for the whole collection. Values are EUR only: Cardmarket is the reference market.
 type CollectionStats struct {
