@@ -9,6 +9,22 @@ import { CollectionEntryTile } from './CollectionEntryTile';
 const { lightningBolt, propaganda } = cards;
 
 describe('CardTile', () => {
+  it('can bring its own price line, or none', () => {
+    const { rerender } = render(<CardTile card={lightningBolt} price={<p>Priced elsewhere</p>} />);
+    expect(screen.getByText('Priced elsewhere')).toBeInTheDocument();
+    expect(screen.queryByText(eur(lightningBolt.prices.eur))).not.toBeInTheDocument();
+    rerender(<CardTile card={lightningBolt} price={null} />);
+    expect(document.querySelector('.card-tile__price')).toBeNull();
+    expect(screen.queryByText(eur(lightningBolt.prices.eur))).not.toBeInTheDocument();
+  });
+
+  it('marks foil and etched copies, which shimmer', () => {
+    const { rerender } = render(<CardTile card={lightningBolt} finish="foil" />);
+    expect(screen.getByRole('article')).toHaveClass('card-tile--foil');
+    rerender(<CardTile card={lightningBolt} />);
+    expect(screen.getByRole('article')).toHaveClass('card-tile--nonfoil');
+  });
+
   it('shows the name, printing, non-foil price and actions', () => {
     render(<CardTile card={lightningBolt} actions={<button type="button">Add</button>} />);
     const tile = screen.getByRole('article');
@@ -41,6 +57,14 @@ describe('CardTile', () => {
 });
 
 describe('CollectionEntryTile', () => {
+  it("shows its price once, as the unit price beside the line's value", () => {
+    render(<CollectionEntryTile entry={entries.bolts} />);
+    const tile = screen.getByRole('article');
+    expect(tile.querySelectorAll('.card-tile__price')).toHaveLength(0);
+    expect(tile.querySelector('.entry-tile__price')).toHaveTextContent(`${eur(entries.bolts.unit_price_eur)} each`);
+    expect(tile.querySelector('.entry-tile__price')).toHaveTextContent(`Value ${eur(entries.bolts.value_eur)}`);
+  });
+
   it('shows quantity, condition, the server unit price and the line value', () => {
     const { bolts } = entries;
     render(<CollectionEntryTile entry={bolts} />);
@@ -48,14 +72,15 @@ describe('CollectionEntryTile', () => {
     expect(within(tile).getByText(`${bolts.quantity}×`)).toBeInTheDocument();
     expect(getByTooltip(tile, 'Near Mint')).toHaveTextContent(/^NM$/);
     expect(within(tile).getByText(eur(bolts.unit_price_eur))).toBeInTheDocument();
-    expect(within(tile).getByText(/^Value/)).toHaveTextContent(eur(bolts.value_eur));
+    expect(tile.querySelector('.entry-tile__value')).toHaveTextContent(`Value ${eur(bolts.value_eur)}`);
+    expect(tile.querySelector('.entry-tile__unit')).toHaveTextContent(`${eur(bolts.unit_price_eur)} each`);
   });
 
   it("shows the server's unit price and value, not one worked out from the card", () => {
     render(<CollectionEntryTile entry={serverPricedBolts} />);
     const tile = screen.getByRole('article');
     expect(within(tile).getByText(eur(serverPricedBolts.unit_price_eur))).toBeInTheDocument();
-    expect(within(tile).getByText(/^Value/)).toHaveTextContent(eur(serverPricedBolts.value_eur));
+    expect(tile.querySelector('.entry-tile__value')).toHaveTextContent(`Value ${eur(serverPricedBolts.value_eur)}`);
     expect(tile).not.toHaveTextContent(eur(lightningBolt.prices.eur));
   });
 

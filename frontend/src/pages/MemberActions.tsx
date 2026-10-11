@@ -35,7 +35,12 @@ export function MemberActions({ groupId, groupName, row }: Props) {
       <Menu
         trigger={
           <Button variant="ghost" className="member-actions" busy={remove.isPending}>
-            Actions <VisuallyHidden>for {name}</VisuallyHidden>
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+              <circle cx="4" cy="9" r="1.6" />
+              <circle cx="9" cy="9" r="1.6" />
+              <circle cx="14" cy="9" r="1.6" />
+            </svg>
+            <VisuallyHidden>Actions for {name}</VisuallyHidden>
           </Button>
         }
         onAction={(id) => (id === 'change' ? setChanging(true) : takeOut())}

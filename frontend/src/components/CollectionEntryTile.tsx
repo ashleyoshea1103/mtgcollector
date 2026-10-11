@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { CONDITIONS, FINISHES, labelFor, LANGUAGES } from '../lib/labels';
 import type { CollectionEntry } from '../types';
-import { Badge, Cluster, TooltipText } from '../ui';
+import { Badge, Cluster, TooltipText, VisuallyHidden } from '../ui';
 import { CardTile } from './CardTile';
 import { Price } from './Price';
 
@@ -16,7 +16,7 @@ export function CollectionEntryTile({ entry, actions }: Props) {
     <CardTile
       card={entry.card}
       finish={entry.finish}
-      unitPrice={entry.unit_price_eur}
+      price={null}
       className="entry-tile"
       overlay={<Badge className="entry-tile__quantity">{entry.quantity}×</Badge>}
       actions={actions}
@@ -32,8 +32,14 @@ export function CollectionEntryTile({ entry, actions }: Props) {
           </TooltipText>
         )}
       </Cluster>
-      <p className="entry-tile__value">
-        Value <Price value={entry.value_eur} />
+      <p className="entry-tile__price">
+        <span className="entry-tile__unit">
+          <Price value={entry.unit_price_eur} /> each
+        </span>
+        <span className="entry-tile__value">
+          <VisuallyHidden>Value </VisuallyHidden>
+          <Price value={entry.value_eur} />
+        </span>
       </p>
     </CardTile>
   );

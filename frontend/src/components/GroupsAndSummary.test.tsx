@@ -73,6 +73,20 @@ describe('CollectionSummary', () => {
   });
 
   it.each([
+    ['By color', stats.by_color],
+    ['By rarity', stats.by_rarity],
+  ] as const)('draws %s as a bar, each part as big as its count', (title, counts) => {
+    render(<CollectionSummary stats={stats} />);
+    const section = screen.getByRole('heading', { name: title }).closest('section')!;
+    const bar = section.querySelector('.breakdown-bar')!;
+    expect(bar).toHaveAttribute('aria-hidden', 'true');
+    const parts = [...bar.querySelectorAll<HTMLElement>('.breakdown-bar__part')];
+    expect(parts.map((p) => [p.className.match(/swatch--(\w+)/)![1], Number(p.style.flexGrow)])).toEqual(
+      Object.entries(counts).map(([key, n]) => [key.toLowerCase(), n]),
+    );
+  });
+
+  it.each([
     ['By color', stats.by_color, COLORS],
     ['By rarity', stats.by_rarity, RARITIES],
   ] as const)('breaks the collection down %s', (title, counts, labels) => {

@@ -30,6 +30,8 @@ describe('the app frame', () => {
     expect(header().getByRole('link', { name: 'Groups' })).toBeInTheDocument();
     expect(header().getByText(ann.email)).toBeInTheDocument();
     expect(header().queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument();
+    expect(header().getByRole('button', { name: 'Light theme' })).toBeInTheDocument();
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Add cards' })).toHaveAttribute('href', '/search');
   });
 
   it("offers logging in when it can't tell who's signed in", async () => {

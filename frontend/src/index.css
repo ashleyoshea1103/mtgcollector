@@ -1,80 +1,148 @@
 /*
- * Base styles only: enough to make the components readable. The visual design
- * is still to be decided, so components expose BEM-style class names
- * (block__element--modifier) for the real stylesheet to target later. Every value
- * comes from the tokens in src/styles/tokens.css; the src/ui primitives have their
- * own structural rules in src/ui/ui.css.
+ * The app's own components and pages, styled for direction A (dark, binder-style): a quiet
+ * frame that lets the card art do the visual work. Every value is a token from
+ * src/styles/tokens.css. Components keep their BEM class names (block__element--modifier);
+ * these rules are the only place they're styled.
  */
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  padding: var(--spacing-4);
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: var(--font-body);
-  font-size: var(--text-md);
-  line-height: var(--leading-body);
-}
+/* App frame */
 
 /* Hidden until focused: the first thing a keyboard user reaches. */
 .skip-link {
   position: absolute;
-  left: var(--spacing-2);
+  left: var(--spacing-3);
   top: -100vh;
+  padding: var(--spacing-2) var(--spacing-4);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: var(--font-weight-semibold);
+  z-index: var(--z-toast);
 }
 .skip-link:focus {
-  top: var(--spacing-2);
-}
-
-/* Focused when a new page opens, for screen readers; not a control, so no focus ring. */
-.app-main:focus {
-  outline: none;
+  top: var(--spacing-3);
 }
 
 .app-header {
-  margin-bottom: var(--spacing-5);
+  border-bottom: 1px solid var(--color-rule);
 }
-.app-header__nav ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.app-header__bar {
+  max-width: var(--size-page);
+  margin: 0 auto;
+  padding: var(--spacing-3) var(--spacing-6);
+  row-gap: var(--spacing-2);
+}
+.app-header__home {
+  color: var(--color-text-strong);
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+.app-header__nav {
+  flex: 1 1 auto;
+}
+.app-header__nav a {
+  display: inline-block;
+  padding: var(--spacing-1) 0;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+.app-header__nav a:hover {
+  color: var(--color-text-strong);
 }
 .app-header__nav a[aria-current='page'] {
-  font-weight: bold;
+  border-bottom-color: var(--color-accent);
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
+}
+.app-header__account {
+  gap: var(--spacing-4);
+}
+.app-header__account a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+.app-header__account a:hover {
+  color: var(--color-text-strong);
+}
+.app-header__email {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.theme-toggle {
+  font-size: var(--text-sm);
+}
+/* Deleting is offered quietly beside the group's other actions; its confirmation is the loud one. */
+.group-page__actions .button--danger {
+  border-color: var(--color-border-control);
+  background: transparent;
+  color: var(--color-danger-fg);
 }
 
-/* Lists of cards and groups are grids; their list markers would only get in the way. */
-.card-grid,
-.group-grid,
-.printing-links {
+/* Focused when a new page opens, for screen readers; not a control, so no focus ring. */
+.app-main {
+  max-width: var(--size-page);
+  margin: 0 auto;
+  padding: 0 var(--spacing-6) var(--spacing-7);
+}
+.app-main:focus {
+  outline: none;
+}
+@media (max-width: 40rem) {
+  .app-header__bar {
+    padding: var(--spacing-2) var(--spacing-4);
+  }
+  .app-main {
+    padding: 0 var(--spacing-4) var(--spacing-7);
+  }
+}
+
+/* A page's heading: its title (and a line under it) on the left, its main action on the right. */
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--spacing-4) var(--spacing-6);
+  padding-top: var(--spacing-6);
+}
+.page-head__titles {
+  display: grid;
+  gap: var(--spacing-1);
+}
+.page-head__subtitle {
   margin: 0;
-  padding: 0;
-  list-style: none;
+  color: var(--color-text-muted);
+}
+a.button:hover {
+  color: inherit;
+  filter: brightness(1.08);
+}
+:is(.search-page, .groups-page, .card-page, .auth-page, .not-found, .route-error) > h1,
+:is(.groups-page, .group-page__header) h1 {
+  padding-top: var(--spacing-6);
+}
+:is(.groups-page, .group-page__header) > .cluster h1 {
+  padding-top: 0;
+}
+.groups-page > .cluster:first-of-type,
+.group-page__header > .cluster:first-child {
+  padding-top: var(--spacing-6);
+  align-items: flex-end;
 }
 
-.search-filters__colors {
-  margin: 0;
-  border: 0;
-  padding: 0;
-}
+/* Cards */
 
-img {
-  max-width: 100%;
-  height: auto;
-}
-
-/* Card images keep the printed card's 63 × 88 mm proportions. */
+/* Card images keep the printed card's 63 × 88 mm proportions and its round corners. */
 .card-image {
   display: block;
   aspect-ratio: 63 / 88;
   width: 100%;
   border-radius: 4.75% / 3.5%;
+  background: var(--color-surface);
 }
 .card-image--small {
   max-width: 146px;
@@ -90,7 +158,9 @@ img {
   align-items: center;
   justify-content: center;
   padding: var(--spacing-4);
-  border: 1px dashed var(--color-border);
+  border: 1px dashed var(--color-border-control);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
   text-align: center;
 }
 
@@ -150,44 +220,536 @@ img {
 .rarity-badge--bonus {
   color: var(--color-rarity-bonus);
 }
+.rarity-badge {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+}
 .rarity-badge abbr {
   text-decoration: none;
 }
 
+.no-longer-listed {
+  padding: 0.0625rem var(--spacing-2);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.price {
+  font-variant-numeric: tabular-nums;
+}
+.price--none {
+  color: var(--color-text-muted);
+}
+.total-value__unpriced {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-normal);
+}
+
+/* A card as a tile: its image, then its name, printing and price. Pointing at it (or
+   focusing inside it) tilts it slightly toward you, like a card picked up from a binder. */
+.card-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  transition: transform 0.18s var(--ease-out);
+}
 .card-tile__media {
   position: relative;
+  border-radius: 4.75% / 3.5%;
+  box-shadow: var(--shadow-md);
+  transition: box-shadow 0.18s var(--ease-out);
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .card-tile:hover,
+  .card-tile:focus-within {
+    transform: perspective(900px) rotateX(3deg) rotateY(-4deg) translateY(-4px);
+  }
+  .card-tile:hover .card-tile__media,
+  .card-tile:focus-within .card-tile__media {
+    box-shadow: var(--shadow-lg);
+  }
+}
+/* Foil copies catch the light: a sheen that sweeps across the image. */
+:is(.card-tile--foil, .card-tile--etched) .card-tile__media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    115deg,
+    transparent 28%,
+    rgb(255 255 255 / 34%) 42%,
+    rgb(150 225 255 / 28%) 48%,
+    rgb(255 170 240 / 24%) 54%,
+    transparent 68%
+  );
+  background-size: 260% 260%;
+  animation: foil-sheen 3.6s ease-in-out infinite;
+}
+@keyframes foil-sheen {
+  0% {
+    background-position: 110% 0;
+  }
+  100% {
+    background-position: -110% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.card-tile--foil, .card-tile--etched) .card-tile__media::after {
+    animation: none;
+    background-position: 50% 0;
+  }
 }
 .card-tile__overlay {
   position: absolute;
   top: var(--spacing-2);
   left: var(--spacing-2);
 }
-.card-tile__body p,
-.card-tile__name {
-  margin: var(--spacing-1) 0;
+.card-tile__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0 0.125rem;
 }
-
-.custom-group-card__previews {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--spacing-1);
-  min-height: 4rem;
-}
-
-.entry-table {
-  border-collapse: collapse;
-  width: 100%;
-}
-.entry-table th,
-.entry-table td {
-  padding: var(--spacing-1) var(--spacing-2);
-  text-align: left;
-}
-
-.group-bucket__header {
+.card-tile__body p {
   margin: 0;
+}
+.card-tile__name {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  line-height: var(--leading-snug);
+}
+/* Runs as a line of text, so a long set name wraps with its symbol and number, not apart. */
+.card-tile__printing {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+.card-tile__price {
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
+}
+.card-tile__actions {
+  gap: var(--spacing-2);
+}
+.card-tile__actions a {
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+/* An owned copy's tile: a count on the image, its copy as chips, its value. */
+.entry-tile__quantity {
+  padding: 0.125rem 0.5625rem;
+  background: rgb(10 10 12 / 86%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 16%);
+  color: #ffffff;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+.entry-tile__copy {
+  gap: 0.375rem;
+}
+.entry-tile__copy > :is(abbr, span) {
+  padding: 0.125rem var(--spacing-2);
+  border-radius: 6px;
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+.entry-tile__copy > .entry-tile__finish {
+  background: linear-gradient(100deg, #3a3550, #24414a);
+  color: #e7e0ff;
+}
+.entry-tile__price {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  margin-top: 0.125rem;
+}
+.entry-tile__unit {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.entry-tile__value {
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
+}
+/* The Actions button sits on the image's corner, shown while the tile is pointed at or
+   focused (always, on a touch screen, where there's no pointing). */
+.entry-tile .card-tile__actions {
+  position: absolute;
+  top: var(--spacing-2);
+  right: var(--spacing-2);
+}
+.entry-tile .card-tile__actions .button {
+  width: var(--size-touch);
+  min-height: var(--size-touch);
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: rgb(10 10 12 / 86%);
+  color: #ffffff;
+}
+@media (hover: hover) {
+  .entry-tile .card-tile__actions {
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+  .entry-tile:hover .card-tile__actions,
+  .entry-tile:focus-within .card-tile__actions {
+    opacity: 1;
+  }
+}
+
+/* An owned copy as a table row (the list view). */
+.entry-table {
+  font-size: var(--text-sm);
+}
+.entry-table .entry-row__name {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+}
+.entry-table :is(.entry-row__quantity, .entry-row__price, .entry-row__value) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.entry-table td.entry-row__quantity,
+.entry-table td.entry-row__value {
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
+}
+.entry-table td:is(.entry-row__type, .entry-row__set, .entry-row__condition, .entry-row__finish, .entry-row__language, .entry-row__price) {
+  color: var(--color-text-secondary);
+}
+.entry-table .entry-row__actions {
+  text-align: right;
+}
+.entry-table .entry-row__actions .button {
+  width: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--color-border-control);
+}
+
+/* The collection */
+
+.collection-page__add {
+  flex: none;
+}
+/* On a phone, adding cards floats at the bottom of the screen, in reach of a thumb. */
+@media (max-width: 40rem) {
+  .collection-page__add {
+    position: fixed;
+    right: var(--spacing-4);
+    bottom: var(--spacing-5);
+    min-height: 3.25rem;
+    padding: 0 var(--spacing-5);
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-lg);
+    z-index: var(--z-sticky);
+  }
+}
+
+/* Totals, then thin bars of how the cards divide by color and rarity. */
+.collection-summary {
+  display: grid;
+  grid-template-columns: auto repeat(2, minmax(14rem, 1fr));
+  align-items: end;
+  gap: var(--spacing-4) var(--spacing-6);
+}
+@media (max-width: 64rem) {
+  .collection-summary {
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  }
+}
+.collection-summary__totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3) var(--spacing-6);
+  margin: 0;
+}
+.collection-summary__total {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.125rem;
+}
+.collection-summary__total dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.collection-summary__total dd {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 1.875rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-tight);
+  font-variant-numeric: tabular-nums;
+}
+.collection-summary__breakdown {
+  display: grid;
+  gap: var(--spacing-2);
+}
+.collection-summary__breakdown h3 {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.breakdown-bar {
+  display: flex;
+  gap: 2px;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--color-rule);
+}
+.breakdown-bar__part {
+  flex-basis: 0;
+}
+.breakdown-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem var(--spacing-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.breakdown-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.breakdown-item__swatch {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--radius-full);
+}
+/* Rarities are diamonds, like the rarity marks on the cards. */
+.collection-summary__breakdown--rarity .breakdown-item__swatch {
+  border-radius: 1px;
+  transform: rotate(45deg) scale(0.85);
+}
+.breakdown-item__count {
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.swatch--w {
+  background: var(--color-mana-w);
+}
+.swatch--u {
+  background: var(--color-mana-u);
+}
+.swatch--b {
+  background: var(--color-mana-b);
+}
+.swatch--r {
+  background: var(--color-mana-r);
+}
+.swatch--g {
+  background: var(--color-mana-g);
+}
+.swatch--c {
+  background: var(--color-mana-c);
+}
+.swatch--m {
+  background: var(--color-mana-m);
+}
+.swatch--common {
+  background: var(--color-rarity-common);
+}
+.swatch--uncommon {
+  background: var(--color-rarity-uncommon);
+}
+.swatch--rare {
+  background: var(--color-rarity-rare);
+}
+.swatch--mythic {
+  background: var(--color-rarity-mythic);
+}
+.swatch--special,
+.swatch--bonus {
+  background: var(--color-rarity-special);
+}
+
+/* How the cards are shown: stays at the top while the cards scroll under it. */
+.listing-controls {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  min-height: var(--toolbar-height);
+  padding: var(--spacing-3) 0;
+  border-top: 1px solid var(--color-rule);
+  border-bottom: 1px solid var(--color-rule);
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+}
+.listing-controls .field {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+.listing-controls .select {
+  width: auto;
+}
+.listing-controls__view {
+  margin-left: auto;
+}
+
+/* A group of the listing: its heading stays in view below the controls while its cards scroll. */
+.listing {
+  display: grid;
+}
+.group-bucket__header {
+  position: sticky;
+  top: var(--toolbar-height);
+  z-index: calc(var(--z-sticky) - 1);
+  margin: 0;
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+}
+.group-bucket__toggle {
+  padding: var(--spacing-4) 0 var(--spacing-3);
+  color: var(--color-text-strong);
+}
+.group-bucket__label {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+}
+.group-bucket__count {
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-normal);
+  font-variant-numeric: tabular-nums;
+}
+.group-bucket__value {
+  margin-left: auto;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.group-bucket__body {
+  padding: var(--spacing-2) 0 var(--spacing-6);
+}
+.group-bucket__body .entry-grid {
+  row-gap: var(--spacing-6);
+}
+.group-bucket__more {
+  margin-top: var(--spacing-5);
+}
+
+/* Groups */
+
+.custom-group-card {
+  display: grid;
+  gap: var(--spacing-2);
+  height: 100%;
+  padding: var(--spacing-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+/* Its best cards, fanned like the top of a deck box. */
+.custom-group-card__previews {
+  display: flex;
+  justify-content: center;
+  height: 9.5rem;
+  margin-bottom: var(--spacing-2);
+  padding-top: var(--spacing-3);
+}
+.custom-group-card__previews img {
+  width: 5.5rem;
+  height: auto;
+  aspect-ratio: 63 / 88;
+  margin: 0 -1.25rem;
+  border-radius: 4.75% / 3.5%;
+  box-shadow: var(--shadow-md);
+  transform-origin: 50% 120%;
+}
+.custom-group-card__previews img:nth-child(1):not(:only-child) {
+  transform: rotate(-9deg);
+}
+.custom-group-card__previews img:nth-child(2) {
+  transform: rotate(-3deg);
+}
+.custom-group-card__previews img:nth-child(3) {
+  transform: rotate(3deg);
+}
+.custom-group-card__previews img:nth-child(4) {
+  transform: rotate(9deg);
+}
+.custom-group-card__empty {
+  width: 100%;
+  padding: var(--spacing-4);
+}
+.custom-group-card__name {
+  margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-lg);
 }
+.custom-group-card__meta {
+  gap: var(--spacing-1) var(--spacing-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.custom-group-card__kind {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+.custom-group-card__description {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.custom-group-card__actions {
+  margin-top: auto;
+  padding-top: var(--spacing-2);
+}
+.custom-group-card__actions a {
+  font-weight: var(--font-weight-semibold);
+}
+.group-grid,
+.card-grid,
+.printing-links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card-grid {
+  row-gap: var(--spacing-6);
+}
+
+.group-page__header {
+  display: grid;
+  gap: var(--spacing-2);
+}
+.group-page__meta {
+  gap: var(--spacing-1) var(--spacing-4);
+  color: var(--color-text-muted);
+}
+.group-page__description {
+  margin: 0;
+  max-width: 48rem;
+  color: var(--color-text-secondary);
+}
+
+/* A card in full */
 
 /* Top-aligned, not stretched: a stretched image would take the height of a taller info
    column and lose the card's proportions. */
@@ -195,7 +757,8 @@ img {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--spacing-4);
+  gap: var(--spacing-6);
+  padding-top: var(--spacing-6);
 }
 /* The images get a set width: room for each face at full size (--faces, from CardDetail), or
    the whole row on narrow screens. Shared out between the faces, each image then has its
@@ -203,35 +766,119 @@ img {
 .card-detail__images {
   display: flex;
   align-items: flex-start;
-  gap: var(--spacing-2);
-  width: min(100%, calc(var(--faces, 1) * 336px + (var(--faces, 1) - 1) * var(--spacing-2)));
+  gap: var(--spacing-3);
+  width: min(100%, calc(var(--faces, 1) * 336px + (var(--faces, 1) - 1) * var(--spacing-3)));
 }
 .card-detail__images > .card-image {
   flex: 1 1 0;
   min-width: 0;
+  box-shadow: var(--shadow-lg);
 }
-.card-detail__oracle {
-  white-space: pre-line;
+.card-detail__info {
+  display: grid;
+  flex: 1 1 22rem;
+  gap: var(--spacing-5);
+  min-width: 0;
 }
-
-.add-form {
+.card-detail__header {
   display: grid;
   gap: var(--spacing-2);
-  max-width: 24rem;
 }
-
-.printing-list {
+.card-detail__name {
+  margin: 0;
+  font-family: var(--font-display);
+}
+.card-detail__printing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-1) var(--spacing-3);
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+.card-detail__face {
   display: grid;
   gap: var(--spacing-1);
-  max-width: 32rem;
+  padding: var(--spacing-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
 }
-.printing-option {
+.card-detail__face-name {
   display: flex;
-  gap: var(--spacing-3);
-  text-align: left;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
 }
-.printing-option__set {
-  flex: 1;
+.card-detail__type {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.card-detail__oracle {
+  margin-top: var(--spacing-2);
+  white-space: pre-line;
+}
+.card-detail__prices,
+.card-detail__owned {
+  display: grid;
+  gap: var(--spacing-2);
+}
+.card-detail__prices > h2,
+.card-detail__owned > h2,
+.card-detail__prices > h3,
+.card-detail__owned > h3 {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.card-detail__cardmarket {
+  justify-self: start;
+  font-weight: var(--font-weight-semibold);
+}
+.card-detail__owned ul {
+  display: grid;
+  gap: var(--spacing-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card-page__printings {
+  display: grid;
+  gap: var(--spacing-3);
+}
+/* In columns on a wide screen: a card can have a hundred printings. */
+.printing-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(24rem, 100%), 1fr));
+  column-gap: var(--spacing-6);
+}
+.printing-links li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) 0;
+  border-top: 1px solid var(--color-rule);
+  color: var(--color-text-muted);
+}
+.printing-links a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+.printing-links a:hover {
+  color: var(--color-text-strong);
+  text-decoration: underline;
+}
+.printing-links [aria-current='page'] {
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Card symbols are Scryfall's images, sized to the text around them (a mana cost or a line
@@ -248,6 +895,11 @@ img {
   vertical-align: -0.125em;
 }
 /* A symbol Scryfall has no image for is shown as text, in braces, coloured from the tokens. */
+.mana-symbol--text {
+  padding: 0 0.15em;
+  border-radius: var(--radius-sm);
+  color: #1a1a1a;
+}
 .mana-symbol--text::before {
   content: '{';
 }
@@ -273,11 +925,205 @@ img {
   background: var(--color-mana-c);
 }
 
-/* Gallery page */
+/* Search */
+
+.search-filters {
+  display: grid;
+  gap: var(--spacing-4);
+  padding: var(--spacing-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.search-filters > .field .search-input input {
+  min-height: 3rem;
+  font-size: var(--text-lg);
+}
+.search-filters__more > .field {
+  flex: 1 1 12rem;
+}
+.search-filters__colors {
+  display: grid;
+  gap: var(--spacing-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.search-filters__colors legend {
+  margin-bottom: var(--spacing-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+}
+/* Colours are pills you switch on and off; the checkbox in each is still what's operated
+   (and read), only drawn as the pill. */
+.search-filters__color {
+  min-height: 2.5rem;
+  padding: 0 var(--spacing-3) 0 var(--spacing-2);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-full);
+  background: var(--color-control);
+  font-size: var(--text-sm);
+}
+.search-filters__color .checkbox__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.search-filters__color:has(:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-text-strong);
+}
+.search-filters__color:has(:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.search-filters__color .checkbox__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.search-filters__color .mana-symbol__icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.search-page__login,
+.search-page__hint {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+.search-page__results {
+  display: grid;
+  gap: var(--spacing-5);
+  transition: opacity 0.15s ease;
+}
+/* The last results, shown while the next search runs. */
+.search-page__results[aria-busy='true'] {
+  opacity: 0.6;
+}
+.search-page__more {
+  justify-self: center;
+}
+
+/* Adding a card */
+
+.dialog-modal:has(.add-card-dialog) {
+  width: min(44rem, 100%);
+}
+.add-card-dialog__printings {
+  display: grid;
+  gap: var(--spacing-2);
+}
+.add-card-dialog__printings h3 {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.printing-list {
+  display: grid;
+  gap: var(--spacing-1);
+  max-height: 16rem;
+  overflow-y: auto;
+  padding-right: var(--spacing-1);
+}
+.printing-option {
+  justify-content: flex-start;
+  gap: var(--spacing-3);
+  width: 100%;
+  min-height: 2.75rem;
+  border-color: transparent;
+  background: transparent;
+  font-weight: var(--font-weight-normal);
+  text-align: left;
+}
+.printing-option__set {
+  flex: 1;
+  color: var(--color-text);
+}
+.printing-option__number,
+.printing-option__date {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.add-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--spacing-3) var(--spacing-4);
+}
+.add-form__card {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+.add-form__card strong {
+  color: var(--color-text-strong);
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+}
+.add-form__submit {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+/* Buttons keep their own width in the dialog's column. */
+.add-card-dialog__cancel,
+.add-card-dialog__printings > .button {
+  align-self: flex-start;
+  justify-self: start;
+}
+
+/* Forms in pages and dialogs */
+
+.auth-page {
+  max-width: 26rem;
+  margin: 0 auto;
+}
+.auth-form,
+.group-form,
+.entry-change-form,
+.member-form {
+  display: grid;
+  gap: var(--spacing-4);
+}
+.auth-form .button[type='submit'] {
+  justify-self: stretch;
+}
+.group-form__actions,
+.entry-change-form__actions,
+.member-form__actions {
+  justify-content: flex-end;
+  padding-top: var(--spacing-2);
+}
+
+/* Not found, and a page that failed */
+
+.not-found,
+.route-error {
+  max-width: 36rem;
+}
+.not-found p,
+.route-error p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+/* Gallery page (development only) */
+.gallery {
+  max-width: var(--size-page);
+  margin: 0 auto;
+  padding: var(--spacing-6);
+}
 .gallery__section {
   margin-block: var(--spacing-6);
   padding-top: var(--spacing-4);
   border-top: 1px solid var(--color-border);
+}
+.gallery__section > h2 {
+  margin-bottom: var(--spacing-3);
 }
 .gallery__toc {
   display: flex;
@@ -294,7 +1140,15 @@ img {
   width: auto;
 }
 .gallery__note {
+  color: var(--color-text-muted);
   font-style: italic;
+}
+.gallery__output {
+  padding: var(--spacing-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
 }
 .gallery__swatch {
   display: inline-flex;
@@ -320,4 +1174,57 @@ img {
 }
 .gallery__form {
   max-width: 24rem;
+}
+
+/* On a phone */
+
+@media (max-width: 40rem) {
+  /* The header in two short rows: the email goes (it's on the account's own pages), and the
+     theme switch shrinks to its icon, keeping its name for screen readers. */
+  .app-header__email {
+    display: none;
+  }
+  .theme-toggle {
+    width: var(--size-touch);
+    padding: 0;
+  }
+  .theme-toggle__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  /* The controls side by side, labels above, so the toolbar stays one short row. */
+  .listing-controls {
+    align-items: flex-end;
+    gap: var(--spacing-2);
+  }
+  .listing-controls .field {
+    display: grid;
+    flex: 1 1 7rem;
+    gap: 0.125rem;
+  }
+  .listing-controls .field__label {
+    font-size: var(--text-xs);
+  }
+  .listing-controls .select {
+    width: 100%;
+  }
+  /* Cards two to a row. */
+  :is(.entry-grid, .card-grid).grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--spacing-3);
+  }
+  .card-tile__name {
+    font-size: var(--text-md);
+  }
+  .collection-summary__total dd {
+    font-size: var(--text-xl);
+  }
+}
+
+.card-page__printings > .button {
+  justify-self: start;
 }

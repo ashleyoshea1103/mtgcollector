@@ -3,6 +3,7 @@ import { COLORS, labelFor, RARITIES } from '../lib/labels';
 import { isSetCode, SEARCH_COLORS } from '../lib/search';
 import { MaxSearchLength, type Rarity } from '../types';
 import { Checkbox, Cluster, Field, SearchInput, Select } from '../ui';
+import { ManaSymbol } from './ManaSymbol';
 
 interface Props {
   /** The search as it stands; text fields start from it and then keep what's typed. */
@@ -49,12 +50,12 @@ export function SearchFilters({ value, onChange }: Props) {
         <legend>Colors (all of)</legend>
         <Cluster>
           {SEARCH_COLORS.map((c) => (
-            <Checkbox key={c} checked={!colorless && value.colors.includes(c)} onChange={(on) => toggleColor(c, on)}>
-              {labelFor(COLORS, c)}
+            <Checkbox key={c} className="search-filters__color" checked={!colorless && value.colors.includes(c)} onChange={(on) => toggleColor(c, on)}>
+              <ManaSymbol symbol={c} announce={false} /> {labelFor(COLORS, c)}
             </Checkbox>
           ))}
-          <Checkbox checked={colorless} onChange={(on) => set({ colors: on ? 'C' : '' })}>
-            {labelFor(COLORS, 'C')}
+          <Checkbox className="search-filters__color" checked={colorless} onChange={(on) => set({ colors: on ? 'C' : '' })}>
+            <ManaSymbol symbol="C" announce={false} /> {labelFor(COLORS, 'C')}
           </Checkbox>
         </Cluster>
       </fieldset>
