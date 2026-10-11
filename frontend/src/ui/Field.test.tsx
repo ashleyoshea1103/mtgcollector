@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Button } from './Button';
 import { Dialog } from './Dialog';
-import { Field, NumberInput, SearchInput, Select, TextInput } from './Field';
+import { Checkbox, Field, NumberInput, SearchInput, Select, TextArea, TextInput } from './Field';
 
 describe('Field', () => {
   it('names its control by the label', () => {
@@ -201,5 +201,77 @@ describe('SearchInput', () => {
     act(() => vi.advanceTimersByTime(1000));
     expect(onSearch).not.toHaveBeenCalled();
     expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('bolt');
+  });
+});
+
+describe('TextInput types', () => {
+  it('is plain text unless asked for an email address or password', () => {
+    render(
+      <>
+        <Field label="Name">
+          <TextInput />
+        </Field>
+        <Field label="Email">
+          <TextInput type="email" autoComplete="email" />
+        </Field>
+        <Field label="Password">
+          <TextInput type="password" autoComplete="current-password" />
+        </Field>
+      </>,
+    );
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveAttribute('type', 'email');
+    // Password inputs have no role; the label still names it.
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
+  });
+});
+
+describe('Checkbox', () => {
+  it('is named by its label and reports each change', async () => {
+    const onChange = vi.fn<(checked: boolean) => void>();
+    const { rerender } = render(
+      <Checkbox checked={false} onChange={onChange}>
+        Include tokens
+      </Checkbox>,
+    );
+    const box = screen.getByRole('checkbox', { name: 'Include tokens' });
+    expect(box).not.toBeChecked();
+    await userEvent.click(screen.getByText('Include tokens'));
+    expect(onChange).toHaveBeenLastCalledWith(true);
+
+    rerender(
+      <Checkbox checked onChange={onChange}>
+        Include tokens
+      </Checkbox>,
+    );
+    expect(box).toBeChecked();
+    await userEvent.click(box);
+    expect(onChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('passes other attributes to the box', () => {
+    render(
+      <Checkbox checked={false} onChange={() => {}} disabled aria-describedby="why">
+        White
+      </Checkbox>,
+    );
+    const box = screen.getByRole('checkbox', { name: 'White' });
+    expect(box).toBeDisabled();
+    expect(box).toHaveAttribute('aria-describedby', 'why');
+  });
+});
+
+describe('TextArea', () => {
+  it('is named by its field and reads its help and errors', () => {
+    render(
+      <Field label="Description" description="Up to 1,000 characters." error="Too long">
+        <TextArea defaultValue={'Line one\nLine two'} />
+      </Field>,
+    );
+    const area = screen.getByRole('textbox', { name: 'Description' });
+    expect(area.tagName).toBe('TEXTAREA');
+    expect(area).toHaveValue('Line one\nLine two');
+    expect(area).toHaveAccessibleDescription('Up to 1,000 characters. Too long');
+    expect(area).toHaveAttribute('aria-invalid', 'true');
   });
 });

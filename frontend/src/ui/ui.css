@@ -78,6 +78,17 @@
   gap: var(--spacing-1);
 }
 
+.text-area {
+  resize: vertical;
+  font: inherit;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
 .search-input {
   display: inline-flex;
   align-items: center;

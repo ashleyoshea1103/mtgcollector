@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useEffectEvent, useId, useRef, useState, type AriaAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
+import { createContext, useContext, useEffect, useEffectEvent, useId, useRef, useState, type AriaAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 
 interface FieldControl {
   id: string;
@@ -15,7 +15,7 @@ interface FieldProps {
   /** An error shown under the control; marks the control invalid and is read with it. */
   error?: ReactNode;
   className?: string;
-  /** One control: TextInput, NumberInput, Select or SearchInput. */
+  /** One control: TextInput, TextArea, NumberInput, Select or SearchInput. */
   children: ReactNode;
 }
 
@@ -71,10 +71,41 @@ function useFieldControl(own: ControlWiring): ControlWiring {
 
 type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>;
 
-/** A single-line text input. */
-export function TextInput({ className, ...rest }: InputProps) {
+interface TextInputProps extends InputProps {
+  /** An email address or password gets the browser's own keyboard, autofill and masking. */
+  type?: 'text' | 'email' | 'password';
+}
+
+/** A single-line text input: plain text, an email address or a password. */
+export function TextInput({ className, type = 'text', ...rest }: TextInputProps) {
   const control = useFieldControl(rest);
-  return <input {...rest} {...control} type="text" className={['text-input', className].filter(Boolean).join(' ')} />;
+  return <input {...rest} {...control} type={type} className={['text-input', className].filter(Boolean).join(' ')} />;
+}
+
+/** Text over several lines, e.g. a description. */
+export function TextArea({ className, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const control = useFieldControl(rest);
+  return <textarea {...rest} {...control} className={['text-area', className].filter(Boolean).join(' ')} />;
+}
+
+interface CheckboxProps extends Omit<InputProps, 'checked' | 'defaultChecked' | 'onChange' | 'children'> {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  /** The label, beside the box. */
+  children: ReactNode;
+}
+
+/**
+ * An on/off choice, labelled by its children: the browser's own checkbox. Several that answer
+ * one question go in a fieldset whose legend asks it.
+ */
+export function Checkbox({ checked, onChange, children, className, ...rest }: CheckboxProps) {
+  return (
+    <label className={['checkbox', className].filter(Boolean).join(' ')}>
+      <input {...rest} type="checkbox" className="checkbox__input" checked={checked} onChange={(e) => onChange(e.target.checked)} />{' '}
+      <span className="checkbox__label">{children}</span>
+    </label>
+  );
 }
 
 /**
