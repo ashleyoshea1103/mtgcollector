@@ -322,7 +322,9 @@ export interface MemberQuantity {
   quantity: number /* int */;
 }
 /**
- * The longest a group's name and description can be, in characters.
+ * The longest a group's name and description can be, in characters: Unicode code points, after
+ * trimming and NFC normalisation. (In JavaScript, count [...s].length, not s.length, which
+ * counts UTF-16 units.)
  */
 export const MaxGroupNameLength = 100;
 export const MaxGroupDescriptionLength = 1000;

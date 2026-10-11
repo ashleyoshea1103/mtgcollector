@@ -60,6 +60,7 @@ func NewHandler(s Services) http.Handler {
 	mux.HandleFunc("DELETE /api/groups/{id}", requireUser(s.Auth, deleteGroup(s.CustomGroups)))
 	mux.HandleFunc("GET /api/groups/{id}/groups", requireUser(s.Auth, groupGroups(s.CustomGroups)))
 	mux.HandleFunc("GET /api/groups/{id}/members", requireUser(s.Auth, groupMembers(s.CustomGroups)))
+	mux.HandleFunc("GET /api/groups/{id}/members/{entry_id}", requireUser(s.Auth, getMember(s.CustomGroups)))
 	mux.HandleFunc("PUT /api/groups/{id}/members/{entry_id}", requireUser(s.Auth, setMember(s.CustomGroups)))
 	mux.HandleFunc("DELETE /api/groups/{id}/members/{entry_id}", requireUser(s.Auth, removeMember(s.CustomGroups)))
 	// Anything else under /api/ is a JSON 404, like every other API error.

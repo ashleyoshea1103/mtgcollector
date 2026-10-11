@@ -288,7 +288,9 @@ type MemberQuantity struct {
 	Quantity int `json:"quantity"`
 }
 
-// The longest a group's name and description can be, in characters.
+// The longest a group's name and description can be, in characters: Unicode code points, after
+// trimming and NFC normalisation. (In JavaScript, count [...s].length, not s.length, which
+// counts UTF-16 units.)
 const MaxGroupNameLength = 100
 
 const MaxGroupDescriptionLength = 1000

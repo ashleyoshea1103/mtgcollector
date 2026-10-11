@@ -743,3 +743,159 @@ func TestAMemberWrittenAsItsGroupIsDeleted(t *testing.T) {
 		t.Errorf("the entry has %d copies, want its 2: the add into the deleted group went in", got.Quantity)
 	}
 }
+
+func TestEveryKindCanBeStored(t *testing.T) {
+	f := newFixture(t)
+	for _, k := range []contract.CustomGroupKind{contract.CustomGroupKindBinder, contract.CustomGroupKindDeck, contract.CustomGroupKindBox, contract.CustomGroupKindOther} {
+		if g, err := f.s.CreateGroup(t.Context(), f.ann, contract.NewGroup{Name: string(k), Kind: k}); err != nil || g.Kind != k {
+			t.Errorf("kind %s: %+v, %v", k, g, err)
+		}
+	}
+}
+
+func TestNamesAndDescriptionsAreTidied(t *testing.T) {
+	f := newFixture(t)
+	g, err := f.s.CreateGroup(t.Context(), f.ann, contract.NewGroup{Name: "Cafe\u0301 binder", Kind: "binder", Description: "  For trades.\n  "})
+	if err != nil || g.Name != "Caf\u00e9 binder" || g.Description != "For trades." {
+		t.Fatalf("= %+v, %v; want the name in NFC and the description trimmed", g, err)
+	}
+	if _, err := f.s.CreateGroup(t.Context(), f.ann, contract.NewGroup{Name: "caf\u00e9 binder", Kind: "box"}); apperr.KindOf(err) != apperr.Conflict {
+		t.Errorf("the same name, precomposed and lower-case = %v, want a conflict", err)
+	}
+}
+
+func TestReadingOneMember(t *testing.T) {
+	f := newFixture(t)
+	g := f.group(t, f.ann, "Binder")
+	in, out := f.add(t, f.ann, newEntry(f.card(t, testCard{}), 3)), f.add(t, f.ann, newEntry(f.card(t, testCard{}), 1))
+	f.member(t, f.ann, g.ID, in.ID, 2)
+	if m, err := f.s.Member(t.Context(), f.ann, g.ID, in.ID); err != nil || m.Quantity != 2 || m.Entry.ID != in.ID {
+		t.Errorf("member = %+v, %v", m, err)
+	}
+	if _, err := f.s.Member(t.Context(), f.ann, g.ID, out.ID); !errors.Is(err, ErrMemberNotFound) {
+		t.Errorf("an entry not in the group = %v, want ErrMemberNotFound", err)
+	}
+	if _, err := f.s.Member(t.Context(), f.bob, g.ID, in.ID); !errors.Is(err, ErrGroupNotFound) {
+		t.Errorf("Bob reading Ann's member = %v, want ErrGroupNotFound", err)
+	}
+}
+
+func TestSetMemberRefusesQuantitiesThatWouldWrap(t *testing.T) {
+	f := newFixture(t)
+	g := f.group(t, f.ann, "Binder")
+	e := f.add(t, f.ann, newEntry(f.card(t, testCard{}), 3))
+	for _, q := range []int{1<<32 + 1, contract.MaxQuantity + 1, -1} {
+		if _, _, err := f.s.SetMember(t.Context(), f.ann, g.ID, e.ID, q); !isInputError(err) {
+			t.Errorf("quantity %d = %v, want an apperr.Invalid", q, err)
+		}
+	}
+}
+
+// Adding copies to a group they're already in tops up the member, never past its entry.
+func TestAddingMoreToAMember(t *testing.T) {
+	f := newFixture(t)
+	g := f.group(t, f.ann, "Binder")
+	card := f.card(t, testCard{})
+	e := f.add(t, f.ann, newEntry(card, 4))
+	f.member(t, f.ann, g.ID, e.ID, 1)
+	more := newEntry(card, 1)
+	more.GroupID = &g.ID
+	if got, _, err := f.s.Add(t.Context(), f.ann, more); err != nil || got.Quantity != 5 {
+		t.Fatalf("add = %+v, %v", got, err)
+	}
+	if m, _ := f.s.member(t.Context(), f.ann, g.ID, e.ID); m.Quantity != 2 {
+		t.Errorf("the member holds %d after one more was added to it, want 2 (of the entry's 5)", m.Quantity)
+	}
+}
+
+// A group's totals are of its members' copies, not their entries'.
+func TestAGroupsTotalsCountItsCopies(t *testing.T) {
+	f := newFixture(t)
+	g := f.group(t, f.ann, "Binder")
+	priced := f.add(t, f.ann, newEntry(f.card(t, testCard{eur: euros(2)}), 4))
+	unpriced := f.add(t, f.ann, newEntry(f.card(t, testCard{}), 5))
+	f.member(t, f.ann, g.ID, priced.ID, 1)
+	f.member(t, f.ann, g.ID, unpriced.ID, 2)
+	groups, err := f.s.GroupGroups(t.Context(), f.ann, g.ID, contract.GroupByNone)
+	want := contract.ValueTotal{CardCount: 3, ValueEUR: 2, UnpricedCount: 2}
+	if err != nil || len(groups.Groups) != 1 || groups.Groups[0].ValueTotal != want {
+		t.Errorf("= %+v, %v; want %+v", groups.Groups, err, want)
+	}
+}
+
+// Every order pages through a group's members only, each once; newest first is by when they
+// joined the group.
+func TestPagingThroughAGroupInEveryOrder(t *testing.T) {
+	f := newFixture(t)
+	g := f.group(t, f.ann, "Binder")
+	var members []contract.CollectionEntry
+	for i := range 70 {
+		e := f.add(t, f.ann, newEntry(f.card(t, testCard{name: fmt.Sprintf("Card %02d", i%20), cmc: float64(i % 6), eur: euros(float64(i%9) + 0.5)}), 1))
+		if i < 65 {
+			members = append(members, e)
+		}
+	}
+	// They join the group in the opposite order to being added to the collection.
+	for i := len(members) - 1; i >= 0; i-- {
+		f.member(t, f.ann, g.ID, members[i].ID, 1)
+	}
+	if _, err := f.pool.Exec(t.Context(),
+		`UPDATE group_members SET added_at = '2026-01-01T00:00:00Z'::timestamptz + (1000000 - entry_id) * interval '1 second' WHERE group_id = $1`, g.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, sort := range []contract.SortBy{contract.SortByName, contract.SortByPrice, contract.SortByCMC, contract.SortByAdded} {
+		var got []int64
+		q := EntryQuery{Sort: sort}
+		for pages := 0; ; pages++ {
+			if pages > 3 {
+				t.Fatalf("%s: too many pages", sort)
+			}
+			p, err := f.s.Members(t.Context(), f.ann, g.ID, q)
+			if err != nil {
+				t.Fatalf("%s: %v", sort, err)
+			}
+			for _, m := range p.Members {
+				got = append(got, m.Entry.ID)
+			}
+			if p.NextCursor == nil {
+				break
+			}
+			q.Cursor = *p.NextCursor
+		}
+		if len(got) != len(members) {
+			t.Errorf("%s: %d members listed, want %d", sort, len(got), len(members))
+			continue
+		}
+		seen := map[int64]bool{}
+		for _, id := range got {
+			seen[id] = true
+		}
+		for _, m := range members {
+			if !seen[m.ID] {
+				t.Errorf("%s: member %d missing", sort, m.ID)
+			}
+		}
+		if sort == contract.SortByAdded {
+			// Joined last = the lowest entry id, so newest first is by entry id, ascending.
+			if !slices.IsSorted(got) {
+				t.Errorf("newest first in the group = %v, want by when each joined", got)
+			}
+		}
+	}
+}
+
+// A card's place in the previews is by its most valuable copy in the group.
+func TestPreviewsRankACardByItsBestCopy(t *testing.T) {
+	f := newFixture(t)
+	g := f.group(t, f.ann, "Binder")
+	both := f.card(t, testCard{eur: euros(1), eurFoil: euros(10)})
+	mid := f.card(t, testCard{eur: euros(5)})
+	f.member(t, f.ann, g.ID, f.add(t, f.ann, newEntry(both, 1)).ID, 1)
+	f.member(t, f.ann, g.ID, f.add(t, f.ann, newEntry(mid, 1)).ID, 1)
+	foil := newEntry(both, 1)
+	foil.Finish = contract.FinishFoil
+	f.member(t, f.ann, g.ID, f.add(t, f.ann, foil).ID, 1)
+	if got, _ := f.s.Group(t.Context(), f.ann, g.ID); !slices.Equal(got.PreviewImages, []string{smallImage(both), smallImage(mid)}) {
+		t.Errorf("previews = %q, want the card with a €10 foil copy before the €5 card", got.PreviewImages)
+	}
+}

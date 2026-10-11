@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
+	"golang.org/x/text/unicode/norm"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
@@ -270,6 +271,19 @@ func (s *Service) RemoveMember(ctx context.Context, userID, groupID, entryID int
 	return nil
 }
 
+// Member returns one of a group's members: how many of the entry's copies are in it.
+func (s *Service) Member(ctx context.Context, userID, groupID, entryID int64) (contract.GroupMember, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+	m, err := s.member(ctx, userID, groupID, entryID)
+	if errors.Is(err, ErrMemberNotFound) {
+		if err := s.ownGroup(ctx, userID, groupID); err != nil {
+			return contract.GroupMember{}, err
+		}
+	}
+	return m, err
+}
+
 func (s *Service) member(ctx context.Context, userID, groupID, entryID int64) (contract.GroupMember, error) {
 	row, err := s.q().GetEntry(ctx, store.GetEntryParams{GroupID: groupID, UserID: userID, ID: entryID})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -321,8 +335,10 @@ func checkGroup(name string, kind contract.CustomGroupKind, description string) 
 	return name, description, err
 }
 
+// checkName checks a group's name, and returns it as stored: trimmed, and in one Unicode form
+// (NFC), so "Café" typed with an accent or with é is one name.
 func checkName(name string) (string, error) {
-	name = strings.TrimSpace(name)
+	name = norm.NFC.String(strings.TrimSpace(name))
 	switch n := utf8.RuneCountInString(name); {
 	case n == 0:
 		return "", invalid("give the group a name")
@@ -335,7 +351,7 @@ func checkName(name string) (string, error) {
 }
 
 func checkDescription(description string) (string, error) {
-	description = strings.TrimSpace(description)
+	description = norm.NFC.String(strings.TrimSpace(description))
 	if utf8.RuneCountInString(description) > contract.MaxGroupDescriptionLength {
 		return "", invalid("a group's description can't be longer than %d characters", contract.MaxGroupDescriptionLength)
 	}

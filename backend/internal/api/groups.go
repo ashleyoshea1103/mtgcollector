@@ -19,6 +19,7 @@ type CustomGroups interface {
 	DeleteGroup(ctx context.Context, userID, id int64) error
 	GroupGroups(ctx context.Context, userID, groupID int64, by contract.GroupBy) (contract.CollectionGroups, error)
 	Members(ctx context.Context, userID, groupID int64, q collection.EntryQuery) (contract.GroupMemberPage, error)
+	Member(ctx context.Context, userID, groupID, entryID int64) (contract.GroupMember, error)
 	SetMember(ctx context.Context, userID, groupID, entryID int64, quantity int) (contract.GroupMember, bool, error)
 	RemoveMember(ctx context.Context, userID, groupID, entryID int64) error
 }
@@ -102,6 +103,23 @@ func groupMembers(g CustomGroups) func(http.ResponseWriter, *http.Request, contr
 			return
 		}
 		res, err := g.Members(r.Context(), user.ID, id, entryQuery(r))
+		result(w, r, http.StatusOK, res, err)
+	}
+}
+
+// GET /api/groups/{id}/members/{entry_id}: one member: how many of the entry's copies are in
+// the group.
+func getMember(g CustomGroups) func(http.ResponseWriter, *http.Request, contract.User) {
+	return func(w http.ResponseWriter, r *http.Request, user contract.User) {
+		groupID, ok := pathID(w, r, "id", collection.ErrGroupNotFound)
+		if !ok {
+			return
+		}
+		entryID, ok := pathID(w, r, "entry_id", collection.ErrNotFound)
+		if !ok {
+			return
+		}
+		res, err := g.Member(r.Context(), user.ID, groupID, entryID)
 		result(w, r, http.StatusOK, res, err)
 	}
 }

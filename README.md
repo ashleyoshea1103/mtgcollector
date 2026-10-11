@@ -46,12 +46,13 @@ The API's own responses are JSON, shaped by the types in `backend/internal/contr
 | `PATCH /api/collection/entries/{id}` | Changes an entry's quantity, finish, condition or language (`EntryChange`): 200 with the entry; 409 if it would then be the same as another of yours. |
 | `DELETE /api/collection/entries/{id}` | Removes an entry: 204. It leaves any groups it was in. |
 | `GET /api/groups` | The user's custom groups (`CustomGroupList`), by name, each with its totals and up to four preview images (its most valuable cards'). |
-| `POST /api/groups` | Makes a group (`NewGroup`: a name, unique per user whatever its case; a kind, `binder`, `deck`, `box` or `other`; a description): 201. |
+| `POST /api/groups` | Makes a group (`NewGroup`: a name, unique per user whatever its case; a kind, `binder`, `deck`, `box` or `other`; a description): 201. 409 if you have a group of that name; 400 at 500 groups. |
 | `GET /api/groups/{id}` | One group (`CustomGroup`). |
-| `PATCH /api/groups/{id}` | Renames a group, or changes its kind or description (`GroupChange`). |
+| `PATCH /api/groups/{id}` | Renames a group, or changes its kind or description (`GroupChange`). 409 if you have another group of the new name. |
 | `DELETE /api/groups/{id}` | Deletes a group: 204. Its cards stay in the collection. |
 | `GET /api/groups/{id}/groups?group_by=` | The group's cards grouped (`CollectionGroups`), as the collection's are. |
 | `GET /api/groups/{id}/members?group_by=&key=&sort=&cursor=` | A page of the group's members (`GroupMemberPage`), as the collection's entries are; `added` sorts by when they joined the group. |
+| `GET /api/groups/{id}/members/{entry_id}` | One member (`GroupMember`): how many of the entry's copies are in the group. 404 if it isn't in it. |
 | `PUT /api/groups/{id}/members/{entry_id}` | Puts copies of one of your entries in the group (`MemberQuantity`), or changes how many are there: 201 if the entry is new to the group, else 200. |
 | `DELETE /api/groups/{id}/members/{entry_id}` | Takes an entry out of the group: 204. It stays in the collection. |
 
@@ -68,7 +69,7 @@ Pages hold 60 cards, up to page 50.
 | `rarity` | `mythic`, `rare`, `uncommon`, `common`, `special`, `bonus` |
 | `cmc` | mana value, rounded down: `0` to `6`, then `7` for 7 or more |
 
-**Custom groups.** A group (binder, deck, box) holds some of your entries: of each, 1 to all of its copies. One entry can be in several groups (a deck can list cards that live in a binder). Lowering an entry's quantity lowers its copies in groups with it, and adding cards with a `group_id` puts them in that group as well, both or neither. A user has at most 500 groups (`MaxGroups`), holding at most 100,000 entries between them (`MaxMembers`). Changes to a group or an entry change only the fields given, so two at once don't undo each other. Another user's group, or a member of it, is a 404.
+**Custom groups.** A group (binder, deck, box) holds some of your entries: of each, 1 to all of its copies. One entry can be in several groups (a deck can list cards that live in a binder). Lowering an entry's quantity lowers its copies in groups with it, and adding cards with a `group_id` puts them in that group as well, both or neither. A user has at most 500 groups (`MaxGroups`), holding at most 100,000 entries between them (`MaxMembers`). Changes to a group or an entry change only the fields given, so two at once don't undo each other. Another user's group, or a member of it, is a 404 (but a `group_id` that isn't one of yours, in an entry being added, is a 400, like any other bad field in a request). Names are trimmed and stored in one Unicode form (NFC), and must have a letter, digit or symbol; names and descriptions can't have invisible characters. Their lengths are in characters (code points: in JavaScript, `[...s].length`).
 
 **Signing in.** A session lasts about 30 days from its last use (its expiry moves forward at most once a day), and 90 days at most; the browser holds it in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, and the database only the token's SHA-256. Passwords are hashed with argon2id. Request bodies are JSON (`Content-Type: application/json`, at most 16 KB, no unknown fields). Requests that change anything are refused (403) when a browser says they come from another site, by their `Sec-Fetch-Site` or `Origin` header.
 

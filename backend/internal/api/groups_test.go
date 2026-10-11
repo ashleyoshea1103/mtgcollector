@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
@@ -70,6 +71,12 @@ func (f *fakeGroups) Members(_ context.Context, userID, groupID int64, q collect
 	return contract.GroupMemberPage{Members: []contract.GroupMember{}}, f.err
 }
 
+func (f *fakeGroups) Member(_ context.Context, userID, groupID, entryID int64) (contract.GroupMember, error) {
+	f.call("member", userID)
+	f.groupID, f.entryID = groupID, entryID
+	return contract.GroupMember{Quantity: 1}, f.err
+}
+
 func (f *fakeGroups) SetMember(_ context.Context, userID, groupID, entryID int64, quantity int) (contract.GroupMember, bool, error) {
 	f.call("set member", userID)
 	f.groupID, f.entryID, f.quantity = groupID, entryID, quantity
@@ -95,6 +102,7 @@ var groupRoutes = []struct{ method, path, body, call string }{
 	{http.MethodDelete, "/api/groups/4", "", "delete"},
 	{http.MethodGet, "/api/groups/4/groups?group_by=color", "", "groups"},
 	{http.MethodGet, "/api/groups/4/members?group_by=set&key=mh2&sort=added&cursor=abc", "", "members"},
+	{http.MethodGet, "/api/groups/4/members/7", "", "member"},
 	{http.MethodPut, "/api/groups/4/members/7", `{"quantity":2}`, "set member"},
 	{http.MethodDelete, "/api/groups/4/members/7", "", "remove member"},
 }
@@ -118,6 +126,9 @@ func TestEachGroupRouteReachesItsHandlerForTheSignedInUser(t *testing.T) {
 		}
 		if r.path != "/api/groups" && g.groupID != 4 {
 			t.Errorf("%s %s: group %d, want 4", r.method, r.path, g.groupID)
+		}
+		if strings.HasSuffix(r.path, "/members/7") && g.entryID != 7 {
+			t.Errorf("%s %s: entry %d, want 7", r.method, r.path, g.entryID)
 		}
 	}
 }
