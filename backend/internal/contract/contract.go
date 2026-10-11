@@ -144,6 +144,16 @@ type CardNames struct {
 	Names []string `json:"names"`
 }
 
+// How many letters or digits in a row a card name search needs in one of its words; without
+// one, a set must be given.
+const MinSearchWord = 3
+
+// The longest a card search's name or type can be, in characters. The longest card name is 141.
+const MaxSearchLength = 150
+
+// The last page of card search results served.
+const MaxSearchPage = 50
+
 // The body of every 4xx and 5xx API response.
 type APIError struct {
 	// What went wrong, safe to show: never internal details.

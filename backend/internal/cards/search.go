@@ -38,16 +38,16 @@ const (
 	// PageSize is how many cards a page of search results or printings holds.
 	PageSize = 60
 	// MaxPage is the last page served: deep pages are slow and nobody reads that far.
-	MaxPage = 50
+	MaxPage = contract.MaxSearchPage
 	// MinSearchWord is how many letters or digits in a row a name search needs in one of
 	// its words to look the name up by index (pg_trgm's trigrams); without one, a set must
 	// be given.
-	MinSearchWord = 3
+	MinSearchWord = contract.MinSearchWord
 	// MinAutocomplete is how many letters or digits in a row must be typed before names
 	// are suggested.
 	MinAutocomplete = 3
 	// MaxQueryLength caps what's typed (characters). The longest card name is 141.
-	MaxQueryLength = 150
+	MaxQueryLength = contract.MaxSearchLength
 	// autocompleteLimit is how many names autocomplete suggests.
 	autocompleteLimit = 20
 	// queryTimeout bounds each database query the search runs.

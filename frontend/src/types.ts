@@ -157,6 +157,19 @@ export interface CardNames {
   names: string[];
 }
 /**
+ * How many letters or digits in a row a card name search needs in one of its words; without
+ * one, a set must be given.
+ */
+export const MinSearchWord = 3;
+/**
+ * The longest a card search's name or type can be, in characters. The longest card name is 141.
+ */
+export const MaxSearchLength = 150;
+/**
+ * The last page of card search results served.
+ */
+export const MaxSearchPage = 50;
+/**
  * The body of every 4xx and 5xx API response.
  */
 export interface APIError {
