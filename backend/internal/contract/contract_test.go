@@ -17,7 +17,7 @@ import (
 // Every struct the API sends or receives.
 var all = []any{
 	CardImages{}, CardFace{}, Prices{}, CardSet{}, CardSummary{}, Card{}, CollectionEntry{}, ValueTotal{},
-	GroupSummary{}, EntryPage{}, GroupMember{}, GroupMemberPage{}, CustomGroup{}, CollectionStats{},
+	GroupSummary{}, EntryPage{}, CardCopies{}, GroupMember{}, GroupMemberPage{}, CustomGroup{}, CollectionStats{},
 	Health{}, NewEntry{}, CardPage{}, CardNames{}, APIError{}, User{}, Credentials{}, CollectionGroups{}, EntryChange{}, CustomGroupList{}, NewGroup{}, GroupChange{}, MemberQuantity{},
 }
 

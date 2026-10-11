@@ -42,6 +42,7 @@ The API's own responses are JSON, shaped by the types in `backend/internal/contr
 | `GET /api/collection/groups?group_by=` | The signed-in user's groups (`CollectionGroups`) for one way of grouping (`none` if left out), with each group's totals. Groups with none of the user's cards are left out, except `none`'s one group, `all`. |
 | `GET /api/collection/entries?group_by=&key=&sort=&cursor=` | A page of one group's entries (`EntryPage`), sorted by `name` (the default; Unicode order, so "Æther Vial" sorts with the aethers), `price` (most valuable copy first, unpriced last), `cmc` or `added` (newest first: when the entry was made, not when copies were last added to it). Pass `next_cursor` back as `cursor` for the next page. |
 | `GET /api/collection/stats` | Totals for the whole collection (`CollectionStats`). |
+| `GET /api/collection/cards/{card_id}` | Your copies of one printing (`CardCopies`): an entry for each finish, condition and language you own it in, non-foil first, then best condition first. None if you own no copies. |
 | `POST /api/collection/entries` | Adds copies (`NewEntry`): 201 with a new entry, or 200 with the entry of the same printing, finish, condition and language they were added to. |
 | `PATCH /api/collection/entries/{id}` | Changes an entry's quantity, finish, condition or language (`EntryChange`): 200 with the entry; 409 if it would then be the same as another of yours. |
 | `DELETE /api/collection/entries/{id}` | Removes an entry: 204. It leaves any groups it was in. |

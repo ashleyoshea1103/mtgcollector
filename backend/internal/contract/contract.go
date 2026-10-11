@@ -227,6 +227,12 @@ type EntryPage struct {
 	NextCursor *string           `json:"next_cursor" tstype:"string | null,required"`
 }
 
+// GET /api/collection/cards/{card_id}: the user's copies of one printing, an entry for each
+// finish, condition and language they own it in (none if they own no copies).
+type CardCopies struct {
+	Entries []CollectionEntry `json:"entries"`
+}
+
 // A collection entry as a member of a custom group. A binder can hold only some
 // of an entry's copies, so the member has its own quantity and value.
 type GroupMember struct {

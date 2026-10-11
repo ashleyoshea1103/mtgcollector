@@ -60,6 +60,16 @@ SELECT sqlc.embed(p), sqlc.embed(v)
   JOIN card_listing v ON v.id = p.card_id
  WHERE p.group_id = @group_id AND p.user_id = @user_id AND p.id = @id;
 
+-- name: CardCopies :many
+-- The user's entries of one printing: by finish, then condition (best first), then language.
+SELECT sqlc.embed(p), sqlc.embed(v)
+  FROM listing_rows p
+  JOIN card_listing v ON v.id = p.card_id
+ WHERE p.group_id = 0 AND p.user_id = @user_id AND p.card_id = @card_id
+ ORDER BY array_position(ARRAY['nonfoil', 'foil', 'etched'], p.finish),
+          array_position(ARRAY['MT', 'NM', 'EX', 'GD', 'LP', 'PL', 'PO'], p.condition),
+          p.language, p.id;
+
 -- name: GroupTotals :many
 -- The groups of the user's collection (group 0) or one of their custom groups, for one way of
 -- grouping, with their totals: of the copies listed (a member's, in a custom group). Cards

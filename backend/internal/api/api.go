@@ -50,6 +50,7 @@ func NewHandler(s Services) http.Handler {
 	mux.HandleFunc("GET /api/collection/groups", requireUser(s.Auth, collectionGroups(s.Collection)))
 	mux.HandleFunc("GET /api/collection/entries", requireUser(s.Auth, collectionEntries(s.Collection)))
 	mux.HandleFunc("GET /api/collection/stats", requireUser(s.Auth, collectionStats(s.Collection)))
+	mux.HandleFunc("GET /api/collection/cards/{card_id}", requireUser(s.Auth, cardCopies(s.Collection)))
 	mux.HandleFunc("POST /api/collection/entries", requireUser(s.Auth, addEntry(s.Collection)))
 	mux.HandleFunc("PATCH /api/collection/entries/{id}", requireUser(s.Auth, changeEntry(s.Collection)))
 	mux.HandleFunc("DELETE /api/collection/entries/{id}", requireUser(s.Auth, deleteEntry(s.Collection)))

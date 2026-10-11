@@ -241,6 +241,30 @@ func (s *Service) get(ctx context.Context, userID, id int64) (contract.Collectio
 	return toEntry(row.ListingRow, row.CardListing)
 }
 
+// Copies returns the user's entries of one printing, in every finish, condition and language
+// they own it in: none if they own no copies (or there's no such card).
+func (s *Service) Copies(ctx context.Context, userID int64, cardID string) (contract.CardCopies, error) {
+	id, err := cards.ParseID(cardID)
+	if err != nil {
+		return contract.CardCopies{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+	rows, err := s.q().CardCopies(ctx, store.CardCopiesParams{UserID: userID, CardID: id})
+	if err != nil {
+		return contract.CardCopies{}, db.Error(ctx, "card copies", err)
+	}
+	out := contract.CardCopies{Entries: make([]contract.CollectionEntry, 0, len(rows))}
+	for _, r := range rows {
+		e, err := toEntry(r.ListingRow, r.CardListing)
+		if err != nil {
+			return contract.CardCopies{}, err
+		}
+		out.Entries = append(out.Entries, e)
+	}
+	return out, nil
+}
+
 // checkEntry checks what an entry is: values the JSON decoder hasn't already checked
 // (a missing field is its type's zero value, never a valid one).
 func checkEntry(quantity int, finish contract.Finish, condition contract.Condition, language contract.Language) error {

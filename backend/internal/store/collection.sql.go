@@ -62,6 +62,95 @@ func (q *Queries) AddEntry(ctx context.Context, arg AddEntryParams) (AddEntryRow
 	return i, err
 }
 
+const cardCopies = `-- name: CardCopies :many
+SELECT p.group_id, p.id, p.user_id, p.card_id, p.quantity, p.finish, p.condition, p.language, p.added_at, p.name, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc, p.unit_price, p.value, p.count, p.count_value, p.listed_at, v.id, v.oracle_id, v.name, v.lang, v.set_code, v.collector_number, v.rarity, v.layout, v.mana_cost, v.cmc, v.type_line, v.oracle_text, v.colors, v.color_identity, v.finishes, v.images, v.faces, v.price_eur, v.price_eur_foil, v.price_usd, v.price_usd_foil, v.price_usd_etched, v.cardmarket_url, v.released_at, v.gone_since, v.set_name, v.set_icon_svg_uri
+  FROM listing_rows p
+  JOIN card_listing v ON v.id = p.card_id
+ WHERE p.group_id = 0 AND p.user_id = $1 AND p.card_id = $2
+ ORDER BY array_position(ARRAY['nonfoil', 'foil', 'etched'], p.finish),
+          array_position(ARRAY['MT', 'NM', 'EX', 'GD', 'LP', 'PL', 'PO'], p.condition),
+          p.language, p.id
+`
+
+type CardCopiesParams struct {
+	UserID int64
+	CardID pgtype.UUID
+}
+
+type CardCopiesRow struct {
+	ListingRow  ListingRow
+	CardListing CardListing
+}
+
+// The user's entries of one printing: by finish, then condition (best first), then language.
+func (q *Queries) CardCopies(ctx context.Context, arg CardCopiesParams) ([]CardCopiesRow, error) {
+	rows, err := q.db.Query(ctx, cardCopies, arg.UserID, arg.CardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CardCopiesRow
+	for rows.Next() {
+		var i CardCopiesRow
+		if err := rows.Scan(
+			&i.ListingRow.GroupID,
+			&i.ListingRow.ID,
+			&i.ListingRow.UserID,
+			&i.ListingRow.CardID,
+			&i.ListingRow.Quantity,
+			&i.ListingRow.Finish,
+			&i.ListingRow.Condition,
+			&i.ListingRow.Language,
+			&i.ListingRow.AddedAt,
+			&i.ListingRow.Name,
+			&i.ListingRow.SetCode,
+			&i.ListingRow.ColorIdentity,
+			&i.ListingRow.TypeLine,
+			&i.ListingRow.Rarity,
+			&i.ListingRow.Cmc,
+			&i.ListingRow.UnitPrice,
+			&i.ListingRow.Value,
+			&i.ListingRow.Count,
+			&i.ListingRow.CountValue,
+			&i.ListingRow.ListedAt,
+			&i.CardListing.ID,
+			&i.CardListing.OracleID,
+			&i.CardListing.Name,
+			&i.CardListing.Lang,
+			&i.CardListing.SetCode,
+			&i.CardListing.CollectorNumber,
+			&i.CardListing.Rarity,
+			&i.CardListing.Layout,
+			&i.CardListing.ManaCost,
+			&i.CardListing.Cmc,
+			&i.CardListing.TypeLine,
+			&i.CardListing.OracleText,
+			&i.CardListing.Colors,
+			&i.CardListing.ColorIdentity,
+			&i.CardListing.Finishes,
+			&i.CardListing.Images,
+			&i.CardListing.Faces,
+			&i.CardListing.PriceEur,
+			&i.CardListing.PriceEurFoil,
+			&i.CardListing.PriceUsd,
+			&i.CardListing.PriceUsdFoil,
+			&i.CardListing.PriceUsdEtched,
+			&i.CardListing.CardmarketUrl,
+			&i.CardListing.ReleasedAt,
+			&i.CardListing.GoneSince,
+			&i.CardListing.SetName,
+			&i.CardListing.SetIconSvgUri,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const cardFinishes = `-- name: CardFinishes :one
 
 SELECT finishes FROM cards WHERE id = $1
