@@ -23,7 +23,16 @@ cd frontend
 npm install
 npm run dev
 ```
-Open http://localhost:5173/dev/components to see the component gallery, and http://localhost:5173/api/health to check that the API can reach its database.
+Open http://localhost:5173 for the app, http://localhost:5173/dev/components for the component gallery, and http://localhost:5173/api/health to check that the API can reach its database.
+
+## The app
+- **Search** (`/search`): cards by name, set, type, rarity and colors, kept in the URL. Signed in, you can add a card: pick the printing, how many, the finish, condition and language, and optionally a group.
+- **A card** (`/cards/{id}`): one printing in full, with its prices, a Cardmarket link, the copies you own and its other printings.
+- **Your collection** (`/collection`): totals, then your cards grouped by set, color, type, rarity or mana value, sorted, in a grid or a list. Each card's Actions menu changes it, puts copies of it in a group, or removes it.
+- **Groups** (`/groups`, `/groups/{id}`): your binders, decks and boxes. A group's page lists its cards as the collection page does, with the group's copies.
+- **Log in, Sign up** (`/login`, `/signup`). The collection and group pages send visitors to log in, and back afterwards; so does a session that ends.
+
+Pages fetch with TanStack Query (the hooks are in `frontend/src/api/queries.ts`) and pass what they get to the components in `frontend/src/components`, which know nothing of the API. Logging out, or a session ending, drops everything cached.
 
 ## API
 The API's own responses are JSON, shaped by the types in `backend/internal/contract` (and so `frontend/src/types.ts`); its errors are `{"error": "…"}` with a 4xx or 5xx status. (The router's redirect from an unclean path, such as `//`, is plain text.)

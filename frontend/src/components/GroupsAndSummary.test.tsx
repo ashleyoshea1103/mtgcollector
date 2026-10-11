@@ -90,7 +90,8 @@ describe('PrintingOption', () => {
     const { ragavan } = cards;
     render(<PrintingOption card={ragavan} />);
     const button = screen.getByRole('button');
-    expect(button).toHaveTextContent(`${ragavan.set.name}#${ragavan.collector_number}${ragavan.released_at.slice(0, 4)}`);
+    // Read with spaces between the parts, not as one run ("#1382021").
+    expect(button).toHaveAccessibleName(expect.stringContaining(`${ragavan.set.name} #${ragavan.collector_number} ${ragavan.released_at.slice(0, 4)} `));
     expect(within(button).getByText(eur(ragavan.prices.eur))).toBeInTheDocument();
     expect(getByTooltip(button, ragavan.set.name)).toHaveClass('set-symbol');
   });

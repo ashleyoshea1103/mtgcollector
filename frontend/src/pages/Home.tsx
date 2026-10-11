@@ -1,15 +1,10 @@
-import { Link } from 'react-router';
+import { Navigate } from 'react-router';
+import { useMe } from '../api/queries';
+import { Loading } from '../ui';
 
-/** Placeholder until the search, collection and groups pages are wired to the API. */
+/** The start: your collection when you're signed in, else the card search. */
 export function Home() {
-  return (
-    <main>
-      <h1>mtgcollector</h1>
-      {import.meta.env.DEV && (
-        <p>
-          <Link to="/dev/components">Component gallery</Link>
-        </p>
-      )}
-    </main>
-  );
+  const me = useMe();
+  if (me.isPending) return <Loading />;
+  return <Navigate to={me.data ? '/collection' : '/search'} replace />;
 }

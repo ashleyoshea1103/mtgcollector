@@ -122,4 +122,13 @@ describe('CardDetail', () => {
     render(<CardDetail card={delver} />);
     expect(screen.queryByRole('heading', { name: 'In your collection' })).not.toBeInTheDocument();
   });
+
+  it('can be the page title, with its sections a level below', () => {
+    render(<CardDetail card={cards.delver} entries={[entries.germanDelver]} headingLevel={1} />);
+    expect(screen.getByRole('heading', { level: 1, name: cards.delver.name })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(
+      expect.arrayContaining(['Prices', 'In your collection', expect.stringMatching(/^Delver of Secrets/)]),
+    );
+    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
+  });
 });

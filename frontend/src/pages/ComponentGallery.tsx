@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AddToCollectionForm } from '../components/AddToCollectionForm';
+import { AuthForm } from '../components/AuthForm';
 import { CardDetail } from '../components/CardDetail';
 import { CardImage } from '../components/CardImage';
 import { CardTile } from '../components/CardTile';
@@ -7,12 +8,20 @@ import { CollectionEntryTable } from '../components/CollectionEntryTable';
 import { CollectionEntryTile } from '../components/CollectionEntryTile';
 import { CollectionSummary } from '../components/CollectionSummary';
 import { CustomGroupCard } from '../components/CustomGroupCard';
+import { EntryChangeForm } from '../components/EntryChangeForm';
+import { GroupForm } from '../components/GroupForm';
 import { GroupBucketSection, type CollectionView } from '../components/GroupBucketSection';
+import { ListingControls } from '../components/ListingControls';
 import { ManaCost } from '../components/ManaCost';
+import { MemberForm } from '../components/MemberForm';
 import { Price } from '../components/Price';
 import { PrintingOption } from '../components/PrintingOption';
 import { RarityBadge } from '../components/RarityBadge';
+import { SearchFilters } from '../components/SearchFilters';
 import { SetSymbol } from '../components/SetSymbol';
+import type { CardSearch } from '../api/endpoints';
+import { DEFAULT_LISTING, type ListingParams } from '../lib/listingParams';
+import { EMPTY_SEARCH } from '../lib/search';
 import { DEV_ONLY_MARKER } from '../devOnly';
 import { cards, colorGroups, customGroups, entries, setGroup, stats, unlistedCard, unpricedCard } from '../fixtures';
 import type { Card, NewEntry } from '../types';
@@ -30,6 +39,10 @@ export function ComponentGallery() {
   const [printing, setPrinting] = useState(allCards[0].id);
   const [detailKey, setDetailKey] = useState<keyof typeof cards>('delver');
   const [submitted, setSubmitted] = useState<NewEntry | null>(null);
+  const [formOutput, setFormOutput] = useState<unknown>(null);
+  const [search, setSearch] = useState<CardSearch>(EMPTY_SEARCH);
+  const [listing, setListing] = useState<ListingParams>(DEFAULT_LISTING);
+  const [memberGroup, setMemberGroup] = useState(customGroups[0].id);
 
   return (
     <main className="gallery" data-dev-only={DEV_ONLY_MARKER}>
@@ -154,6 +167,46 @@ export function ComponentGallery() {
         {submitted && <pre className="gallery__output">{JSON.stringify(submitted, null, 2)}</pre>}
       </Section>
 
+      <Section name="SearchFilters" note="Text is reported once typing pauses; the search below is what the page would send.">
+        <SearchFilters value={search} onChange={setSearch} />
+        <pre className="gallery__output">{JSON.stringify(search, null, 2)}</pre>
+      </Section>
+
+      <Section name="ListingControls">
+        <ListingControls value={listing} onChange={setListing} />
+        <pre className="gallery__output">{JSON.stringify(listing)}</pre>
+      </Section>
+
+      <Section name="AuthForm" note="Signing up checks the password's length before sending it; the second shows a server error.">
+        <Grid minItemWidth="260px">
+          <AuthForm mode="signup" onSubmit={(c) => setFormOutput({ ...c, password: '…' })} />
+          <AuthForm mode="login" onSubmit={() => {}} error="Email or password is incorrect." />
+        </Grid>
+      </Section>
+
+      <Section name="GroupForm" note="Making a group, and changing one.">
+        <Grid minItemWidth="260px">
+          <GroupForm onSubmit={setFormOutput} />
+          <GroupForm group={customGroups[0]} onSubmit={setFormOutput} onCancel={() => setFormOutput(null)} />
+        </Grid>
+      </Section>
+
+      <Section name="EntryChangeForm" note="Sends only what changed.">
+        <EntryChangeForm entry={entries.germanDelver} onSubmit={setFormOutput} onCancel={() => setFormOutput(null)} />
+      </Section>
+
+      <Section name="MemberForm" note="Copies of 4 × Lightning Bolt in a group; Izzet Tempo holds 2 already.">
+        <MemberForm
+          entry={entries.bolts}
+          groups={customGroups}
+          groupId={memberGroup}
+          onGroupChange={setMemberGroup}
+          current={memberGroup === customGroups[1].id ? 2 : null}
+          onSubmit={(quantity) => setFormOutput({ group: memberGroup, quantity })}
+        />
+        {formOutput !== null && <pre className="gallery__output">{JSON.stringify(formOutput, null, 2)}</pre>}
+      </Section>
+
       <PrimitivesGallery />
     </main>
   );
@@ -172,4 +225,10 @@ const SECTIONS = [
   'CollectionSummary',
   'CardDetail',
   'AddToCollectionForm',
+  'SearchFilters',
+  'ListingControls',
+  'AuthForm',
+  'GroupForm',
+  'EntryChangeForm',
+  'MemberForm',
 ];

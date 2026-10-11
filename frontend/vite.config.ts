@@ -25,6 +25,20 @@ function forbidDevOnlyModules(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), forbidDevOnlyModules()],
+  build: {
+    rolldownOptions: {
+      output: {
+        // The libraries in chunks of their own, apart from the app's code: they change less
+        // often, so browsers keep them cached across releases.
+        codeSplitting: {
+          groups: [
+            { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+            { name: 'vendor', test: /node_modules/ },
+          ],
+        },
+      },
+    },
+  },
   server: {
     // The app calls the API on its own origin, as it will in production: in development,
     // Vite forwards /api to the Go server (backend/cmd/server, default 127.0.0.1:8080). An IP,
@@ -34,6 +48,11 @@ export default defineConfig({
   test: {
     // A stray .only would silently skip every other test; fail instead, locally as well as in CI.
     allowOnly: false,
+    // Globals a test replaces (fetch, for the fake API) come back after it.
+    unstubGlobals: true,
+    // Each jsdom worker holds a few hundred MB, so one per core can exhaust the memory of a
+    // machine running much else (and CI's runners have 4 cores anyway).
+    maxWorkers: 4,
     // The two test projects map to the unit and behaviour stages of scripts/verify.sh.
     projects: [
       {
