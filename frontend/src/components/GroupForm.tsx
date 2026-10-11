@@ -29,7 +29,11 @@ export function GroupForm({ group, onSubmit, onCancel, submitting = false, error
     e.preventDefault();
     if (submitting) return;
     setChecked(true);
-    if (Object.keys(groupProblems(values)).length > 0) return;
+    const problems = groupProblems(values);
+    if (problems.name || problems.description) {
+      ((e.currentTarget as HTMLFormElement).elements.namedItem(problems.name ? 'name' : 'description') as HTMLElement | null)?.focus();
+      return;
+    }
     onSubmit(values);
   }
 
@@ -37,13 +41,13 @@ export function GroupForm({ group, onSubmit, onCancel, submitting = false, error
     <form className="group-form" onSubmit={handleSubmit}>
       <Stack>
         <Field label="Name" description={`Up to ${MaxGroupNameLength} characters.`} error={problems.name}>
-          <TextInput required value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })} />
+          <TextInput name="name" required value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })} />
         </Field>
         <Field label="Kind">
           <Select options={KIND_OPTIONS} value={values.kind} onChange={(kind) => setValues({ ...values, kind })} />
         </Field>
         <Field label="Description" description={`Optional. Up to ${MaxGroupDescriptionLength} characters.`} error={problems.description}>
-          <TextArea rows={3} value={values.description} onChange={(e) => setValues({ ...values, description: e.target.value })} />
+          <TextArea name="description" rows={3} value={values.description} onChange={(e) => setValues({ ...values, description: e.target.value })} />
         </Field>
         {error && <FormError className="group-form__error">{error}</FormError>}
         <Cluster as="footer" className="group-form__actions">

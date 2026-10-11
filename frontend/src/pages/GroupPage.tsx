@@ -31,11 +31,11 @@ function GroupView({ id }: { id: number }) {
   const [params, setParams] = useSearchParams();
   const listing = readListing(params);
 
-  if (group.isPending) return <Loading />;
-  if (group.isError) {
+  if (group.isError && (group.data === undefined || isNotFound(group.error))) {
     if (isNotFound(group.error)) return <NotFoundPage thing="group" back={backToGroups} />;
     return <ErrorState message={errorMessage(group.error)} onRetry={() => void group.refetch()} />;
   }
+  if (group.data === undefined) return <Loading />;
   const g = group.data;
 
   return (

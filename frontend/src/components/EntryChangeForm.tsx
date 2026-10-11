@@ -37,7 +37,8 @@ export function EntryChangeForm({ entry, onSubmit, onCancel, submitting = false,
     <form className="entry-change-form" onSubmit={handleSubmit}>
       <Stack>
         <Field label="Quantity">
-          <NumberInput min={1} max={MAX_QUANTITY} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+          {/* Required: a box left empty isn't "1 copy". */}
+          <NumberInput required min={1} max={MAX_QUANTITY} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
         </Field>
         <Field label="Finish">
           <Select options={finishes.map((f) => ({ value: f, label: labelFor(FINISHES, f) }))} value={finish} onChange={setFinish} />

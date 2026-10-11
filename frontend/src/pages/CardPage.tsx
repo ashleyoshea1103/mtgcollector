@@ -21,14 +21,14 @@ export function CardPage() {
   const location = useLocation();
   const [adding, setAdding] = useState(false);
 
-  if (card.isPending) return <Loading />;
-  if (card.isError) {
+  if (card.isError && card.data === undefined) {
     // A 400 is an id that isn't a Scryfall id at all: no such card either.
     if (isNotFound(card.error) || (card.error instanceof ApiError && card.error.status === 400)) {
       return <NotFoundPage thing="card" back={{ to: '/search', label: 'Search for cards' }} />;
     }
     return <ErrorState message={errorMessage(card.error)} onRetry={() => void card.refetch()} />;
   }
+  if (card.data === undefined) return <Loading />;
 
   return (
     <Stack as="section" className="card-page" gap={5}>
@@ -43,7 +43,7 @@ export function CardPage() {
           </Button>
         </p>
       ) : (
-        me.data === null && (
+        (me.data === null || me.isError) && (
           <p>
             <Link to={loginUrl(location.pathname)}>Log in</Link> to add it to your collection.
           </p>
@@ -84,7 +84,7 @@ function OtherPrintings({ id }: { id: string }) {
         </ul>
       )}
       {printings.hasNextPage && (
-        <Button onPress={() => void printings.fetchNextPage()} busy={printings.isFetchingNextPage}>
+        <Button onPress={() => void printings.fetchNextPage({ cancelRefetch: false })} busy={printings.isFetching}>
           {printings.isFetchingNextPage ? 'Loading…' : 'More printings'}
         </Button>
       )}

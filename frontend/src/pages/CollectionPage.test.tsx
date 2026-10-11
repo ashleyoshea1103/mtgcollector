@@ -1,6 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { colorGroups, customGroups, entries, makeEntry, makeGroup, cards, stats } from '../fixtures';
+import { keys } from '../api/keys';
 import { renderApp, signedIn, type FakeRequest, type Routes } from '../test/app';
 import type { CollectionEntry, GroupSummary } from '../types';
 
@@ -239,5 +240,192 @@ describe('entry actions', () => {
     const dialog = await openAction(user, 'Put in a group…');
     expect(await within(dialog).findByText('You have no groups yet')).toBeInTheDocument();
     expect(within(dialog).getByRole('link', { name: 'Make a group' })).toHaveAttribute('href', '/groups');
+  });
+});
+
+describe('refreshing after a change', () => {
+  it('Show more waits for a refresh under way rather than cancelling it, and follows the fresh pages', async () => {
+    let quantity = 4;
+    let slow = false;
+    const { api, user, client } = renderApp('/collection', {
+      ...collection,
+      'GET /api/collection/entries': async (req) => {
+        if (req.query.get('cursor') === 'p2') return { body: { entries: [entries.foilRagavan], next_cursor: null } };
+        if (slow) await new Promise((resolve) => setTimeout(resolve, 150));
+        return { body: { entries: [{ ...entries.bolts, quantity }], next_cursor: 'p2' } };
+      },
+    });
+    await screen.findByRole('button', { name: 'Show more' });
+    quantity = 9;
+    slow = true;
+    act(() => void client.invalidateQueries({ queryKey: ['collection'] }));
+    // Busy while the refresh runs: pressing it does nothing.
+    await user.click(await screen.findByRole('button', { name: 'Loading…' }));
+    expect(await screen.findByText('9×')).toBeInTheDocument();
+    expect(api.sent('GET /api/collection/entries').map((r) => r.query.get('cursor'))).toEqual([null, null]);
+    await user.click(screen.getByRole('button', { name: 'Show more' }));
+    expect(await main().findByRole('heading', { name: entries.foilRagavan.card.name })).toBeInTheDocument();
+  });
+
+  it('keeps showing the cards when a refresh fails', async () => {
+    let fail = false;
+    const { client } = renderApp('/collection', {
+      ...collection,
+      'GET /api/collection/entries': () => (fail ? { status: 503, body: { error: 'that took too long; try again' } } : { body: { entries: all, next_cursor: null } }),
+      'GET /api/collection/groups': () => (fail ? { status: 503, body: { error: 'that took too long; try again' } } : { body: { group_by: 'none', groups: [allGroup.group] } }),
+    });
+    await main().findByRole('heading', { name: entries.bolts.card.name });
+    fail = true;
+    await act(() => client.invalidateQueries({ queryKey: ['collection'] }));
+    // The failures reach the page on a later tick.
+    await waitFor(() => expect(client.getQueryState(keys.listingGroups(null, 'none'))?.status).toBe('error'));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(main().getByRole('heading', { name: entries.bolts.card.name })).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load these cards.")).not.toBeInTheDocument();
+  });
+
+  it('keeps the cards loaded when Show more fails, and says so', async () => {
+    const { user } = renderApp('/collection', {
+      ...collection,
+      'GET /api/collection/entries': (req) =>
+        req.query.get('cursor') === 'p2' ? { status: 503, body: { error: 'that took too long; try again' } } : { body: { entries: [entries.bolts], next_cursor: 'p2' } },
+    });
+    await user.click(await screen.findByRole('button', { name: 'Show more' }));
+    expect(await screen.findByText("Couldn't load more of All cards")).toBeInTheDocument();
+    expect(main().getByRole('heading', { name: entries.bolts.card.name })).toBeInTheDocument();
+  });
+
+  it('replaces the history entry when the grouping changes, rather than adding one each time', async () => {
+    const { user, router } = renderApp('/collection', collection);
+    await main().findByRole('heading', { name: entries.bolts.card.name });
+    await user.selectOptions(main().getByRole('combobox', { name: 'Group by' }), 'Color');
+    expect(router.state.historyAction).toBe('REPLACE');
+  });
+});
+
+describe('how many groups start open', () => {
+  const groupsOf = (n: number) => Array.from({ length: n }, (_, i) => makeGroup(`s${i}`, `Set ${i}`, [makeEntry(200 + i, cards.lightningBolt)]));
+  const render = (many: ReturnType<typeof groupsOf>) =>
+    renderApp('/collection?group_by=set', {
+      ...collection,
+      'GET /api/collection/groups': { body: { group_by: 'set', groups: many.map((g) => g.group) } },
+      'GET /api/collection/entries': (req) => ({ body: { entries: many.find((g) => g.group.key === req.query.get('key'))!.entries, next_cursor: null } }),
+    });
+
+  it('opens all of eight', async () => {
+    render(groupsOf(8));
+    await screen.findByRole('button', { name: /^Set 7/ });
+    expect(screen.getByRole('button', { name: /^Set 7/ })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('opens only the first of nine', async () => {
+    render(groupsOf(9));
+    await screen.findByRole('button', { name: /^Set 8/ });
+    expect(screen.getByRole('button', { name: /^Set 0/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /^Set 1/ })).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+describe('a section that failed to show its cards', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('fetches them afresh to try again, rather than showing the same again', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let broken = true;
+    const bad = { ...entries.bolts, card: { ...entries.bolts.card, set: undefined } } as unknown as CollectionEntry;
+    const { user } = renderApp('/collection?group_by=color', {
+      ...collection,
+      'GET /api/collection/entries': (req) => ({
+        body: { entries: req.query.get('key') === 'R' ? (broken ? [bad] : [entries.bolts]) : byKey[req.query.get('key')!], next_cursor: null },
+      }),
+    });
+    const error = (await screen.findByText("Couldn't show Red.")).closest('[role="alert"]') as HTMLElement;
+    broken = false;
+    await user.click(within(error).getByRole('button', { name: 'Try again' }));
+    expect(await main().findByRole('heading', { name: entries.bolts.card.name })).toBeInTheDocument();
+  });
+});
+
+describe('focus after a card goes', () => {
+  it('moves to the section heading when the card that had it is removed', async () => {
+    let shown = [entries.bolts, entries.foilRagavan];
+    const { user } = renderApp('/collection', {
+      ...collection,
+      'GET /api/collection/entries': () => ({ body: { entries: shown, next_cursor: null } }),
+      'DELETE /api/collection/entries/:id': (req) => {
+        shown = shown.filter((e) => String(e.id) !== req.params.id);
+        return { status: 204 };
+      },
+    });
+    await user.click(await screen.findByRole('button', { name: `Actions for ${entries.bolts.card.name}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Remove…' }));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(main().queryByRole('heading', { name: entries.bolts.card.name })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: /^All cards/ })).toHaveFocus());
+  });
+});
+
+describe('putting copies in a group', () => {
+  const [binder, deck] = customGroups;
+  const member = (quantity: number) => ({ entry: entries.bolts, quantity, value_eur: null, added_at: '2026-10-01T00:00:00Z' });
+  const oneEntry: Routes = { ...collection, 'GET /api/collection/entries': { body: { entries: [entries.bolts], next_cursor: null } } };
+  const open = async (user: ReturnType<typeof renderApp>['user']) => {
+    await user.click(await screen.findByRole('button', { name: `Actions for ${entries.bolts.card.name}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Put in a group…' }));
+    return screen.getByRole('dialog');
+  };
+
+  it("waits to know what the group holds, so as not to overwrite it, and says when it can't find out", async () => {
+    let fail = true;
+    const { user } = renderApp('/collection', {
+      ...oneEntry,
+      'GET /api/groups': { body: { groups: customGroups } },
+      'GET /api/groups/:id/members/:entry': () => (fail ? { status: 503, body: { error: 'that took too long; try again' } } : { body: member(3) }),
+    });
+    const dialog = await open(user);
+    expect(await within(dialog).findByText(/Couldn't find out how many the group holds now/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Add to group' })).toBeDisabled();
+    fail = false;
+    await user.click(within(dialog).getByRole('button', { name: 'Try again' }));
+    expect(await within(dialog).findByRole('button', { name: 'Save' })).toBeEnabled();
+    expect(within(dialog).getByRole('spinbutton', { name: 'Copies in the group' })).toHaveValue(3);
+  });
+
+  it('falls back to the first group when the chosen one is deleted meanwhile', async () => {
+    let groups = customGroups;
+    const { api, user, client } = renderApp('/collection', {
+      ...oneEntry,
+      'GET /api/groups': () => ({ body: { groups } }),
+      'GET /api/groups/:id/members/:entry': { status: 404, body: { error: "that entry isn't in this group" } },
+      'PUT /api/groups/:id/members/:entry': { status: 201, body: member(1) },
+    });
+    const dialog = await open(user);
+    const select = await within(dialog).findByRole('combobox', { name: 'Group' });
+    await user.selectOptions(select, deck.name);
+    expect(select).toHaveValue(String(deck.id));
+    groups = customGroups.filter((g) => g.id !== deck.id);
+    await act(() => client.invalidateQueries({ queryKey: keys.groupList }));
+    await waitFor(() => expect(select).toHaveValue(String(binder.id)));
+    // And that's where the copies go (not to the deleted group the select can no longer show).
+    await within(dialog).findByText(/It has none now/);
+    await user.click(within(dialog).getByRole('button', { name: 'Add to group' }));
+    await waitFor(() => expect(api.sent('PUT /api/groups/:id/members/:entry').map((r) => r.params.id)).toEqual([String(binder.id)]));
+  });
+
+  it('takes the new membership from the answer, rather than asking for it again', async () => {
+    const { api, user } = renderApp('/collection', {
+      ...oneEntry,
+      'GET /api/groups': { body: { groups: customGroups } },
+      'GET /api/groups/:id/members/:entry': { status: 404, body: { error: "that entry isn't in this group" } },
+      'PUT /api/groups/:id/members/:entry': { status: 201, body: member(1) },
+    });
+    const dialog = await open(user);
+    await within(dialog).findByText(/It has none now/);
+    await user.click(within(dialog).getByRole('button', { name: 'Add to group' }));
+    await screen.findByText(`${binder.name} now holds 1 × ${entries.bolts.card.name}`);
+    const afterPut = api.requests.slice(api.requests.findIndex((r) => r.method === 'PUT') + 1);
+    expect(afterPut.filter((r) => r.path.includes('/members/'))).toEqual([]);
   });
 });

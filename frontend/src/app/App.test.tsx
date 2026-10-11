@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { stats } from '../fixtures';
 import { ann, renderApp, signedIn, signedOut, type Routes } from '../test/app';
@@ -217,5 +217,65 @@ describe('signing out', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Log in' })).toBeInTheDocument();
     expect(new URLSearchParams(location().search).get('next')).toBe('/collection?view=list');
     expect(header().queryByText(ann.email)).not.toBeInTheDocument();
+  });
+});
+
+describe("who's signed in, while it's checked", () => {
+  it("doesn't take a page away when a later check fails", async () => {
+    let fail = false;
+    const { client } = renderApp('/collection', {
+      ...emptyCollection,
+      'GET /api/auth/me': () => (fail ? { status: 503, body: { error: 'that took too long; try again' } } : { body: ann }),
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Your collection' });
+    fail = true;
+    await act(() => client.refetchQueries({ queryKey: keys.me }));
+    expect(screen.getByRole('heading', { level: 1, name: 'Your collection' })).toBeInTheDocument();
+  });
+
+  it("says so when the first check fails, and checks again on request", async () => {
+    let fail = true;
+    const { user } = renderApp('/collection', {
+      ...emptyCollection,
+      'GET /api/auth/me': () => (fail ? { status: 503, body: { error: 'that took too long; try again' } } : { body: ann }),
+    });
+    expect(await within(screen.getByRole('main')).findByRole('alert')).toHaveTextContent('That took too long; try again.');
+    fail = false;
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your collection' })).toBeInTheDocument();
+  });
+
+  it('shows no account links until it knows', async () => {
+    renderApp('/search', { 'GET /api/auth/me': () => new Promise(() => {}) });
+    await screen.findByRole('heading', { level: 1, name: 'Search cards' });
+    expect(header().queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/to add cards to your collection/)).not.toBeInTheDocument();
+  });
+
+  it("logging in from the header comes back to the page it's on", async () => {
+    renderApp('/search?q=bolt', { ...signedOut, 'GET /api/cards/search': { body: { cards: [], page: 1, has_more: false } } });
+    const next = encodeURIComponent('/search?q=bolt');
+    expect(await header().findByRole('link', { name: 'Log in' })).toHaveAttribute('href', `/login?next=${next}`);
+    expect(header().getByRole('link', { name: 'Sign up' })).toHaveAttribute('href', `/signup?next=${next}`);
+  });
+});
+
+describe('moving between pages', () => {
+  it('moves focus to the new page, for screen readers', async () => {
+    const { user } = renderApp('/collection', { ...signedIn, ...emptyCollection, 'GET /api/groups': { body: { groups: [] } } });
+    await screen.findByRole('heading', { level: 1, name: 'Your collection' });
+    expect(screen.getByRole('main')).not.toHaveFocus();
+    await user.click(header().getByRole('link', { name: 'Groups' }));
+    await waitFor(() => expect(screen.getByRole('main')).toHaveFocus());
+  });
+});
+
+describe('form checks', () => {
+  it('moves focus to a new password that is too short, which reads out why', async () => {
+    const { user } = renderApp('/signup', signedOut);
+    await user.type(await screen.findByRole('textbox', { name: 'Email' }), 'ann@example.com');
+    await user.type(screen.getByLabelText('Password'), 'too short');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(screen.getByLabelText('Password')).toHaveFocus();
   });
 });

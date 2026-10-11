@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useAddEntry, useCustomGroups, usePrintings } from '../api/queries';
 import { AddToCollectionForm } from '../components/AddToCollectionForm';
 import { PrintingOption } from '../components/PrintingOption';
@@ -19,13 +19,14 @@ export function AddCardDialog({ card, pickPrinting = false, onClose }: Props) {
   const printings = usePrintings(card.id, pickPrinting);
   const groups = useCustomGroups();
   const add = useAddEntry();
+  const printingsHeading = useId();
 
   return (
     <Dialog title={`Add ${card.name}`} className="add-card-dialog" isOpen onOpenChange={(open) => !open && onClose()}>
       <Stack>
         {pickPrinting && (
-          <section className="add-card-dialog__printings" aria-label="Printings">
-            <h3>Which printing?</h3>
+          <section className="add-card-dialog__printings" aria-labelledby={printingsHeading}>
+            <h3 id={printingsHeading}>Which printing?</h3>
             {printings.isPending ? (
               <Loading label="Loading printings…" />
             ) : printings.isError ? (
@@ -38,11 +39,14 @@ export function AddCardDialog({ card, pickPrinting = false, onClose }: Props) {
               </div>
             )}
             {printings.hasNextPage && (
-              <Button onPress={() => void printings.fetchNextPage()} busy={printings.isFetchingNextPage}>
+              <Button onPress={() => void printings.fetchNextPage({ cancelRefetch: false })} busy={printings.isFetching}>
                 {printings.isFetchingNextPage ? 'Loading…' : 'More printings'}
               </Button>
             )}
           </section>
+        )}
+        {groups.isError && groups.data === undefined && (
+          <FormError className="add-card-dialog__groups-error">Couldn't load your groups, so the copies can't go in one now. {errorMessage(groups.error)}</FormError>
         )}
         <AddToCollectionForm
           card={chosen}

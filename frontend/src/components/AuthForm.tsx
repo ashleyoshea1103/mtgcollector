@@ -30,7 +30,10 @@ export function AuthForm({ mode, onSubmit, submitting = false, error }: Props) {
     e.preventDefault();
     if (submitting) return;
     setChecked(true);
-    if (mode === 'signup' && passwordProblem(password)) return;
+    if (mode === 'signup' && passwordProblem(password)) {
+      ((e.currentTarget as HTMLFormElement).elements.namedItem('password') as HTMLElement | null)?.focus();
+      return;
+    }
     // The password is sent as typed: spaces in it are part of it.
     onSubmit({ email: email.trim(), password });
   }
@@ -40,14 +43,14 @@ export function AuthForm({ mode, onSubmit, submitting = false, error }: Props) {
       <Stack>
         <Field label="Email">
           {/* "username" on logging in: what password managers look for beside a current password. */}
-          <TextInput type="email" autoComplete={mode === 'login' ? 'username' : 'email'} required value={email} onChange={(e) => setEmail(e.target.value)} />
+          <TextInput name="email" type="email" autoComplete={mode === 'login' ? 'username' : 'email'} required value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
         <Field
           label="Password"
           description={mode === 'signup' ? `${MinPasswordLength} to ${MaxPasswordLength} characters. A few words together make a password that's long but easy to remember.` : undefined}
           error={problem}
         >
-          <TextInput type="password" autoComplete={text.password} required value={password} onChange={(e) => setPassword(e.target.value)} />
+          <TextInput name="password" type="password" autoComplete={text.password} required value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
         {error && <FormError className="auth-form__error">{error}</FormError>}
         <Button type="submit" variant="primary" busy={submitting}>

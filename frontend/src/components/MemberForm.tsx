@@ -30,7 +30,8 @@ export function MemberForm({ entry, groups, groupId, onGroupChange, current, onS
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (submitting || groupId === null) return;
+    // Not until it's known what the group holds: saving would overwrite it.
+    if (submitting || groupId === null || current === undefined) return;
     onSubmit(parseQuantity(quantity, entry.quantity));
   }
 
@@ -47,12 +48,12 @@ export function MemberForm({ entry, groups, groupId, onGroupChange, current, onS
           </Field>
         )}
         <Field label="Copies in the group" description={`Up to ${countOf(entry.quantity, 'copy', 'copies')}, all you have.${held}`}>
-          <NumberInput min={1} max={entry.quantity} value={quantity} onChange={(e) => setTyped({ groupId, value: e.target.value })} />
+          <NumberInput required min={1} max={entry.quantity} value={quantity} onChange={(e) => setTyped({ groupId, value: e.target.value })} />
         </Field>
         {error && <FormError className="member-form__error">{error}</FormError>}
         <Cluster as="footer" className="member-form__actions">
           {onCancel && <Button onPress={onCancel}>Cancel</Button>}
-          <Button type="submit" variant="primary" busy={submitting} isDisabled={groupId === null}>
+          <Button type="submit" variant="primary" busy={submitting} isDisabled={groupId === null || current === undefined}>
             {submitting ? 'Saving…' : current ? 'Save' : 'Add to group'}
           </Button>
         </Cluster>

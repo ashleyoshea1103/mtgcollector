@@ -1,7 +1,9 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { customGroups, entries, makeGroup } from '../fixtures';
+import { keys } from '../api/keys';
 import { renderApp, signedIn, type Routes } from '../test/app';
+import { eur } from '../test/helpers';
 import type { CustomGroup, GroupMember } from '../types';
 
 const [binder] = customGroups;
@@ -61,7 +63,9 @@ describe('GroupsPage', () => {
     await user.type(within(dialog).getByRole('textbox', { name: 'Description' }), 'Burn');
     await user.click(within(dialog).getByRole('button', { name: 'Make group' }));
 
-    expect(await main().findByRole('heading', { level: 1, name: 'Modern deck' })).toBeInTheDocument();
+    // The dialog closes as the new group's page opens (until then it hides the page from screen readers).
+    expect(await screen.findByRole('heading', { level: 1, name: 'Modern deck' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(location().pathname).toBe('/groups/9');
     expect(api.sent('POST /api/groups').map((r) => r.body)).toEqual([{ name: 'Modern deck', kind: 'deck', description: 'Burn' }]);
     expect(screen.getByText('Made Modern deck')).toBeInTheDocument();
@@ -175,5 +179,96 @@ describe('GroupPage', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Take out of the group' }));
     expect(await screen.findByText(`Took ${entries.unpricedElves.card.name} out of ${binder.name}`)).toBeInTheDocument();
     expect(api.sent('DELETE /api/groups/:id/members/:entry').map((r) => [r.params.id, r.params.entry])).toEqual([[String(binder.id), String(entries.unpricedElves.id)]]);
+  });
+});
+
+describe('GroupPage, more', () => {
+  it("shows each card's value as the group's copies' value, not the whole entry's", async () => {
+    renderApp(`/groups/${binder.id}`, groupApi());
+    const bolts = (await main().findByRole('heading', { name: entries.bolts.card.name })).closest('article')!;
+    expect(within(bolts).getByText(/^Value/)).toHaveTextContent(`Value ${eur(members[0].value_eur)}`);
+    expect(members[0].value_eur).not.toBe(entries.bolts.value_eur);
+  });
+
+  it('takes a deleted group out of the groups list at once, before the list is fetched again', async () => {
+    let slowList = false;
+    const { user } = renderApp('/groups', {
+      ...groupApi(),
+      'GET /api/groups': async () => {
+        if (slowList) await new Promise((resolve) => setTimeout(resolve, 2000));
+        return { body: { groups: customGroups } };
+      },
+      'DELETE /api/groups/:id': { status: 204 },
+    });
+    await user.click(await main().findByRole('link', { name: `Open ${binder.name}` }));
+    slowList = true;
+    await user.click(await main().findByRole('button', { name: 'Delete…' }));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByRole('link', { name: `Open ${customGroups[1].name}` })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: `Open ${binder.name}` })).not.toBeInTheDocument();
+  });
+
+  it('replaces the deleted group in the history, so Back skips it', async () => {
+    const { user, router } = renderApp(`/groups/${binder.id}`, { ...groupApi(), 'DELETE /api/groups/:id': { status: 204 } });
+    await user.click(await main().findByRole('button', { name: 'Delete…' }));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/groups'));
+    expect(router.state.historyAction).toBe('REPLACE');
+  });
+
+  it('titles its dialogs at the second level, under the page', async () => {
+    const { user } = renderApp(`/groups/${binder.id}`, groupApi());
+    await user.click(await main().findByRole('button', { name: 'Change…' }));
+    expect(screen.getByRole('heading', { level: 2, name: `Change ${binder.name}` })).toBeInTheDocument();
+  });
+
+  it("is a fresh page for another group: nothing open on one stays open on the next", async () => {
+    const deck = customGroups[1];
+    const { user, router, client } = renderApp(`/groups/${binder.id}`, {
+      ...groupApi(),
+      'GET /api/groups/:id': (req) => ({ body: customGroups.find((g) => String(g.id) === req.params.id) }),
+    });
+    // Already cached, so the next group's page shows at once, without loading first.
+    client.setQueryData(keys.group(deck.id), deck);
+    await user.click(await main().findByRole('button', { name: 'Change…' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await act(() => router.navigate(`/groups/${deck.id}`));
+    expect(await screen.findByRole('heading', { level: 1, name: deck.name })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it("sends nothing when a card's copies are saved unchanged", async () => {
+    const { api, user } = renderApp(`/groups/${binder.id}`, groupApi());
+    await user.click(await main().findByRole('button', { name: `Actions for ${entries.bolts.card.name}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Change copies…' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(api.sent('PUT /api/groups/:id/members/:entry')).toHaveLength(0);
+  });
+
+  it("says when a card couldn't be taken out", async () => {
+    const { user } = renderApp(`/groups/${binder.id}`, {
+      ...groupApi(),
+      'DELETE /api/groups/:id/members/:entry': { status: 503, body: { error: 'that took too long; try again' } },
+    });
+    await user.click(await main().findByRole('button', { name: `Actions for ${entries.unpricedElves.card.name}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Take out of the group' }));
+    expect(await screen.findByText(`Couldn't take ${entries.unpricedElves.card.name} out`)).toBeInTheDocument();
+  });
+
+  it('moves focus to the section heading when the card that had it is taken out', async () => {
+    let shown = members;
+    const { user } = renderApp(`/groups/${binder.id}`, {
+      ...groupApi(),
+      'GET /api/groups/:id/members': () => ({ body: { members: shown, next_cursor: null } }),
+      'DELETE /api/groups/:id/members/:entry': (req) => {
+        shown = shown.filter((m) => String(m.entry.id) !== req.params.entry);
+        return { status: 204 };
+      },
+    });
+    await user.click(await main().findByRole('button', { name: `Actions for ${entries.unpricedElves.card.name}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Take out of the group' }));
+    await waitFor(() => expect(main().queryByRole('heading', { name: entries.unpricedElves.card.name })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: /^All cards/ })).toHaveFocus());
   });
 });

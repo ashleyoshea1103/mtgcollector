@@ -901,6 +901,10 @@ func TestCopiesOfOnePrinting(t *testing.T) {
 	mint := add(f.ann, card, contract.FinishNonfoil, contract.ConditionMT, contract.LanguageJapanese)
 	add(f.ann, other, contract.FinishNonfoil, contract.ConditionNM, contract.LanguageEnglish)
 	add(f.bob, card, contract.FinishNonfoil, contract.ConditionNM, contract.LanguageEnglish)
+	// Copies in a group are still one entry each, listed once.
+	binder := f.group(t, f.ann, "Binder")
+	f.member(t, f.ann, binder.ID, foil, 1)
+	f.member(t, f.ann, binder.ID, mint, 2)
 
 	got, err := f.s.Copies(t.Context(), f.ann, card)
 	if err != nil {

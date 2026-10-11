@@ -8,6 +8,7 @@ export { Dialog } from './Dialog';
 export { Disclosure } from './Disclosure';
 export { ErrorBoundary } from './ErrorBoundary';
 export { useDisclosureState } from './useDisclosureState';
+export { useFocusFallback } from './useFocusFallback';
 export { Checkbox, Field, NumberInput, SearchInput, Select, TextArea, TextInput, type SelectOption } from './Field';
 export { Cluster, Grid, Stack, type Space } from './Layout';
 export { Menu, MenuItem, Popover } from './Menu';

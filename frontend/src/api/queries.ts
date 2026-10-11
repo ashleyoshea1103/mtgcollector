@@ -2,7 +2,7 @@
 // to the presentational components, which know nothing of the API.
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { uniqueItems } from '../lib/pages';
-import { MaxSearchPage, type CardPage, type CollectionEntry, type Credentials, type EntryChange, type GroupBy, type GroupChange, type GroupMember, type NewEntry, type NewGroup, type SortBy } from '../types';
+import { MaxSearchPage, type CardPage, type CollectionEntry, type Credentials, type CustomGroupList, type EntryChange, type GroupBy, type GroupChange, type GroupMember, type NewEntry, type NewGroup, type SortBy } from '../types';
 import * as api from './endpoints';
 import { keys, type ListingId } from './keys';
 import { forgetCachedUser, switchUser } from './queryClient';
@@ -116,6 +116,16 @@ export function useListingEntries(id: ListingId, groupBy: GroupBy, key: string, 
   });
 }
 
+/**
+ * After a change to a group's copies: the group, its listing and the groups list (whose totals
+ * and previews include it). The membership itself is set from the answer, not fetched again.
+ */
+const refreshGroup = (client: QueryClient, groupId: number) => {
+  for (const queryKey of [keys.group(groupId), [...keys.listing(groupId), 'groups'], [...keys.listing(groupId), 'entries'], keys.groupList]) {
+    void client.invalidateQueries({ queryKey });
+  }
+};
+
 /** After a change to entries: everything about the user's cards, in the collection and in groups. */
 const refreshOwned = (client: QueryClient) => {
   void client.invalidateQueries({ queryKey: ['collection'] });
@@ -133,9 +143,19 @@ export function useSignup() {
   return useMutation({ mutationFn: (c: Credentials) => api.signup(c), onSuccess: (user) => switchUser(client, user), gcTime: 0 });
 }
 
-export function useLogout() {
+/**
+ * Logging out. beforeForgetting runs first, once the server has ended the session: leave a
+ * page that needs an account there, or forgetting the user would send it to the login page.
+ */
+export function useLogout(beforeForgetting?: () => unknown) {
   const client = useQueryClient();
-  return useMutation({ mutationFn: api.logout, onSuccess: () => forgetCachedUser(client) });
+  return useMutation({
+    mutationFn: api.logout,
+    onSuccess: async () => {
+      await beforeForgetting?.();
+      await forgetCachedUser(client);
+    },
+  });
 }
 
 export function useAddEntry() {
@@ -160,7 +180,11 @@ export function useCreateGroup() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (g: NewGroup) => api.createGroup(g),
-    onSuccess: () => void client.invalidateQueries({ queryKey: keys.groupList }),
+    onSuccess: (group) => {
+      // Its page, opened next, has it already.
+      client.setQueryData(keys.group(group.id), group);
+      void client.invalidateQueries({ queryKey: keys.groupList });
+    },
   });
 }
 
@@ -183,6 +207,8 @@ export function useDeleteGroup() {
       // Marked stale but not refetched: the page showing the group is about to leave, and a
       // refetch now would only find it gone. Coming back to it refetches (and says so).
       void client.invalidateQueries({ queryKey: keys.listing(id), refetchType: 'none' });
+      // Out of the list at once, rather than when the list is fetched again.
+      client.setQueryData<CustomGroupList>(keys.groupList, (list) => list && { groups: list.groups.filter((g) => g.id !== id) });
       void client.invalidateQueries({ queryKey: keys.groupList });
     },
   });
@@ -193,7 +219,10 @@ export function useSetGroupMember() {
   return useMutation({
     mutationFn: ({ groupId, entryId, quantity }: { groupId: number; entryId: number; quantity: number }) =>
       api.setGroupMember(groupId, entryId, quantity),
-    onSuccess: () => void client.invalidateQueries({ queryKey: ['groups'] }),
+    onSuccess: ({ member }, { groupId, entryId }) => {
+      client.setQueryData(keys.member(groupId, entryId), member);
+      refreshGroup(client, groupId);
+    },
   });
 }
 
@@ -201,6 +230,9 @@ export function useRemoveGroupMember() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ groupId, entryId }: { groupId: number; entryId: number }) => api.removeGroupMember(groupId, entryId),
-    onSuccess: () => void client.invalidateQueries({ queryKey: ['groups'] }),
+    onSuccess: (_, { groupId, entryId }) => {
+      client.setQueryData(keys.member(groupId, entryId), null);
+      refreshGroup(client, groupId);
+    },
   });
 }

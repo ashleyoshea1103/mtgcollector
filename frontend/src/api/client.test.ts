@@ -69,6 +69,7 @@ describe('send', () => {
 
   it.each([
     [502, "the server isn't answering; try again shortly"],
+    [504, "the server isn't answering; try again shortly"],
     [500, 'something went wrong on the server'],
     [418, 'the request failed (418)'],
   ])('stands in for a %i that has no API message', async (status, message) => {

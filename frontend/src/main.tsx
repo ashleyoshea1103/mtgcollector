@@ -1,7 +1,9 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-router';
+import { createBrowserRouter, type RouteObject } from 'react-router';
+// The DOM build: it can commit a navigation at once (flushSync), which logging out needs.
+import { RouterProvider } from 'react-router/dom';
 // Tokens first: the other stylesheets use them.
 import './styles/tokens.css';
 import './ui/ui.css';

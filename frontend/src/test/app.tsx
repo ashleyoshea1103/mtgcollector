@@ -3,7 +3,8 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createMemoryRouter, RouterProvider } from 'react-router';
+import { createMemoryRouter } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
 import { afterEach, vi } from 'vitest';
 import { createQueryClient } from '../api/queryClient';
 import { routes } from '../app/routes';

@@ -10,6 +10,7 @@ describe('createQueryClient', () => {
   it("retries what wasn't the user's fault, twice", () => {
     const retry = createQueryClient().getDefaultOptions().queries!.retry as (failures: number, err: Error) => boolean;
     expect(retry(0, new ApiError(503, 'busy'))).toBe(true);
+    expect(retry(0, new ApiError(500, 'oops'))).toBe(true);
     expect(retry(1, new NetworkError())).toBe(true);
     expect(retry(2, new ApiError(500, 'oops'))).toBe(false);
     expect(retry(0, new ApiError(404, 'no such group'))).toBe(false);

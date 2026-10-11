@@ -73,7 +73,7 @@ describe('endpoints', () => {
   it('searches with only the filters given, trimmed', async () => {
     const sent = stubApi(200, { cards: [], page: 1, has_more: false });
     await api.searchCards({ ...EMPTY_SEARCH, q: ' bolt ', set: ' mh2 ' }, 1);
-    await api.searchCards({ q: 'elf', set: '', type: 'Creature — Elf', rarity: 'rare', colors: 'G', extras: true }, 3);
+    await api.searchCards({ q: 'elf', set: '', type: ' Creature — Elf ', rarity: 'rare', colors: 'G', extras: true }, 3);
     expect(sent.map((s) => s.url)).toEqual([
       '/api/cards/search?q=bolt&set=mh2&page=1',
       '/api/cards/search?q=elf&type=Creature+%E2%80%94+Elf&rarity=rare&colors=G&extras=true&page=3',

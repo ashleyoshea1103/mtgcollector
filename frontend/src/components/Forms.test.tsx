@@ -97,6 +97,18 @@ describe('GroupForm', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it('moves focus to the field in error, which reads out why', async () => {
+    render(<GroupForm group={{ name: 'Box', kind: 'box', description: 'x'.repeat(MaxGroupDescriptionLength + 1) }} onSubmit={() => {}} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('textbox', { name: 'Description' })).toHaveFocus();
+  });
+
+  it('moves focus to the name before the description when both are wrong', async () => {
+    render(<GroupForm group={{ name: '  ', kind: 'box', description: 'x'.repeat(MaxGroupDescriptionLength + 1) }} onSubmit={() => {}} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus();
+  });
+
   it('shows why the last attempt failed', () => {
     render(<GroupForm onSubmit={() => {}} error="You already have a group with that name." />);
     expect(screen.getByRole('alert')).toHaveTextContent('You already have a group with that name.');
@@ -125,13 +137,25 @@ describe('EntryChangeForm', () => {
     expect(screen.getByRole('combobox', { name: 'Finish' })).toHaveValue('foil');
   });
 
-  it('sends a typed quantity as a whole number in range', async () => {
+  it("won't save an emptied quantity, which isn't 1 copy", async () => {
+    const onSubmit = vi.fn<(c: EntryChange) => void>();
+    render(<EntryChangeForm entry={entries.bolts} onSubmit={onSubmit} />);
+    const quantity = screen.getByRole('spinbutton', { name: 'Quantity' });
+    expect(quantity).toBeRequired();
+    await userEvent.clear(quantity);
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Condition' }), 'LP: Light Played');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('sends a typed quantity as a whole number', async () => {
     const onSubmit = vi.fn<(c: EntryChange) => void>();
     render(<EntryChangeForm entry={entries.bolts} onSubmit={onSubmit} />);
     const quantity = screen.getByRole('spinbutton', { name: 'Quantity' });
     await userEvent.clear(quantity);
+    await userEvent.type(quantity, '7');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect(onSubmit).toHaveBeenLastCalledWith({ quantity: 1 });
+    expect(onSubmit).toHaveBeenLastCalledWith({ quantity: 7 });
   });
 });
 
@@ -169,6 +193,24 @@ describe('MemberForm', () => {
     expect(copies).toHaveValue(2);
     rerender(<MemberForm entry={entries.bolts} groups={groups} groupId={groups[1].id} current={null} onSubmit={() => {}} />);
     expect(copies).toHaveValue(1);
+  });
+
+  it("can't be saved until it's known what the group holds, which it would overwrite", async () => {
+    const onSubmit = vi.fn<(q: number) => void>();
+    render(<MemberForm entry={entries.bolts} groups={groups} groupId={groups[0].id} current={undefined} onSubmit={onSubmit} />);
+    expect(screen.getByRole('button', { name: 'Add to group' })).toBeDisabled();
+    await userEvent.type(screen.getByRole('spinbutton', { name: 'Copies in the group' }), '{Enter}');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("won't save an emptied number of copies", async () => {
+    const onSubmit = vi.fn<(q: number) => void>();
+    render(<MemberForm entry={entries.bolts} groupId={groups[0].id} current={2} onSubmit={onSubmit} />);
+    const copies = screen.getByRole('spinbutton', { name: 'Copies in the group' });
+    expect(copies).toBeRequired();
+    await userEvent.clear(copies);
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('offers no group choice when the group is already chosen', () => {

@@ -1,4 +1,5 @@
-import { Link, NavLink, Outlet, ScrollRestoration, useNavigate } from 'react-router';
+import { useEffect, useRef } from 'react';
+import { Link, NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router';
 import { useLogout, useMe } from '../api/queries';
 import { errorMessage } from '../lib/messages';
 import { Button, Cluster, toast } from '../ui';
@@ -6,13 +7,32 @@ import { Button, Cluster, toast } from '../ui';
 /** Every page's frame: the header with the app's sections and the account, then the page. */
 export function AppLayout() {
   const me = useMe();
-  const logout = useLogout();
   const navigate = useNavigate();
+  // Off any page that needs an account before the user is forgotten, or it would send them to log in.
+  const logout = useLogout(() => navigate('/search', { flushSync: true }));
+  const location = useLocation();
   const user = me.data;
+  // Logging in or signing up comes back to this page afterwards; from those pages themselves,
+  // to wherever they were going to come back to.
+  const comeBack = /^\/(login|signup)$/.test(location.pathname)
+    ? location.search
+    : location.pathname === '/'
+      ? ''
+      : `?next=${encodeURIComponent(location.pathname + location.search)}`;
+
+  // A new page moves focus to it, so screen readers start there rather than where the old one was.
+  const main = useRef<HTMLElement>(null);
+  const firstPage = useRef(true);
+  useEffect(() => {
+    if (firstPage.current) {
+      firstPage.current = false;
+      return;
+    }
+    main.current?.focus({ preventScroll: true });
+  }, [location.pathname]);
 
   function logOut() {
     logout.mutate(undefined, {
-      onSuccess: () => navigate('/'),
       onError: (err) => toast({ title: "Couldn't log out", description: errorMessage(err), tone: 'error' }),
     });
   }
@@ -56,14 +76,14 @@ export function AppLayout() {
           ) : (
             (user === null || me.isError) && (
               <Cluster className="app-header__account">
-                <NavLink to="/login">Log in</NavLink>
-                <NavLink to="/signup">Sign up</NavLink>
+                <NavLink to={`/login${comeBack}`}>Log in</NavLink>
+                <NavLink to={`/signup${comeBack}`}>Sign up</NavLink>
               </Cluster>
             )
           )}
         </Cluster>
       </header>
-      <main id="main" className="app-main" tabIndex={-1}>
+      <main id="main" ref={main} className="app-main" tabIndex={-1}>
         <Outlet />
       </main>
       <ScrollRestoration />

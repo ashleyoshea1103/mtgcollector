@@ -11,8 +11,9 @@ import { ErrorState, Loading } from '../ui';
 export function RequireAuth() {
   const me = useMe();
   const location = useLocation();
-  if (me.isPending) return <Loading />;
-  if (me.isError) return <ErrorState message={errorMessage(me.error)} onRetry={() => void me.refetch()} />;
-  if (!me.data) return <Navigate to={loginUrl(location.pathname + location.search)} replace />;
+  // Only until it's first known: a later check that fails (say, on returning to the tab)
+  // mustn't take the page away, with whatever was being typed in it.
+  if (me.data === undefined) return me.isError ? <ErrorState message={errorMessage(me.error)} onRetry={() => void me.refetch()} /> : <Loading />;
+  if (me.data === null) return <Navigate to={loginUrl(location.pathname + location.search)} replace />;
   return <Outlet />;
 }

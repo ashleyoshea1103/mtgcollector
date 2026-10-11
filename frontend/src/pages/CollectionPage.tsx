@@ -18,10 +18,12 @@ export function CollectionPage() {
     <Stack as="section" className="collection-page" gap={5}>
       <title>Your collection · mtgcollector</title>
       <h1>Your collection</h1>
-      {stats.isPending ? (
-        <Loading label="Loading totals…" live={false} />
-      ) : stats.isError ? (
-        <ErrorState message={errorMessage(stats.error)} onRetry={() => void stats.refetch()} />
+      {stats.data === undefined ? (
+        stats.isError ? (
+          <ErrorState message={errorMessage(stats.error)} onRetry={() => void stats.refetch()} />
+        ) : (
+          <Loading label="Loading totals…" live={false} />
+        )
       ) : (
         <CollectionSummary stats={stats.data} />
       )}

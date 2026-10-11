@@ -248,3 +248,61 @@ describe('CardPage', () => {
     expect(main().getByRole('link', { name: 'Search for cards' })).toHaveAttribute('href', '/search');
   });
 });
+
+describe('SearchPage, more', () => {
+  it('has a heading for the results', async () => {
+    renderApp('/search?q=bolt', { ...signedOut, ...searchApi });
+    expect(await main().findByRole('heading', { level: 2, name: 'Results' })).toBeInTheDocument();
+  });
+
+  it("keeps the last results up, marked busy, while the next search runs", async () => {
+    const { user } = renderApp('/search?q=bolt', {
+      ...signedOut,
+      'GET /api/cards/search': async (req) => {
+        if (req.query.get('q') === 'boltx') await new Promise((resolve) => setTimeout(resolve, 300));
+        return { body: page([lightningBolt]) };
+      },
+    });
+    await main().findByRole('heading', { name: lightningBolt.name });
+    await user.type(main().getByRole('searchbox', { name: 'Card name' }), 'x{Enter}');
+    await waitFor(() => expect(main().getByRole('heading', { level: 2, name: 'Results' }).parentElement).toHaveAttribute('aria-busy', 'true'));
+    expect(main().getByRole('heading', { name: lightningBolt.name })).toBeInTheDocument();
+  });
+
+  it("asks to log in when it can't tell who's signed in", async () => {
+    renderApp('/search?q=bolt', { ...searchApi, 'GET /api/auth/me': { status: 503, body: { error: 'that took too long; try again' } } });
+    expect(await main().findByText(/to add cards to your collection/)).toBeInTheDocument();
+  });
+
+  it('replaces the history entry as the search changes, rather than adding one per pause in typing', async () => {
+    const { user, router } = renderApp('/search', { ...signedOut, ...searchApi });
+    await user.type(await main().findByRole('searchbox', { name: 'Card name' }), 'bolt{Enter}');
+    await waitFor(() => expect(router.state.location.search).toBe('?q=bolt'));
+    expect(router.state.historyAction).toBe('REPLACE');
+  });
+
+  it("says when the user's groups couldn't be loaded, so the add form has none", async () => {
+    const { user } = renderApp('/search?q=bolt', {
+      ...signedIn,
+      ...searchApi,
+      'GET /api/groups': { status: 503, body: { error: 'that took too long; try again' } },
+    });
+    await user.click(await main().findByRole('button', { name: `Add ${lightningBolt.name}` }));
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByText(/Couldn't load your groups/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('region', { name: 'Which printing?' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { level: 2, name: `Add ${lightningBolt.name}` })).toBeInTheDocument();
+  });
+});
+
+describe('CardPage, more', () => {
+  it("says when the user's copies couldn't be loaded", async () => {
+    renderApp(`/cards/${delver.id}`, {
+      ...signedIn,
+      'GET /api/cards/:id': { body: delver },
+      'GET /api/cards/:id/printings': { body: page([delver]) },
+      'GET /api/collection/cards/:id': { status: 503, body: { error: 'that took too long; try again' } },
+    });
+    expect(await main().findByText("Couldn't load your copies. That took too long; try again.")).toBeInTheDocument();
+  });
+});

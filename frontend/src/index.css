@@ -32,6 +32,11 @@ body {
   top: var(--spacing-2);
 }
 
+/* Focused when a new page opens, for screen readers; not a control, so no focus ring. */
+.app-main:focus {
+  outline: none;
+}
+
 .app-header {
   margin-bottom: var(--spacing-5);
 }

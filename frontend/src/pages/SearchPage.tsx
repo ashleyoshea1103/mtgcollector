@@ -40,7 +40,7 @@ export function SearchPage() {
       <title>Search · mtgcollector</title>
       <h1>Search cards</h1>
       <SearchFilters key={form.key} value={search} onChange={changeSearch} />
-      {me.data === null && (
+      {(me.data === null || me.isError) && (
         <p className="search-page__login">
           <Link to={loginUrl(location.pathname + location.search)}>Log in</Link> to add cards to your collection.
         </p>
@@ -49,15 +49,18 @@ export function SearchPage() {
         <p className="search-page__hint">
           {search.set !== '' && !isSetCode(search.set) ? 'Correct the set code to search.' : `Type at least ${MinSearchWord} letters of a card's name, or a set code.`}
         </p>
-      ) : results.isPending ? (
-        <Loading label="Searching…" />
-      ) : results.isError ? (
-        <ErrorState message={errorMessage(results.error)} onRetry={() => void results.refetch()} />
+      ) : results.data === undefined ? (
+        results.isError ? (
+          <ErrorState message={errorMessage(results.error)} onRetry={() => void results.refetch()} />
+        ) : (
+          <Loading label="Searching…" />
+        )
       ) : results.data.length === 0 ? (
         <EmptyState title="No cards match">Check the spelling, or take a filter off.</EmptyState>
       ) : (
         // Busy while the results of an older search stand in for the new one's.
         <div className="search-page__results" aria-busy={results.isPlaceholderData || undefined}>
+          <h2 className="visually-hidden">Results</h2>
           <Grid as="ul" minItemWidth="180px" className="card-grid">
             {results.data.map((card) => (
               <li key={card.id}>
@@ -80,7 +83,7 @@ export function SearchPage() {
             ))}
           </Grid>
           {results.hasNextPage && (
-            <Button className="search-page__more" onPress={() => void results.fetchNextPage()} busy={results.isFetchingNextPage}>
+            <Button className="search-page__more" onPress={() => void results.fetchNextPage({ cancelRefetch: false })} busy={results.isFetching}>
               {results.isFetchingNextPage ? 'Loading…' : 'Show more'}
             </Button>
           )}

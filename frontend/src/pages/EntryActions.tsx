@@ -87,28 +87,33 @@ function PutInGroupDialog({ entry, onClose }: DialogProps) {
           Binders, decks and boxes hold some of your cards.
         </EmptyState>
       ) : (
-        <MemberForm
-          entry={entry}
-          groups={groups.data}
-          groupId={groupId}
-          onGroupChange={setChosen}
-          current={member.isSuccess ? (member.data?.quantity ?? null) : undefined}
-          onCancel={onClose}
-          submitting={put.isPending}
-          error={put.isError ? errorMessage(put.error) : undefined}
-          onSubmit={(quantity) =>
-            put.mutate(
-              { groupId: groupId!, entryId: entry.id, quantity },
-              {
-                onSuccess: ({ member: m }) => {
-                  const name = groups.data.find((g) => g.id === groupId)?.name ?? 'the group';
-                  toast({ title: `${name} now holds ${m.quantity} × ${entry.card.name}`, tone: 'success' });
-                  onClose();
+        <>
+          {member.isError && member.data === undefined && (
+            <ErrorState message={`Couldn't find out how many the group holds now. ${errorMessage(member.error)}`} onRetry={() => void member.refetch()} />
+          )}
+          <MemberForm
+            entry={entry}
+            groups={groups.data}
+            groupId={groupId}
+            onGroupChange={setChosen}
+            current={member.data === undefined ? undefined : (member.data?.quantity ?? null)}
+            onCancel={onClose}
+            submitting={put.isPending}
+            error={put.isError ? errorMessage(put.error) : undefined}
+            onSubmit={(quantity) =>
+              put.mutate(
+                { groupId: groupId!, entryId: entry.id, quantity },
+                {
+                  onSuccess: ({ member: m }) => {
+                    const name = groups.data.find((g) => g.id === groupId)?.name ?? 'the group';
+                    toast({ title: `${name} now holds ${m.quantity} × ${entry.card.name}`, tone: 'success' });
+                    onClose();
+                  },
                 },
-              },
-            )
-          }
-        />
+              )
+            }
+          />
+        </>
       )}
     </Dialog>
   );

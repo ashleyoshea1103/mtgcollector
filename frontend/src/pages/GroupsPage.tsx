@@ -31,29 +31,34 @@ export function GroupsPage() {
         <h1>Groups</h1>
         {groups.data && groups.data.length > 0 && newGroup}
       </Cluster>
-      {groups.isPending ? (
-        <Loading />
-      ) : groups.isError ? (
-        <ErrorState message={errorMessage(groups.error)} onRetry={() => void groups.refetch()} />
+      {groups.data === undefined ? (
+        groups.isError ? (
+          <ErrorState message={errorMessage(groups.error)} onRetry={() => void groups.refetch()} />
+        ) : (
+          <Loading />
+        )
       ) : groups.data.length === 0 ? (
         <EmptyState title="No groups yet" action={newGroup}>
           Make a binder, deck or box, then put cards from your collection in it.
         </EmptyState>
       ) : (
-        <Grid as="ul" minItemWidth="260px" className="group-grid">
-          {groups.data.map((g) => (
-            <li key={g.id}>
-              <CustomGroupCard
-                group={g}
-                actions={
-                  <Link to={groupPath(g.id)} aria-label={`Open ${g.name}`}>
-                    Open
-                  </Link>
-                }
-              />
-            </li>
-          ))}
-        </Grid>
+        <>
+          <h2 className="visually-hidden">Your groups</h2>
+          <Grid as="ul" minItemWidth="260px" className="group-grid">
+            {groups.data.map((g) => (
+              <li key={g.id}>
+                <CustomGroupCard
+                  group={g}
+                  actions={
+                    <Link to={groupPath(g.id)} aria-label={`Open ${g.name}`}>
+                      Open
+                    </Link>
+                  }
+                />
+              </li>
+            ))}
+          </Grid>
+        </>
       )}
       {making && (
         <Dialog title="New group" isOpen onOpenChange={(open) => !open && close()}>
