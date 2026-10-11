@@ -17,6 +17,12 @@ describe('parseQuantity', () => {
     expect(parseQuantity('1e6')).toBe(MAX_QUANTITY);
   });
 
+  it('clamps to a smaller maximum when given one', () => {
+    expect(parseQuantity('5', 3)).toBe(3);
+    expect(parseQuantity('2', 3)).toBe(2);
+    expect(parseQuantity('', 3)).toBe(1);
+  });
+
   it('treats empty, zero, negative and junk input as one', () => {
     for (const input of ['', '0', '-4', 'abc', 'Infinity', '0.5']) {
       expect(parseQuantity(input), input).toBe(1);

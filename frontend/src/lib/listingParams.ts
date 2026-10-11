@@ -1,0 +1,51 @@
+import type { CollectionView } from '../components/GroupBucketSection';
+import type { GroupBy, SortBy } from '../types';
+
+/** How a listing (the collection, or a group) is shown: kept in the URL, so it survives a reload and can be linked. */
+export interface ListingParams {
+  groupBy: GroupBy;
+  sort: SortBy;
+  view: CollectionView;
+}
+
+export const GROUP_BY_LABELS: Record<GroupBy, string> = {
+  none: 'Nothing',
+  set: 'Set',
+  color: 'Color',
+  type: 'Type',
+  rarity: 'Rarity',
+  cmc: 'Mana value',
+};
+
+export const SORT_LABELS: Record<SortBy, string> = {
+  name: 'Name',
+  price: 'Price (highest first)',
+  cmc: 'Mana value',
+  added: 'Newest first',
+};
+
+export const VIEW_LABELS: Record<CollectionView, string> = { grid: 'Grid', list: 'List' };
+
+export const DEFAULT_LISTING: ListingParams = { groupBy: 'none', sort: 'name', view: 'grid' };
+
+const oneOf = <T extends string>(labels: Record<T, string>, value: string | null, fallback: T): T =>
+  value !== null && Object.hasOwn(labels, value) ? (value as T) : fallback;
+
+/** The listing's settings in a URL's query; unknown or missing values are the defaults. */
+export function readListing(params: URLSearchParams): ListingParams {
+  return {
+    groupBy: oneOf(GROUP_BY_LABELS, params.get('group_by'), DEFAULT_LISTING.groupBy),
+    sort: oneOf(SORT_LABELS, params.get('sort'), DEFAULT_LISTING.sort),
+    view: oneOf(VIEW_LABELS, params.get('view'), DEFAULT_LISTING.view),
+  };
+}
+
+/** params with the listing's settings in them; defaults are left out, to keep URLs short. */
+export function writeListing(params: URLSearchParams, listing: ListingParams): URLSearchParams {
+  const out = new URLSearchParams(params);
+  const set = (name: string, value: string, fallback: string) => (value === fallback ? out.delete(name) : out.set(name, value));
+  set('group_by', listing.groupBy, DEFAULT_LISTING.groupBy);
+  set('sort', listing.sort, DEFAULT_LISTING.sort);
+  set('view', listing.view, DEFAULT_LISTING.view);
+  return out;
+}
