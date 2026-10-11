@@ -1,3 +1,4 @@
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
@@ -24,7 +25,7 @@ function forbidDevOnlyModules(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), forbidDevOnlyModules()],
+  plugins: [react(), tailwindcss(), forbidDevOnlyModules()],
   build: {
     rolldownOptions: {
       output: {

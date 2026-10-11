@@ -4,11 +4,12 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, type RouteObject } from 'react-router';
 // The DOM build: it can commit a navigation at once (flushSync), which logging out needs.
 import { RouterProvider } from 'react-router/dom';
-// Tokens first: the other stylesheets use them.
-import './styles/tokens.css';
-import './ui/ui.css';
-import './index.css';
+// The fonts, bundled (the site's CSP allows fonts from itself only), then the stylesheet.
+import '@fontsource-variable/instrument-sans';
+import '@fontsource/spectral/600.css';
+import './styles/app.css';
 import { createQueryClient } from './api/queryClient';
+import { applyTheme, storedTheme } from './lib/theme';
 import { routes } from './app/routes';
 import { LazyToaster } from './ui/LazyToaster';
 
@@ -23,6 +24,9 @@ if (import.meta.env.DEV) {
     hydrateFallbackElement: <p>Loading…</p>,
   });
 }
+
+// Before the first paint, so a light-theme choice doesn't flash dark first.
+applyTheme(storedTheme());
 
 const queryClient = createQueryClient();
 

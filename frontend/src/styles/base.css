@@ -1,0 +1,80 @@
+/*
+ * Element defaults, on top of Tailwind's reset (which zeroes margins, list styles and
+ * heading sizes): the page's ground, type and links, from the tokens.
+ */
+html {
+  background: var(--color-bg);
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-snug);
+  text-wrap: balance;
+}
+h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  line-height: var(--leading-tight);
+}
+h2 {
+  font-size: var(--text-lg);
+}
+h3 {
+  font-size: var(--text-md);
+}
+
+a {
+  color: var(--color-accent);
+  text-underline-offset: 0.18em;
+}
+a:hover {
+  color: var(--color-text-strong);
+}
+
+/* Keyboard focus is always visible, in the accent. */
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+abbr[title] {
+  text-decoration: none;
+}
+
+/* Figures line up: counts, prices and totals use tabular numbers everywhere. */
+data,
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Everything that moves stops for those who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

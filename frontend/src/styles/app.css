@@ -1,0 +1,12 @@
+/*
+ * The app's one stylesheet, in order: Tailwind (its reset and utilities), the design tokens
+ * (its theme), element defaults, the src/ui primitives, then the app's own components and
+ * pages. The
+ * primitives and components are in Tailwind's components layer, so a utility in markup
+ * (e.g. on a page's layout) wins over them.
+ */
+@import 'tailwindcss';
+@import './tokens.css';
+@import './base.css' layer(base);
+@import '../ui/ui.css' layer(components);
+@import '../index.css' layer(components);

@@ -63,7 +63,13 @@ export function PrimitivesGallery() {
 
   return (
     <>
-      <Section name="Design tokens" note="Placeholder values until the design brief; the names are the contract (src/styles/tokens.css).">
+      <Section name="Design tokens" note="Direction A, dark and binder-style (src/styles/tokens.css); the light theme overrides the same names.">
+        <h3>Surfaces and lines</h3>
+        <Cluster gap={4}>{['--color-bg', '--color-surface', '--color-surface-raised', '--color-control', '--color-rule', '--color-border', '--color-border-control'].map(swatch)}</Cluster>
+        <h3>Text</h3>
+        <Cluster gap={4}>{['--color-text-strong', '--color-text', '--color-text-secondary', '--color-text-muted'].map(swatch)}</Cluster>
+        <h3>Accent and feedback</h3>
+        <Cluster gap={4}>{['--color-accent', '--color-focus', '--color-danger', '--color-danger-fg', '--color-success', '--color-warning'].map(swatch)}</Cluster>
         <h3>Rarity</h3>
         <Cluster gap={4}>{Object.keys(RARITIES).map((r) => swatch(`--color-rarity-${r}`))}</Cluster>
         <h3>Mana</h3>
