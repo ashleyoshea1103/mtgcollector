@@ -92,6 +92,17 @@ describe('signing in', () => {
     expect(header().getByText(ann.email)).toBeInTheDocument();
   });
 
+  it("forgets a failed attempt's password once the login page is left", async () => {
+    const { user, client } = renderApp('/login', { ...signedOut, 'POST /api/auth/login': { status: 401, body: { error: 'email or password is incorrect' } } });
+    await user.type(await screen.findByRole('textbox', { name: 'Email' }), 'ann@example.com');
+    await user.type(screen.getByLabelText('Password'), 'a nearly right password');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+    await screen.findByRole('alert');
+    expect(client.getMutationCache().getAll()).toHaveLength(1);
+    await user.click(header().getByRole('link', { name: 'Search' }));
+    await waitFor(() => expect(client.getMutationCache().getAll()).toHaveLength(0));
+  });
+
   it("says why logging in failed and stays put", async () => {
     const { user, location } = renderApp('/login', {
       ...signedOut,

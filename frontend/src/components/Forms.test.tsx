@@ -18,6 +18,8 @@ describe('AuthForm', () => {
     const onSubmit = vi.fn<(c: Credentials) => void>();
     render(<AuthForm mode="login" onSubmit={onSubmit} />);
     const password = screen.getByLabelText('Password');
+    // What password managers look for beside a current password.
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveAttribute('autocomplete', 'username');
     expect(password).toHaveAttribute('autocomplete', 'current-password');
     expect(password).not.toHaveAccessibleDescription();
     await userEvent.type(screen.getByRole('textbox', { name: 'Email' }), ' ann@example.com ');
@@ -30,6 +32,7 @@ describe('AuthForm', () => {
     const onSubmit = vi.fn<(c: Credentials) => void>();
     render(<AuthForm mode="signup" onSubmit={onSubmit} />);
     const password = screen.getByLabelText('Password');
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveAttribute('autocomplete', 'email');
     expect(password).toHaveAttribute('autocomplete', 'new-password');
     expect(password).toHaveAccessibleDescription(expect.stringContaining('15 to 256 characters.'));
     await userEvent.type(screen.getByRole('textbox', { name: 'Email' }), 'ann@example.com');

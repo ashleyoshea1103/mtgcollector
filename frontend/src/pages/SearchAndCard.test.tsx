@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { cards, customGroups, entries, makeEntry } from '../fixtures';
+import { keys } from '../api/keys';
 import { renderApp, signedIn, signedOut, type Routes } from '../test/app';
 import type { Card, CardPage } from '../types';
 
@@ -206,6 +207,13 @@ describe('CardPage', () => {
     // Nobody's signed in: no copies to ask for.
     expect(api.sent('GET /api/collection/cards/:id')).toHaveLength(0);
     expect(main().getByRole('link', { name: 'Log in' })).toHaveAttribute('href', `/login?next=${encodeURIComponent(`/cards/${delver.id}`)}`);
+  });
+
+  it('shows no copies once nobody is signed in, though some are still cached', async () => {
+    const { client } = renderApp(`/cards/${delver.id}`, { ...signedOut, ...cardApi });
+    client.setQueryData(keys.copies(delver.id), { entries: [entries.germanDelver] });
+    expect(await main().findByRole('heading', { level: 1, name: delver.name })).toBeInTheDocument();
+    expect(main().queryByRole('heading', { name: 'In your collection' })).not.toBeInTheDocument();
   });
 
   it("shows the user's copies, and adds more of this printing", async () => {

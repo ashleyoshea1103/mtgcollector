@@ -33,7 +33,8 @@ export function CardPage() {
   return (
     <Stack as="section" className="card-page" gap={5}>
       <title>{`${card.data.name} · mtgcollector`}</title>
-      <CardDetail card={card.data} entries={copies.data?.entries} headingLevel={1} />
+      {/* Copies only while someone is signed in: a disabled query still has what it last fetched. */}
+      <CardDetail card={card.data} entries={me.data ? copies.data?.entries : undefined} headingLevel={1} />
       {copies.isError && <ErrorState message={`Couldn't load your copies. ${errorMessage(copies.error)}`} onRetry={() => void copies.refetch()} />}
       {me.data ? (
         <p>

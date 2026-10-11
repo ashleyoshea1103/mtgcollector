@@ -40,7 +40,7 @@ describe('createQueryClient', () => {
     await vi.waitFor(() => expect(client.getQueryData(keys.me)).toBeNull());
   });
 
-  it("leaves everything when nobody was signed in (a wrong password is a 401 too) or it wasn't a 401", async () => {
+  it("leaves everyone's data when nobody was signed in (a wrong password is a 401 too) or it wasn't a 401", async () => {
     const client = createQueryClient({ queries: { retry: false } });
     client.setQueryData(keys.me, null);
     client.setQueryData(keys.card('x'), { id: 'x' });
@@ -50,6 +50,56 @@ describe('createQueryClient', () => {
     client.setQueryData(keys.me, ann);
     await client.fetchQuery({ queryKey: keys.stats, queryFn: fail(new ApiError(403, 'forbidden')) }).catch(() => {});
     expect(client.getQueryData(keys.me)).toEqual(ann);
+  });
+});
+
+describe('a change of who is signed in, however it is found out', () => {
+  const bob = { id: 2, email: 'bob@example.com' };
+  const signedInAs = async (user: typeof ann | null) => {
+    const client = createQueryClient({ queries: { retry: false } });
+    client.setQueryData(keys.me, ann);
+    client.setQueryData(keys.group(4), { id: 4, name: "Ann's binder" });
+    await client.fetchQuery({ queryKey: keys.me, queryFn: () => Promise.resolve(user), staleTime: 0 });
+    return client;
+  };
+
+  it("drops the last user's data when someone else is signed in now (another tab switched account)", async () => {
+    expect((await signedInAs(bob)).getQueryData(keys.group(4))).toBeUndefined();
+  });
+
+  it("drops the last user's data when nobody is signed in now (their session ended)", async () => {
+    expect((await signedInAs(null)).getQueryData(keys.group(4))).toBeUndefined();
+  });
+
+  it('keeps it when the same user is still signed in', async () => {
+    expect((await signedInAs(ann)).getQueryData(keys.group(4))).toEqual({ id: 4, name: "Ann's binder" });
+  });
+
+  it("drops a user's data that outlived them when a 401 comes after", async () => {
+    const client = createQueryClient({ queries: { retry: false } });
+    client.setQueryData(keys.me, null);
+    client.setQueryData(keys.stats, { card_count: 3 });
+    client.setQueryData(keys.card('x'), { id: 'x' });
+    await client.fetchQuery({ queryKey: keys.groupList, queryFn: fail(new ApiError(401, 'not signed in')) }).catch(() => {});
+    expect(client.getQueryData(keys.stats)).toBeUndefined();
+    // Card data is everyone's.
+    expect(client.getQueryData(keys.card('x'))).toEqual({ id: 'x' });
+  });
+
+  it('forgets changes made, whose variables can hold a typed password', async () => {
+    const client = createQueryClient();
+    client.setQueryData(keys.me, null);
+    await client.getMutationCache().build(client, { mutationFn: () => Promise.resolve(ann) }).execute({ email: ann.email, password: 'correct horse battery staple' });
+    await switchUser(client, null);
+    expect(client.getMutationCache().getAll()).toHaveLength(0);
+  });
+
+  it("tells the browser's other tabs, which check who's signed in", async () => {
+    const here = createQueryClient();
+    const there = createQueryClient();
+    there.setQueryData(keys.me, ann);
+    await switchUser(here, bob);
+    await vi.waitFor(() => expect(there.getQueryState(keys.me)?.isInvalidated).toBe(true));
   });
 });
 

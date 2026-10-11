@@ -39,7 +39,8 @@ export function AuthForm({ mode, onSubmit, submitting = false, error }: Props) {
     <form className={`auth-form auth-form--${mode}`} onSubmit={handleSubmit}>
       <Stack>
         <Field label="Email">
-          <TextInput type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          {/* "username" on logging in: what password managers look for beside a current password. */}
+          <TextInput type="email" autoComplete={mode === 'login' ? 'username' : 'email'} required value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
         <Field
           label="Password"

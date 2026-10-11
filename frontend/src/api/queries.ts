@@ -122,14 +122,15 @@ const refreshOwned = (client: QueryClient) => {
   void client.invalidateQueries({ queryKey: ['groups'] });
 };
 
+// A login's variables are the password typed: kept no longer than the page showing the attempt.
 export function useLogin() {
   const client = useQueryClient();
-  return useMutation({ mutationFn: (c: Credentials) => api.login(c), onSuccess: (user) => switchUser(client, user) });
+  return useMutation({ mutationFn: (c: Credentials) => api.login(c), onSuccess: (user) => switchUser(client, user), gcTime: 0 });
 }
 
 export function useSignup() {
   const client = useQueryClient();
-  return useMutation({ mutationFn: (c: Credentials) => api.signup(c), onSuccess: (user) => switchUser(client, user) });
+  return useMutation({ mutationFn: (c: Credentials) => api.signup(c), onSuccess: (user) => switchUser(client, user), gcTime: 0 });
 }
 
 export function useLogout() {
