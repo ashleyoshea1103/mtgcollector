@@ -15,14 +15,13 @@ interface Props {
 export function PrintingOption({ card, selected = false, onSelect }: Props) {
   return (
     <ToggleButton className={`printing-option${selected ? ' printing-option--selected' : ''}`} selected={selected} onPress={() => onSelect?.(card)}>
-      <SetSymbol set={card.set} rarity={card.rarity} nameShown />
-      <span className="printing-option__set">{card.set.name}</span>
-      <span className="printing-option__number">#{card.collector_number}</span>
+      {/* Spaces between the parts, or a screen reader runs them together: "#1872026" for #187, 2026. */}
+      <SetSymbol set={card.set} rarity={card.rarity} nameShown /> <span className="printing-option__set">{card.set.name}</span>{' '}
+      <span className="printing-option__number">#{card.collector_number}</span>{' '}
       <time className="printing-option__date" dateTime={card.released_at}>
         {card.released_at.slice(0, 4)}
-      </time>
-      <Price prices={card.prices} finish={defaultFinish(card)} />
-      <NoLongerListed card={card} />
+      </time>{' '}
+      <Price prices={card.prices} finish={defaultFinish(card)} /> <NoLongerListed card={card} />
     </ToggleButton>
   );
 }

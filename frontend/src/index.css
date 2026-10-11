@@ -22,6 +22,48 @@ body {
   line-height: var(--leading-body);
 }
 
+/* Hidden until focused: the first thing a keyboard user reaches. */
+.skip-link {
+  position: absolute;
+  left: var(--spacing-2);
+  top: -100vh;
+}
+.skip-link:focus {
+  top: var(--spacing-2);
+}
+
+/* Focused when a new page opens, for screen readers; not a control, so no focus ring. */
+.app-main:focus {
+  outline: none;
+}
+
+.app-header {
+  margin-bottom: var(--spacing-5);
+}
+.app-header__nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.app-header__nav a[aria-current='page'] {
+  font-weight: bold;
+}
+
+/* Lists of cards and groups are grids; their list markers would only get in the way. */
+.card-grid,
+.group-grid,
+.printing-links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-filters__colors {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
 img {
   max-width: 100%;
   height: auto;

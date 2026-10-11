@@ -17,6 +17,7 @@ type Collection interface {
 	Groups(ctx context.Context, userID int64, by contract.GroupBy) (contract.CollectionGroups, error)
 	Entries(ctx context.Context, userID int64, q collection.EntryQuery) (contract.EntryPage, error)
 	Stats(ctx context.Context, userID int64) (contract.CollectionStats, error)
+	Copies(ctx context.Context, userID int64, cardID string) (contract.CardCopies, error)
 }
 
 // GET /api/collection/groups?group_by=: the signed-in user's groups.
@@ -43,6 +44,14 @@ func collectionEntries(c Collection) func(http.ResponseWriter, *http.Request, co
 func collectionStats(c Collection) func(http.ResponseWriter, *http.Request, contract.User) {
 	return func(w http.ResponseWriter, r *http.Request, user contract.User) {
 		res, err := c.Stats(r.Context(), user.ID)
+		result(w, r, http.StatusOK, res, err)
+	}
+}
+
+// GET /api/collection/cards/{card_id}: the user's copies of one printing.
+func cardCopies(c Collection) func(http.ResponseWriter, *http.Request, contract.User) {
+	return func(w http.ResponseWriter, r *http.Request, user contract.User) {
+		res, err := c.Copies(r.Context(), user.ID, r.PathValue("card_id"))
 		result(w, r, http.StatusOK, res, err)
 	}
 }

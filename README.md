@@ -23,7 +23,16 @@ cd frontend
 npm install
 npm run dev
 ```
-Open http://localhost:5173/dev/components to see the component gallery, and http://localhost:5173/api/health to check that the API can reach its database.
+Open http://localhost:5173 for the app, http://localhost:5173/dev/components for the component gallery, and http://localhost:5173/api/health to check that the API can reach its database.
+
+## The app
+- **Search** (`/search`): cards by name, set, type, rarity and colors, kept in the URL. Signed in, you can add a card: pick the printing, how many, the finish, condition and language, and optionally a group.
+- **A card** (`/cards/{id}`): one printing in full, with its prices, a Cardmarket link, the copies you own and its other printings.
+- **Your collection** (`/collection`): totals, then your cards grouped by set, color, type, rarity or mana value, sorted, in a grid or a list. Each card's Actions menu changes it, puts copies of it in a group, or removes it.
+- **Groups** (`/groups`, `/groups/{id}`): your binders, decks and boxes. A group's page lists its cards as the collection page does, with the group's copies.
+- **Log in, Sign up** (`/login`, `/signup`). The collection and group pages send visitors to log in, and back afterwards; so does a session that ends.
+
+Pages fetch with TanStack Query (the hooks are in `frontend/src/api/queries.ts`) and pass what they get to the components in `frontend/src/components`, which know nothing of the API. Logging out, or a session ending, drops everything cached.
 
 ## API
 The API's own responses are JSON, shaped by the types in `backend/internal/contract` (and so `frontend/src/types.ts`); its errors are `{"error": "…"}` with a 4xx or 5xx status. (The router's redirect from an unclean path, such as `//`, is plain text.)
@@ -42,6 +51,7 @@ The API's own responses are JSON, shaped by the types in `backend/internal/contr
 | `GET /api/collection/groups?group_by=` | The signed-in user's groups (`CollectionGroups`) for one way of grouping (`none` if left out), with each group's totals. Groups with none of the user's cards are left out, except `none`'s one group, `all`. |
 | `GET /api/collection/entries?group_by=&key=&sort=&cursor=` | A page of one group's entries (`EntryPage`), sorted by `name` (the default; Unicode order, so "Æther Vial" sorts with the aethers), `price` (most valuable copy first, unpriced last), `cmc` or `added` (newest first: when the entry was made, not when copies were last added to it). Pass `next_cursor` back as `cursor` for the next page. |
 | `GET /api/collection/stats` | Totals for the whole collection (`CollectionStats`). |
+| `GET /api/collection/cards/{card_id}` | Your copies of one printing (`CardCopies`): an entry for each finish, condition and language you own it in, non-foil first, then best condition first. None if you own no copies. |
 | `POST /api/collection/entries` | Adds copies (`NewEntry`): 201 with a new entry, or 200 with the entry of the same printing, finish, condition and language they were added to. |
 | `PATCH /api/collection/entries/{id}` | Changes an entry's quantity, finish, condition or language (`EntryChange`): 200 with the entry; 409 if it would then be the same as another of yours. |
 | `DELETE /api/collection/entries/{id}` | Removes an entry: 204. It leaves any groups it was in. |

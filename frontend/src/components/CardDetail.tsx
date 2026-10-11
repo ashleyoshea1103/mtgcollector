@@ -14,6 +14,8 @@ interface Props {
   card: Card;
   /** The user's copies of this printing, if any. */
   entries?: CollectionEntry[];
+  /** The card name's heading level: 1 when it's the page's title, else 2. Its sections' headings are one level below. */
+  headingLevel?: 1 | 2;
 }
 
 const priceColumns = (card: Card): Column<Finish>[] => [
@@ -23,7 +25,9 @@ const priceColumns = (card: Card): Column<Finish>[] => [
 ];
 
 /** Everything about one printing: images, rules text, prices and owned copies. */
-export function CardDetail({ card, entries = [] }: Props) {
+export function CardDetail({ card, entries = [], headingLevel = 2 }: Props) {
+  const Title = headingLevel === 1 ? 'h1' : 'h2';
+  const Sub = headingLevel === 1 ? 'h2' : 'h3';
   // Transform/modal cards have an image per face; split and adventure cards share one.
   const faceImages = card.faces?.filter((f) => f.images).length ?? 0;
   const faces: CardFace[] = card.faces ?? [
@@ -42,7 +46,7 @@ export function CardDetail({ card, entries = [] }: Props) {
 
       <div className="card-detail__info">
         <header className="card-detail__header">
-          <h2 className="card-detail__name">{card.name}</h2>
+          <Title className="card-detail__name">{card.name}</Title>
           <p className="card-detail__printing">
             <SetSymbol set={card.set} rarity={card.rarity} nameShown /> {card.set.name} #{card.collector_number} <RarityBadge rarity={card.rarity} />{' '}
             <time dateTime={card.released_at}>{card.released_at}</time> <NoLongerListed card={card} />
@@ -51,16 +55,16 @@ export function CardDetail({ card, entries = [] }: Props) {
 
         {faces.map((face, i) => (
           <section key={i} className="card-detail__face">
-            <h3 className="card-detail__face-name">
+            <Sub className="card-detail__face-name">
               {face.name} <ManaCost cost={face.mana_cost} />
-            </h3>
+            </Sub>
             <p className="card-detail__type">{face.type_line}</p>
             {face.oracle_text && <OracleText className="card-detail__oracle" text={face.oracle_text} />}
           </section>
         ))}
 
         <section className="card-detail__prices">
-          <h3>Prices</h3>
+          <Sub>Prices</Sub>
           <DataTable className="card-detail__price-table" columns={priceColumns(card)} rows={card.finishes} rowKey={(f) => f} />
           {card.cardmarket_url && (
             <a className="card-detail__cardmarket" href={card.cardmarket_url} target="_blank" rel="noopener noreferrer">
@@ -71,7 +75,7 @@ export function CardDetail({ card, entries = [] }: Props) {
 
         {entries.length > 0 && (
           <section className="card-detail__owned">
-            <h3>In your collection</h3>
+            <Sub>In your collection</Sub>
             <ul>
               {entries.map((e) => (
                 <li key={e.id}>

@@ -157,6 +157,19 @@ export interface CardNames {
   names: string[];
 }
 /**
+ * How many letters or digits in a row a card name search needs in one of its words; without
+ * one, a set must be given.
+ */
+export const MinSearchWord = 3;
+/**
+ * The longest a card search's name or type can be, in characters. The longest card name is 141.
+ */
+export const MaxSearchLength = 150;
+/**
+ * The last page of card search results served.
+ */
+export const MaxSearchPage = 50;
+/**
  * The body of every 4xx and 5xx API response.
  */
 export interface APIError {
@@ -251,6 +264,13 @@ export interface CollectionGroups {
 export interface EntryPage {
   entries: CollectionEntry[];
   next_cursor: string | null;
+}
+/**
+ * GET /api/collection/cards/{card_id}: the user's copies of one printing, an entry for each
+ * finish, condition and language they own it in (none if they own no copies).
+ */
+export interface CardCopies {
+  entries: CollectionEntry[];
 }
 /**
  * A collection entry as a member of a custom group. A binder can hold only some

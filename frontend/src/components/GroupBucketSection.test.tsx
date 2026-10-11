@@ -157,6 +157,16 @@ describe('GroupBucketSection', () => {
     expect(onLoad).toHaveBeenCalledTimes(2); // once on mount, once for the retry
   });
 
+  it('retries with onRetry when given one, not onLoad', async () => {
+    const user = userEvent.setup();
+    const onLoad = vi.fn<() => void>();
+    const onRetry = vi.fn<() => void>();
+    render(<GroupBucketSection group={red.group} onLoad={onLoad} onRetry={onRetry} loadFailed />);
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+    expect(onLoad).toHaveBeenCalledOnce(); // only on mount
+  });
+
   it('says so when an open group has no cards', () => {
     render(<GroupBucketSection group={makeGroup('E', 'Empty', []).group} entries={[]} />);
     expect(screen.getByText('No cards in this group')).toBeInTheDocument();

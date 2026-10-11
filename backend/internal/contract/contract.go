@@ -144,6 +144,16 @@ type CardNames struct {
 	Names []string `json:"names"`
 }
 
+// How many letters or digits in a row a card name search needs in one of its words; without
+// one, a set must be given.
+const MinSearchWord = 3
+
+// The longest a card search's name or type can be, in characters. The longest card name is 141.
+const MaxSearchLength = 150
+
+// The last page of card search results served.
+const MaxSearchPage = 50
+
 // The body of every 4xx and 5xx API response.
 type APIError struct {
 	// What went wrong, safe to show: never internal details.
@@ -225,6 +235,12 @@ type CollectionGroups struct {
 type EntryPage struct {
 	Entries    []CollectionEntry `json:"entries"`
 	NextCursor *string           `json:"next_cursor" tstype:"string | null,required"`
+}
+
+// GET /api/collection/cards/{card_id}: the user's copies of one printing, an entry for each
+// finish, condition and language they own it in (none if they own no copies).
+type CardCopies struct {
+	Entries []CollectionEntry `json:"entries"`
 }
 
 // A collection entry as a member of a custom group. A binder can hold only some

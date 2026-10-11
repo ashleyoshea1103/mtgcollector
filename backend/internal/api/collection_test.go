@@ -23,6 +23,7 @@ type fakeCollection struct {
 	change  contract.EntryChange
 	groupBy contract.GroupBy
 	query   collection.EntryQuery
+	cardID  string
 }
 
 func (f *fakeCollection) call(name string, userID int64) {
@@ -64,6 +65,12 @@ func (f *fakeCollection) Stats(_ context.Context, userID int64) (contract.Collec
 	return contract.CollectionStats{ByColor: map[string]int{}, ByRarity: map[contract.Rarity]int{}}, f.err
 }
 
+func (f *fakeCollection) Copies(_ context.Context, userID int64, cardID string) (contract.CardCopies, error) {
+	f.call("copies", userID)
+	f.cardID = cardID
+	return contract.CardCopies{Entries: []contract.CollectionEntry{}}, f.err
+}
+
 func collectionHandler(c *fakeCollection) http.Handler {
 	return NewHandler(Services{DB: &fakeDB{}, Cards: &fakeCards{}, Auth: &fakeAuth{}, Collection: c})
 }
@@ -75,6 +82,7 @@ var collectionRoutes = []struct{ method, path, body string }{
 	{http.MethodGet, "/api/collection/groups", ""},
 	{http.MethodGet, "/api/collection/entries", ""},
 	{http.MethodGet, "/api/collection/stats", ""},
+	{http.MethodGet, "/api/collection/cards/0b8fe8b3-0000-4000-8000-000000000000", ""},
 	{http.MethodPost, "/api/collection/entries", `{"card_id":"x","quantity":1,"finish":"foil","condition":"NM","language":"en","group_id":null}`},
 	{http.MethodPatch, "/api/collection/entries/5", `{"quantity":2}`},
 	{http.MethodDelete, "/api/collection/entries/5", ""},
@@ -113,6 +121,10 @@ func TestListingsPassTheirParametersOn(t *testing.T) {
 	send(t, collectionHandler(c), http.MethodGet, "/api/collection/entries?group_by=set&key=mh2&sort=price&cursor=abc", "", signedIn...)
 	if want := (collection.EntryQuery{GroupBy: "set", Key: "mh2", Sort: "price", Cursor: "abc"}); c.query != want {
 		t.Errorf("query = %+v, want %+v", c.query, want)
+	}
+	send(t, collectionHandler(c), http.MethodGet, "/api/collection/cards/0b8fe8b3-0000-4000-8000-000000000001", "", signedIn...)
+	if c.cardID != "0b8fe8b3-0000-4000-8000-000000000001" {
+		t.Errorf("card_id = %q", c.cardID)
 	}
 }
 
@@ -193,7 +205,10 @@ func TestCollectionErrorsGetTheirStatus(t *testing.T) {
 }
 
 func TestCrossOriginCollectionChangesAreRefused(t *testing.T) {
-	for _, r := range collectionRoutes[3:] {
+	for _, r := range collectionRoutes {
+		if r.method == http.MethodGet {
+			continue // reads aren't refused: a cross-site page can't see the answer
+		}
 		c := &fakeCollection{}
 		rec := send(t, collectionHandler(c), r.method, r.path, r.body, append([]string{"Sec-Fetch-Site", "cross-site"}, signedIn...)...)
 		if rec.Code != http.StatusForbidden || len(c.calls) != 0 {

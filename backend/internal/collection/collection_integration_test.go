@@ -883,3 +883,47 @@ func TestALongCursorIsRefused(t *testing.T) {
 		t.Errorf("a %d-character cursor = %v, want an apperr.Invalid", len(c.encode()), err)
 	}
 }
+
+// A card's copies: each finish, condition and language the user owns it in, in that order,
+// and only theirs.
+func TestCopiesOfOnePrinting(t *testing.T) {
+	f := newFixture(t)
+	card, other, unowned := f.card(t, testCard{eur: euros(1), eurFoil: euros(3)}), f.card(t, testCard{}), f.card(t, testCard{})
+	add := func(user int64, card string, finish contract.Finish, condition contract.Condition, language contract.Language) int64 {
+		e := newEntry(card, 2)
+		e.Finish, e.Condition, e.Language = finish, condition, language
+		return f.add(t, user, e).ID
+	}
+	foil := add(f.ann, card, contract.FinishFoil, contract.ConditionMT, contract.LanguageEnglish)
+	played := add(f.ann, card, contract.FinishNonfoil, contract.ConditionLP, contract.LanguageEnglish)
+	japanese := add(f.ann, card, contract.FinishNonfoil, contract.ConditionNM, contract.LanguageJapanese)
+	german := add(f.ann, card, contract.FinishNonfoil, contract.ConditionNM, contract.LanguageGerman)
+	mint := add(f.ann, card, contract.FinishNonfoil, contract.ConditionMT, contract.LanguageJapanese)
+	add(f.ann, other, contract.FinishNonfoil, contract.ConditionNM, contract.LanguageEnglish)
+	add(f.bob, card, contract.FinishNonfoil, contract.ConditionNM, contract.LanguageEnglish)
+	// Copies in a group are still one entry each, listed once.
+	binder := f.group(t, f.ann, "Binder")
+	f.member(t, f.ann, binder.ID, foil, 1)
+	f.member(t, f.ann, binder.ID, mint, 2)
+
+	got, err := f.s.Copies(t.Context(), f.ann, card)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []int64
+	for _, e := range got.Entries {
+		ids = append(ids, e.ID)
+	}
+	if want := []int64{mint, german, japanese, played, foil}; !slices.Equal(ids, want) {
+		t.Errorf("copies = %v, want %v (non-foil before foil, best condition first, then language)", ids, want)
+	}
+	if e := got.Entries[len(got.Entries)-1]; e.Card.ID != card || e.Quantity != 2 || e.ValueEUR == nil || *e.ValueEUR != 6 {
+		t.Errorf("the foil copy = %+v, want 2 at €3", e)
+	}
+	if none, err := f.s.Copies(t.Context(), f.ann, unowned); err != nil || none.Entries == nil || len(none.Entries) != 0 {
+		t.Errorf("an unowned card = %+v, %v; want an empty list", none, err)
+	}
+	if _, err := f.s.Copies(t.Context(), f.ann, "lightning-bolt"); !isInputError(err) {
+		t.Errorf("a bad card id = %v, want an apperr.Invalid", err)
+	}
+}

@@ -28,7 +28,7 @@ export function Dialog({ title, children, trigger, isOpen, onOpenChange, role = 
         <AriaDialog className={['dialog', className].filter(Boolean).join(' ')} role={role}>
           {({ close }) => (
             <>
-              <Heading slot="title" className="dialog__title">
+              <Heading slot="title" level={2} className="dialog__title">
                 {title}
               </Heading>
               {typeof children === 'function' ? children(close) : children}

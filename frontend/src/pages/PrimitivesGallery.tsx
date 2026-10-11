@@ -4,14 +4,17 @@ import { slug } from './gallerySections';
 import {
   Badge,
   Button,
+  Checkbox,
   Chip,
   Cluster,
   DataTable,
   Dialog,
   Disclosure,
   EmptyState,
+  ErrorBoundary,
   ErrorState,
   Field,
+  FormError,
   Grid,
   IconButton,
   Loading,
@@ -25,6 +28,7 @@ import {
   Skeleton,
   Stack,
   Tabs,
+  TextArea,
   TextInput,
   toast,
   ToggleButton,
@@ -51,6 +55,8 @@ export function PrimitivesGallery() {
   const [quantity, setQuantity] = useState('1');
   const [finish, setFinish] = useState<'nonfoil' | 'foil'>('nonfoil');
   const [query, setQuery] = useState('');
+  const [tokens, setTokens] = useState(false);
+  const [broken, setBroken] = useState(false);
   const [chips, setChips] = useState(['Red', 'Rare', 'Modern Horizons 2']);
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [lastAction, setLastAction] = useState<string | null>(null);
@@ -91,7 +97,7 @@ export function PrimitivesGallery() {
         </Cluster>
       </Section>
 
-      <Section name="Field / TextInput / NumberInput / Select / SearchInput" note="Search reports once typing pauses (300 ms), at once on Enter; Escape clears.">
+      <Section name="Field / TextInput / TextArea / NumberInput / Select / SearchInput / Checkbox" note="Search reports once typing pauses (300 ms), at once on Enter; Escape clears.">
         <Stack className="gallery__form">
           <Field label="Group name" description="Shown on the group's card.">
             <TextInput value={name} onChange={(e) => setName(e.target.value)} />
@@ -113,6 +119,18 @@ export function PrimitivesGallery() {
             <SearchInput onSearch={setQuery} placeholder="e.g. bolt" />
           </Field>
           <p>Last search: {query === '' ? '(none)' : <q>{query}</q>}</p>
+          <Field label="Email">
+            <TextInput type="email" autoComplete="off" />
+          </Field>
+          <Field label="Password" description="15 to 256 characters.">
+            <TextInput type="password" autoComplete="off" />
+          </Field>
+          <Field label="Description" description="Up to 1,000 characters.">
+            <TextArea rows={3} />
+          </Field>
+          <Checkbox checked={tokens} onChange={setTokens}>
+            Include tokens and other extras
+          </Checkbox>
         </Stack>
       </Section>
 
@@ -164,13 +182,14 @@ export function PrimitivesGallery() {
         </Grid>
       </Section>
 
-      <Section name="Loading / Skeleton / ErrorState / EmptyState">
+      <Section name="Loading / Skeleton / ErrorState / EmptyState / FormError">
         <Loading label="Loading cards…" />
         <Skeleton lines={3} width="60%" />
         <ErrorState message="Couldn't load your collection." onRetry={() => toast({ title: 'Retrying…' })} />
         <EmptyState title="No cards yet" action={<Button variant="primary">Add cards</Button>}>
           Search for a card to add it to your collection.
         </EmptyState>
+        <FormError>You already have a group with that name.</FormError>
       </Section>
 
       <Section name="DataTable" note="A real table: the name column is the row header; the actions header is for screen readers only.">
@@ -286,6 +305,13 @@ export function PrimitivesGallery() {
         </Cluster>
       </Section>
 
+      <Section name="ErrorBoundary" note="What's inside throws while rendering: only this part shows the fallback, and Try again renders it again.">
+        <Button onPress={() => setBroken(true)}>Break it</Button>
+        <ErrorBoundary fallback={(reset) => <ErrorState message="Couldn't show this part." onRetry={() => (setBroken(false), reset())} />}>
+          <Thrower broken={broken} />
+        </ErrorBoundary>
+      </Section>
+
       <Section name="VisuallyHidden" note="The button below shows only ×; screen readers hear “Close”.">
         <button type="button">
           <span aria-hidden>×</span>
@@ -294,6 +320,11 @@ export function PrimitivesGallery() {
       </Section>
     </>
   );
+}
+
+function Thrower({ broken }: { broken: boolean }) {
+  if (broken) throw new Error('a bad record');
+  return <p>Rendering fine.</p>;
 }
 
 export function Section({ name, note, children }: { name: string; note?: string; children: ReactNode }) {

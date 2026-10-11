@@ -80,3 +80,18 @@ export function EmptyState({ title, children, action, className }: EmptyStatePro
     </div>
   );
 }
+
+interface FormErrorProps {
+  /** Why the last attempt failed, in the user's terms. */
+  children: ReactNode;
+  className?: string;
+}
+
+/** Why a form's last attempt failed (e.g. a name already in use): announced at once, shown with the form. */
+export function FormError({ children, className }: FormErrorProps) {
+  return (
+    <p className={['form-error', className].filter(Boolean).join(' ')} role="alert">
+      {children}
+    </p>
+  );
+}
