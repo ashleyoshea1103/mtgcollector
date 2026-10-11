@@ -46,11 +46,14 @@ function Breakdown({ title, modifier, rows }: { title: string; modifier: string;
   return (
     <section className={`collection-summary__breakdown collection-summary__breakdown--${modifier}`}>
       <h3>{title}</h3>
-      {/* The same counts as the list below, drawn as shares of one bar. */}
+      {/* The same counts as the list below, drawn as shares of one bar (an empty share would
+          still take a gap). */}
       <div className="breakdown-bar" aria-hidden="true">
-        {rows.map(([key, , count]) => (
-          <span key={key} className={`breakdown-bar__part ${swatch(key)}`} style={{ flexGrow: count }} />
-        ))}
+        {rows
+          .filter(([, , count]) => count > 0)
+          .map(([key, , count]) => (
+            <span key={key} className={`breakdown-bar__part ${swatch(key)}`} style={{ flexGrow: count }} />
+          ))}
       </div>
       <ul className="breakdown-list">
         {rows.map(([key, label, count]) => (

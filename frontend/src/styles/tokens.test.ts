@@ -54,9 +54,12 @@ describe('design tokens', () => {
     ['--color-danger-text', '--color-danger', 4.5],
     ['--color-danger-fg', '--color-bg', 4.5],
     ['--color-danger-fg', '--color-surface-raised', 4.5],
-    // A focus ring is a non-text mark: 3:1.
+    // Non-text marks need 3:1: a focus ring, and the outline that shows where a control is.
     ['--color-focus', '--color-bg', 3],
     ['--color-focus', '--color-surface-raised', 3],
+    ['--color-border-control', '--color-bg', 3],
+    ['--color-border-control', '--color-surface', 3],
+    ['--color-border-control', '--color-surface-raised', 3],
   ];
   describe.each(['dark', 'light'] as const)('the %s theme', (theme) => {
     it.each(pairs)('%s is readable on %s', (fg, bg, ratio) => {

@@ -1,10 +1,21 @@
-import { useState } from 'react';
-import { applyTheme, saveTheme, storedTheme, type Theme } from '../lib/theme';
+import { useEffect, useState } from 'react';
+import { applyTheme, currentTheme, onThemeChanged, saveTheme, type Theme } from '../lib/theme';
 import { ToggleButton } from '../ui';
 
 /** Switches between the dark theme (the design) and a light one, remembered in this browser. */
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(() => storedTheme());
+  // The page's own: it's the same as the stored one, unless storing it failed.
+  const [theme, setTheme] = useState<Theme>(() => currentTheme());
+
+  // A change in another tab applies here too.
+  useEffect(
+    () =>
+      onThemeChanged((next) => {
+        applyTheme(next);
+        setTheme(next);
+      }),
+    [],
+  );
 
   function toggle() {
     const next: Theme = theme === 'light' ? 'dark' : 'light';

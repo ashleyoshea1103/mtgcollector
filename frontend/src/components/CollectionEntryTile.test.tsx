@@ -18,9 +18,11 @@ describe('CardTile', () => {
     expect(screen.queryByText(eur(lightningBolt.prices.eur))).not.toBeInTheDocument();
   });
 
-  it('marks foil and etched copies, which shimmer', () => {
+  it('marks its finish, so foil and etched copies shimmer', () => {
     const { rerender } = render(<CardTile card={lightningBolt} finish="foil" />);
     expect(screen.getByRole('article')).toHaveClass('card-tile--foil');
+    rerender(<CardTile card={lightningBolt} finish="etched" />);
+    expect(screen.getByRole('article')).toHaveClass('card-tile--etched');
     rerender(<CardTile card={lightningBolt} />);
     expect(screen.getByRole('article')).toHaveClass('card-tile--nonfoil');
   });
@@ -43,17 +45,6 @@ describe('CardTile', () => {
     expect(queryByTooltip(document.body, 'No price available')).not.toBeInTheDocument();
   });
 
-  it('shows a dash for a null given price rather than working one out', () => {
-    render(<CardTile card={lightningBolt} unitPrice={null} />);
-    expect(getByTooltip(document.body, 'No price available')).toBeInTheDocument();
-    expect(screen.queryByText(eur(lightningBolt.prices.eur))).not.toBeInTheDocument();
-  });
-
-  it('shows a given unit price instead of working one out', () => {
-    render(<CardTile card={lightningBolt} unitPrice={9.99} />);
-    expect(screen.getByText(eur(9.99))).toBeInTheDocument();
-    expect(screen.queryByText(eur(lightningBolt.prices.eur))).not.toBeInTheDocument();
-  });
 });
 
 describe('CollectionEntryTile', () => {

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { EMPTY_SEARCH } from '../lib/search';
 import { cards, customGroups, entries, makeEntry } from '../fixtures';
 import type { CardSearch } from '../api/endpoints';
@@ -240,6 +240,32 @@ describe('ListingControls', () => {
     expect(onChange).toHaveBeenLastCalledWith({ ...value, sort: 'added' });
     await userEvent.click(screen.getByRole('radio', { name: 'List' }));
     expect(onChange).toHaveBeenLastCalledWith({ ...value, view: 'list' });
+  });
+  it("sets --toolbar-height to the bar's height while it's shown, for the headings that stick below it", () => {
+    let report = () => {};
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          report = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    let height = 66;
+    const measure = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({ height }) as DOMRect);
+    onTestFinished(() => measure.mockRestore());
+    const root = document.documentElement;
+    const { unmount } = render(<ListingControls value={{ groupBy: 'color', sort: 'name', view: 'grid' }} onChange={() => {}} />);
+
+    report();
+    expect(root.style.getPropertyValue('--toolbar-height')).toBe('66px');
+    height = 139; // wrapped onto two rows on a narrow phone
+    report();
+    expect(root.style.getPropertyValue('--toolbar-height')).toBe('139px');
+    unmount();
+    expect(root.style.getPropertyValue('--toolbar-height')).toBe('');
   });
 });
 

@@ -25,6 +25,8 @@ h4 {
   font-weight: var(--font-weight-semibold);
   line-height: var(--leading-snug);
   text-wrap: balance;
+  /* A long one-word card name breaks rather than running out of its tile or off a phone. */
+  overflow-wrap: anywhere;
 }
 h1 {
   font-family: var(--font-display);
@@ -38,8 +40,11 @@ h3 {
   font-size: var(--text-md);
 }
 
+/* Links are underlined (colour alone doesn't set one apart from the text around it), except
+   where a component draws them otherwise: navigation, buttons, lists of links. */
 a {
   color: var(--color-accent);
+  text-decoration: underline;
   text-underline-offset: 0.18em;
 }
 a:hover {

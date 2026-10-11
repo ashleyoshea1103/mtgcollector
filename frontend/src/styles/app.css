@@ -1,12 +1,18 @@
 /*
  * The app's one stylesheet, in order: Tailwind (its reset and utilities), the design tokens
  * (its theme), element defaults, the src/ui primitives, then the app's own components and
- * pages. The
- * primitives and components are in Tailwind's components layer, so a utility in markup
- * (e.g. on a page's layout) wins over them.
+ * pages. The primitives and components are in Tailwind's components layer, so a utility in
+ * markup (e.g. on a page's layout) wins over them.
  */
-@import 'tailwindcss';
+@import 'tailwindcss' source(none);
 @import './tokens.css';
 @import './base.css' layer(base);
 @import '../ui/ui.css' layer(components);
 @import '../index.css' layer(components);
+
+/* Utilities come only from the components' source, not tests or fixtures. Tailwind takes every
+   word there as a possible class, so a few stray rules still appear (.hidden, .table, .filter):
+   a component's own class must not share a utility's name, or the utility (a later layer) wins. */
+@source '../**/*.tsx';
+@source not '../**/*.test.tsx';
+@source not '../fixtures';

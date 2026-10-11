@@ -17,6 +17,7 @@
   background: var(--color-accent);
   color: var(--color-accent-text);
   font-weight: var(--font-weight-semibold);
+  text-decoration: none;
   z-index: var(--z-toast);
 }
 .skip-link:focus {
@@ -117,8 +118,9 @@
   margin: 0;
   color: var(--color-text-muted);
 }
+/* A link drawn as a button brightens under the pointer, as the buttons do (React Aria marks
+   theirs [data-hovered]; a link has no such mark). Its colours stay the button's. */
 a.button:hover {
-  color: inherit;
   filter: brightness(1.08);
 }
 :is(.search-page, .groups-page, .card-page, .auth-page, .not-found, .route-error) > h1,
@@ -373,6 +375,7 @@ a.button:hover {
 }
 .entry-tile__price {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--spacing-2);
@@ -387,7 +390,7 @@ a.button:hover {
   font-weight: var(--font-weight-semibold);
 }
 /* The Actions button sits on the image's corner, shown while the tile is pointed at or
-   focused (always, on a touch screen, where there's no pointing). */
+   focused (always where the main pointer is a finger, which can't point without pressing). */
 .entry-tile .card-tile__actions {
   position: absolute;
   top: var(--spacing-2);
@@ -401,13 +404,15 @@ a.button:hover {
   background: rgb(10 10 12 / 86%);
   color: #ffffff;
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .entry-tile .card-tile__actions {
     opacity: 0;
     transition: opacity 0.12s ease;
   }
+  /* Also while its menu is open: the menu takes the focus out of the tile. */
   .entry-tile:hover .card-tile__actions,
-  .entry-tile:focus-within .card-tile__actions {
+  .entry-tile:focus-within .card-tile__actions,
+  .entry-tile .card-tile__actions:has([aria-expanded='true']) {
     opacity: 1;
   }
 }
@@ -441,6 +446,12 @@ a.button:hover {
   padding: 0;
   border: 1px solid var(--color-border-control);
 }
+@media (pointer: coarse) {
+  .entry-table .entry-row__actions .button {
+    width: var(--size-touch);
+    min-height: var(--size-touch);
+  }
+}
 
 /* The collection */
 
@@ -459,6 +470,13 @@ a.button:hover {
     box-shadow: var(--shadow-lg);
     z-index: var(--z-sticky);
   }
+  /* Room below the last cards, and below anything focused, so the button never covers them. */
+  .app-main:has(.collection-page__add) {
+    padding-bottom: 6rem;
+  }
+  html:has(.collection-page__add) {
+    scroll-padding-bottom: 5.5rem;
+  }
 }
 
 /* Totals, then thin bars of how the cards divide by color and rarity. */
@@ -470,7 +488,7 @@ a.button:hover {
 }
 @media (max-width: 64rem) {
   .collection-summary {
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
   }
 }
 .collection-summary__totals {
@@ -554,6 +572,10 @@ a.button:hover {
 .swatch--w {
   background: var(--color-mana-w);
 }
+/* White mana is near the light theme's background: outlined there, so it still shows. */
+:root[data-theme='light'] .swatch--w {
+  box-shadow: inset 0 0 0 1px var(--color-border-control);
+}
 .swatch--u {
   background: var(--color-mana-u);
 }
@@ -584,12 +606,16 @@ a.button:hover {
 .swatch--mythic {
   background: var(--color-rarity-mythic);
 }
-.swatch--special,
-.swatch--bonus {
+.swatch--special {
   background: var(--color-rarity-special);
 }
+.swatch--bonus {
+  background: var(--color-rarity-bonus);
+}
 
-/* How the cards are shown: stays at the top while the cards scroll under it. */
+/* How the cards are shown: stays at the top while the cards scroll under it. Its height is
+   --toolbar-height (kept up to date by ListingControls), which the section headings below
+   stick under. */
 .listing-controls {
   position: sticky;
   top: 0;
@@ -611,6 +637,12 @@ a.button:hover {
 }
 .listing-controls__view {
   margin-left: auto;
+}
+
+/* Keyboard focus scrolled into view lands below the toolbar and a section heading, not
+   under them. */
+html:has(.listing-controls) {
+  scroll-padding-top: calc(var(--toolbar-height) + 4.5rem);
 }
 
 /* A group of the listing: its heading stays in view below the controls while its cards scroll. */
@@ -970,6 +1002,11 @@ a.button:hover {
   opacity: 0;
   pointer-events: none;
 }
+@media (pointer: coarse) {
+  .search-filters__color {
+    min-height: var(--size-touch);
+  }
+}
 .search-filters__color:has(:checked) {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
@@ -978,6 +1015,14 @@ a.button:hover {
 .search-filters__color:has(:focus-visible) {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+/* Forced colours (e.g. Windows High Contrast) repaint the pill's colours the same whether it's
+   on or off, so there the checkbox itself shows it. */
+@media (forced-colors: active) {
+  .search-filters__color .checkbox__input {
+    position: static;
+    opacity: 1;
+  }
 }
 .search-filters__color .checkbox__label {
   display: inline-flex;
@@ -1197,7 +1242,7 @@ a.button:hover {
     white-space: nowrap;
   }
   /* The controls side by side, labels above, so the toolbar stays one short row. */
-  .listing-controls {
+  .listing-controls__bar {
     align-items: flex-end;
     gap: var(--spacing-2);
   }
@@ -1227,4 +1272,26 @@ a.button:hover {
 
 .card-page__printings > .button {
   justify-self: start;
+}
+
+/* A short screen (a phone on its side, or the page zoomed in far) keeps its height for the
+   cards: the toolbar and section headings scroll away, and adding cards sits in the page. */
+@media (max-height: 32rem) {
+  .listing-controls,
+  .group-bucket__header {
+    position: static;
+  }
+  html:has(.listing-controls) {
+    scroll-padding-top: 0;
+  }
+  .collection-page__add {
+    position: static;
+    box-shadow: none;
+  }
+  .app-main:has(.collection-page__add) {
+    padding-bottom: var(--spacing-7);
+  }
+  html:has(.collection-page__add) {
+    scroll-padding-bottom: 0;
+  }
 }

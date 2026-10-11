@@ -7,12 +7,13 @@
  * colours are never decoration, and the one accent (teal) marks what's selected or focused.
  * The light theme (below) is the secondary one.
  *
- * This is Tailwind's @theme: each token is also a utility (bg-surface, text-muted,
+ * This is Tailwind's @theme: each token is also a utility (bg-surface, text-text-muted,
  * font-display, p-4…). Tailwind's own palette, fonts and spacing are cleared, so these are
- * the only ones. src/styles/tokens.test.ts checks every rarity and mana colour has a token,
+ * the only ones. All of them reach the page (static), used in a stylesheet or not: components
+ * also use them from code (e.g. the layout gaps). src/styles/tokens.test.ts checks every rarity and mana colour has a token,
  * and that text colours are readable on the background in both themes.
  */
-@theme {
+@theme static {
   --color-*: initial;
   --font-*: initial;
   --spacing-*: initial;
@@ -28,7 +29,8 @@
   /* Colour: lines, faintest to strongest */
   --color-rule: #26282c;
   --color-border: #2c2e33;
-  --color-border-control: #3a3d42;
+  /* A control's outline sets it apart from the panel it's on (3:1, WCAG's non-text contrast). */
+  --color-border-control: #6b6e74;
   /* Colour: text, strongest to faintest */
   --color-text-strong: #f4f1ec;
   --color-text: #e9e7e4;
@@ -135,7 +137,7 @@
   --color-skeleton: #e4e4de;
   --color-rule: #e4e4de;
   --color-border: #dcdcd6;
-  --color-border-control: #b9b9b1;
+  --color-border-control: #86888c;
   --color-text-strong: #111214;
   --color-text: #1b1c1f;
   --color-text-secondary: #3d4048;

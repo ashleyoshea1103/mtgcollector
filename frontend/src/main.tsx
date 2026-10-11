@@ -9,7 +9,6 @@ import '@fontsource-variable/instrument-sans';
 import '@fontsource/spectral/600.css';
 import './styles/app.css';
 import { createQueryClient } from './api/queryClient';
-import { applyTheme, storedTheme } from './lib/theme';
 import { routes } from './app/routes';
 import { LazyToaster } from './ui/LazyToaster';
 
@@ -24,9 +23,6 @@ if (import.meta.env.DEV) {
     hydrateFallbackElement: <p>Loading…</p>,
   });
 }
-
-// Before the first paint, so a light-theme choice doesn't flash dark first.
-applyTheme(storedTheme());
 
 const queryClient = createQueryClient();
 

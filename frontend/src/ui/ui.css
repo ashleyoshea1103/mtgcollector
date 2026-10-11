@@ -131,8 +131,9 @@
   border-color: var(--color-danger);
   color: var(--color-danger-text);
 }
+/* Darker, not lighter: the white text on it stays readable. */
 :is(.button--danger, .icon-button--danger)[data-hovered] {
-  filter: brightness(1.1);
+  filter: brightness(0.9);
 }
 
 .button--ghost,
@@ -201,6 +202,11 @@
 .chip:not(:has(.chip__remove)) {
   padding-right: var(--spacing-3);
 }
+@media (pointer: coarse) {
+  .chip {
+    min-height: var(--size-touch);
+  }
+}
 .chip__remove {
   width: 1.75rem;
   min-height: 1.75rem;
@@ -237,6 +243,11 @@
 }
 .disclosure__trigger[aria-expanded='true']::before {
   transform: rotate(45deg) translate(-0.1em, -0.1em);
+}
+/* A closed panel (hidden="until-found", so the browser's find can still open it) keeps its
+   box: it takes no room, padding included. */
+.disclosure__panel[hidden] {
+  padding: 0;
 }
 
 /* Fields */
@@ -482,7 +493,9 @@
   background: var(--color-control);
   color: var(--color-text-strong);
 }
-.menu__item--danger {
+/* Red even while highlighted, when it's about to be chosen. */
+.menu__item--danger,
+.menu__item--danger:is([data-focused], [data-hovered]) {
   color: var(--color-danger-fg);
 }
 .menu__item[data-disabled] {
@@ -546,6 +559,11 @@
 }
 .segmented-control__option[data-focus-visible] {
   outline-offset: -3px;
+}
+/* The ring is drawn inside the option, so on the selected one (filled with the accent) it
+   takes the colour of the option's text. */
+.segmented-control__option[data-selected][data-focus-visible] {
+  outline-color: var(--color-accent-text);
 }
 
 .tabs__list {

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ThemeToggle } from './ThemeToggle';
@@ -25,8 +25,30 @@ describe('ThemeToggle', () => {
     expect(localStorage.getItem('mtgcollector-theme')).toBe('dark');
   });
 
-  it('starts from the theme chosen before', () => {
-    localStorage.setItem('mtgcollector-theme', 'light');
+  it('follows a change made in another tab', () => {
+    const { unmount } = render(<ThemeToggle />);
+    const otherTab = (value: string | null) =>
+      act(() => {
+        if (value === null) localStorage.removeItem('mtgcollector-theme');
+        else localStorage.setItem('mtgcollector-theme', value);
+        window.dispatchEvent(new StorageEvent('storage', { key: 'mtgcollector-theme', newValue: value }));
+      });
+
+    otherTab('light');
+    expect(screen.getByRole('button', { name: 'Light theme' })).toHaveAttribute('aria-pressed', 'true');
+    expect(document.documentElement.dataset.theme).toBe('light');
+    otherTab(null);
+    expect(screen.getByRole('button', { name: 'Light theme' })).toHaveAttribute('aria-pressed', 'false');
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+
+    // Once it's gone, other tabs' changes no longer reach this page.
+    unmount();
+    otherTab('light');
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+  });
+
+  it('starts from the theme the page is in, even if it could not be stored', () => {
+    document.documentElement.dataset.theme = 'light';
     render(<ThemeToggle />);
     expect(screen.getByRole('button', { name: 'Light theme' })).toHaveAttribute('aria-pressed', 'true');
   });
