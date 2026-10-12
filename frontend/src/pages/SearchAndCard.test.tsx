@@ -20,6 +20,23 @@ const main = () => within(screen.getByRole('main'));
 describe('in pounds', () => {
   afterEach(() => localStorage.clear());
 
+  it('notes the rate once above the search results, and nothing in euros', async () => {
+    const { user } = renderApp('/search?q=bolt', { ...signedOut, ...searchApi });
+    await main().findByRole('heading', { name: lightningBolt.name });
+    expect(main().queryByText(/ECB rate/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'GBP' }));
+    expect(await main().findAllByText("Cardmarket's euro prices in pounds, at the ECB rate of 9 Oct 2026 (€1 = £0.8712)")).toHaveLength(1);
+  });
+
+  it("notes the rate once in a card's prices, and nothing in euros", async () => {
+    const routes = { ...signedOut, 'GET /api/cards/:id': { body: delver }, 'GET /api/cards/:id/printings': { body: page([delver]) } };
+    const { user } = renderApp(`/cards/${delver.id}`, routes);
+    await main().findByRole('table');
+    expect(main().queryByText(/ECB rate/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'GBP' }));
+    expect(await main().findAllByText("Cardmarket's euro prices in pounds, at the ECB rate of 9 Oct 2026 (€1 = £0.8712)")).toHaveLength(1);
+  });
+
   it('shows search results, and the printings to add, in pounds', async () => {
     localStorage.setItem('mtgcollector-currency', 'gbp');
     const { user } = renderApp('/search?q=bolt', { ...signedIn, ...searchApi, 'GET /api/groups': { body: { groups: [] } } });

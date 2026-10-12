@@ -16,6 +16,7 @@ import { ListingControls } from '../components/ListingControls';
 import { ManaCost } from '../components/ManaCost';
 import { MemberForm } from '../components/MemberForm';
 import { Price } from '../components/Price';
+import { RateNote } from '../components/RateNote';
 import { PrintingOption } from '../components/PrintingOption';
 import { RarityBadge } from '../components/RarityBadge';
 import { SearchFilters } from '../components/SearchFilters';
@@ -23,6 +24,7 @@ import { SetSymbol } from '../components/SetSymbol';
 import type { CardSearch } from '../api/endpoints';
 import { DEFAULT_LISTING, type ListingParams } from '../lib/listingParams';
 import { EMPTY_SEARCH } from '../lib/search';
+import { MoneyContext, type Money } from '../lib/money';
 import { DEV_ONLY_MARKER } from '../devOnly';
 import { cards, colorGroups, customGroups, entries, setGroup, stats, unlistedCard, unpricedCard } from '../fixtures';
 import type { Card, NewEntry } from '../types';
@@ -33,6 +35,11 @@ import { PrimitivesGallery, Section } from './PrimitivesGallery';
 const allCards = [...Object.values(cards), unpricedCard, unlistedCard];
 const allEntries = Object.values(entries);
 const imageless: Card = { ...cards.lightningBolt, id: 'imageless', images: null };
+
+// How prices are shown, in each state, for the gallery's examples (the app's comes from the server's rate).
+const IN_EUROS: Money = { chosen: 'eur', currency: 'eur', gbpPerEur: null, rateDate: null, choose: () => {} };
+const IN_POUNDS: Money = { ...IN_EUROS, chosen: 'gbp', currency: 'gbp', gbpPerEur: 0.8712, rateDate: '2026-10-09' };
+const NO_RATE: Money = { ...IN_EUROS, chosen: 'gbp' };
 
 /** Every presentational component rendered with fixture data, then every src/ui primitive, for review before styling. */
 export function ComponentGallery() {
@@ -98,7 +105,30 @@ export function ComponentGallery() {
           <li>
             Unpriced Llanowar Elves: <Price prices={unpricedCard.prices} />
           </li>
+          <MoneyContext value={IN_POUNDS}>
+            <li>
+              Ragavan non-foil, in pounds: <Price prices={cards.ragavan.prices} />
+            </li>
+            <li>
+              Ragavan foil USD, with pounds chosen (dollars stay): <Price prices={cards.ragavan.prices} finish="foil" currency="usd" />
+            </li>
+            <li>
+              Unpriced Llanowar Elves, in pounds: <Price prices={unpricedCard.prices} />
+            </li>
+          </MoneyContext>
         </ul>
+      </Section>
+
+      <Section name="RateNote" note="Once on each page that shows prices: where pounds come from, or why prices are in euros.">
+        <MoneyContext value={IN_POUNDS}>
+          <RateNote />
+        </MoneyContext>
+        <MoneyContext value={NO_RATE}>
+          <RateNote />
+        </MoneyContext>
+        <MoneyContext value={IN_EUROS}>
+          <RateNote euros="Values from Cardmarket, in euros" />
+        </MoneyContext>
       </Section>
 
       <Section name="CardTile" note="Search result shape, with an action slot. Each image opens the larger view (CardViewer). Foil-only Propaganda is priced at its foil price; the last Ragavan is a printing Scryfall no longer lists.">
@@ -237,6 +267,7 @@ const SECTIONS = [
   'CardImage',
   'ManaCost / SetSymbol / RarityBadge',
   'Price',
+  'RateNote',
   'CardTile',
   'CardViewer',
   'PrintingOption',

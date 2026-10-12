@@ -1,5 +1,5 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { customGroups, entries, makeGroup } from '../fixtures';
 import { keys } from '../api/keys';
 import { renderApp, signedIn, type Routes } from '../test/app';
@@ -78,6 +78,18 @@ describe('GroupsPage', () => {
     await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), binder.name);
     await user.click(within(dialog).getByRole('button', { name: 'Make group' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('You already have a group with that name.');
+  });
+});
+
+describe('GroupPage, in pounds', () => {
+  afterEach(() => localStorage.clear());
+
+  it('notes the rate once in pounds, and nothing in euros', async () => {
+    const { user } = renderApp(`/groups/${binder.id}`, groupApi());
+    await main().findByRole('heading', { level: 1, name: binder.name });
+    expect(main().queryByText(/ECB rate/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'GBP' }));
+    expect(await main().findAllByText("Cardmarket's euro prices in pounds, at the ECB rate of 9 Oct 2026 (€1 = £0.8712)")).toHaveLength(1);
   });
 });
 

@@ -26,6 +26,23 @@ const keysAsked = (requests: FakeRequest[]) => requests.map((r) => r.query.get('
 describe('CollectionPage, in pounds', () => {
   afterEach(() => localStorage.clear());
 
+  it('says where its values come from: euros, or pounds at the ECB rate', async () => {
+    const { user } = renderApp('/collection', collection);
+    expect(await main().findByText('Values from Cardmarket, in euros')).toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'GBP' }));
+    expect(await main().findByText("Cardmarket's euro prices in pounds, at the ECB rate of 9 Oct 2026 (€1 = £0.8712)")).toBeInTheDocument();
+    expect(main().queryByText('Values from Cardmarket, in euros')).not.toBeInTheDocument();
+  });
+
+  it("stays in euros, and says why, when the rate can't be had", async () => {
+    localStorage.setItem('mtgcollector-currency', 'gbp');
+    renderApp('/collection', { ...collection, 'GET /api/rates': { status: 500, body: { error: 'the database is unavailable' } } });
+    expect(await main().findByText("Pound prices aren't available yet, so these are in euros.")).toBeInTheDocument();
+    const summary = await main().findByRole('region', { name: 'Collection summary' });
+    expect(summary).not.toHaveTextContent('≈');
+    expect(summary).toHaveTextContent('€');
+  });
+
   it('shows every value in pounds when GBP is chosen, a missing price still as a dash', async () => {
     localStorage.setItem('mtgcollector-currency', 'gbp');
     renderApp('/collection', collection);

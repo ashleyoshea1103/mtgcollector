@@ -8,6 +8,7 @@ import { ManaCost } from './ManaCost';
 import { NoLongerListed } from './NoLongerListed';
 import { OracleText } from './OracleText';
 import { Price } from './Price';
+import { RateNote } from './RateNote';
 import { RarityBadge } from './RarityBadge';
 import { SetSymbol } from './SetSymbol';
 
@@ -68,6 +69,7 @@ export function CardDetail({ card, entries = [], headingLevel = 2 }: Props) {
 
         <section className="card-detail__prices">
           <Sub>Prices</Sub>
+          <RateNote />
           <DataTable className="card-detail__price-table" columns={priceColumns(card, money.currency === 'gbp')} rows={card.finishes} rowKey={(f) => f} />
           {card.cardmarket_url && (
             <a className="card-detail__cardmarket" href={card.cardmarket_url} target="_blank" rel="noopener noreferrer">
