@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -19,6 +20,7 @@ var all = []any{
 	CardImages{}, CardFace{}, Prices{}, CardSet{}, CardSummary{}, Card{}, CollectionEntry{}, ValueTotal{},
 	GroupSummary{}, EntryPage{}, CardCopies{}, GroupMember{}, GroupMemberPage{}, CustomGroup{}, CollectionStats{},
 	Health{}, NewEntry{}, CardPage{}, CardNames{}, APIError{}, User{}, Credentials{}, CollectionGroups{}, EntryChange{}, CustomGroupList{}, NewGroup{}, GroupChange{}, MemberQuantity{},
+	ExchangeRate{}, ExchangeRates{},
 }
 
 // `all` must list every struct in the package's Go files, or the rule test below misses it.
@@ -99,6 +101,33 @@ func canBeNull(t reflect.Type) bool {
 		return true
 	}
 	return false
+}
+
+func TestExchangeRatesEncodeAsTheAppReadsThem(t *testing.T) {
+	b, err := json.Marshal(ExchangeRates{Rates: []ExchangeRate{{Currency: "GBP", PerEUR: 0.8712, Date: "2026-10-10"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Rates []map[string]any `json:"rates"`
+	}
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Rates) != 1 {
+		t.Fatalf("rates = %s", b)
+	}
+	if v, ok := got.Rates[0]["per_eur"].(float64); !ok || v != 0.8712 {
+		t.Errorf("per_eur = %#v, want the number 0.8712", got.Rates[0]["per_eur"])
+	}
+	if d, _ := got.Rates[0]["date"].(string); !regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`).MatchString(d) {
+		t.Errorf("date = %#v, want YYYY-MM-DD", got.Rates[0]["date"])
+	}
+
+	// None yet is an empty list, never null.
+	if b, _ := json.Marshal(ExchangeRates{Rates: []ExchangeRate{}}); string(b) != `{"rates":[]}` {
+		t.Errorf("no rates encode as %s, want {\"rates\":[]}", b)
+	}
 }
 
 func TestJSONEncodingMatchesTheTypeScript(t *testing.T) {

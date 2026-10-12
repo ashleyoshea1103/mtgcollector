@@ -12,7 +12,7 @@ You need Node 24 (see `frontend/.nvmrc`), Go (see `backend/go.mod`) and PostgreS
 ./scripts/install-hooks.sh   # the pre-push check
 ./scripts/setup-dev-db.sh    # the local databases; asks for your PostgreSQL superuser password
 ```
-Run the API. It applies database migrations when it starts, then imports Scryfall's card data in the background (about 80 MB, 10 seconds or so) and again once a day. Set `SCRYFALL_SYNC=off` to skip that, and `go run ./cmd/sync` to import on demand.
+Run the API. It applies database migrations when it starts, then imports Scryfall's card data in the background (about 80 MB, 10 seconds or so) and again once a day. Set `SCRYFALL_SYNC=off` to skip that, and `go run ./cmd/sync` to import on demand. It also fetches the European Central Bank's euro-to-pound rate, for showing prices in pounds, and checks for a new one every few hours; `RATES_SYNC=off` skips that.
 ```bash
 cd backend
 go run ./cmd/server
@@ -43,6 +43,7 @@ The API's own responses are JSON, shaped by the types in `backend/internal/contr
 | `GET /api/cards/search?q=&set=&type=&rarity=&colors=&extras=&page=` | A page of cards (`CardPage`), one printing each: English if there is one, released, from a regular set rather than a promo or special printing, then the newest; with `set`, that set's printing. `q` is words the name contains, in any order; one of them needs 3 letters or digits in a row, unless `set` (a code like `mh2`) is given. `type` is words the type line contains. `colors` is letters from `WUBRG` the card must all be, or `C` for colourless. Printings Scryfall no longer lists are left out, and so are tokens, emblems, substitute cards and other non-game cards unless `extras=true`. |
 | `GET /api/cards/autocomplete?q=` | Up to 20 card names containing `q` (`CardNames`), best matches first; nothing until 3 letters or digits in a row are typed. |
 | `GET /api/cards/{id}` | One printing in full (`Card`), by Scryfall id. |
+| `GET /api/rates` | The latest euro exchange rates (`ExchangeRates`): the European Central Bank's daily reference rate for GBP (`per_eur` pounds to the euro, on `date`), which the app shows prices in pounds with. Empty until the server has fetched one; public. |
 | `GET /api/cards/{id}/printings?page=` | A page of every printing of that card, newest first, including ones Scryfall no longer lists (`no_longer_listed`). |
 | `POST /api/auth/signup` | Creates an account from `Credentials` (`{email, password}`; a password of 15 to 256 characters) and signs it in: 201 with the `User`. 409 if the email already has an account. |
 | `POST /api/auth/login` | Signs in with `Credentials`: 200 with the `User`, or 401 whether the email or the password was wrong. |

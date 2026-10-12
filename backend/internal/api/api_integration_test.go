@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/rates"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/testdb"
 )
@@ -57,5 +58,22 @@ func TestCardRoutesAgainstARealDatabase(t *testing.T) {
 		if res.StatusCode != tc.status || string(body) != tc.body+"\n" {
 			t.Errorf("GET %s = %d %s, want %d %s", tc.path, res.StatusCode, body, tc.status, tc.body)
 		}
+	}
+}
+
+// The rates are public: the app shows prices in pounds before anyone signs in.
+func TestRatesAgainstARealDatabaseNeedNoSession(t *testing.T) {
+	pool := testdb.New(t)
+	srv := httptest.NewServer(NewHandler(Services{DB: pool, Rates: &rates.Service{Pool: pool}}))
+	t.Cleanup(srv.Close)
+
+	res, err := http.Get(srv.URL + "/api/rates")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK || string(body) != `{"rates":[]}`+"\n" {
+		t.Errorf("GET /api/rates = %d %q, want 200 {\"rates\":[]}", res.StatusCode, body)
 	}
 }

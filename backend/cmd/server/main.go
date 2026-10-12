@@ -8,6 +8,8 @@
 //	               the password comes from pgpass, see scripts/setup-dev-db.sh)
 //	ADDR           address to listen on (default: 127.0.0.1:8080, where the Vite dev proxy sends /api)
 //	SCRYFALL_SYNC  "daily" (the default) or "off"; `go run ./cmd/sync` imports on demand.
+//	RATES_SYNC     "daily" (the default) or "off": fetching the ECB's euro exchange rate,
+//	               for showing prices in pounds.
 //	               With several server instances, leave it on for one: the others would
 //	               only find the import lock taken.
 //	ALLOWED_HOSTS  the host names the site is reached by, comma-separated (default:
@@ -34,6 +36,7 @@ import (
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/cards"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/collection"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/db"
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/rates"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/scryfall"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/web"
@@ -43,6 +46,7 @@ type config struct {
 	DatabaseURL  string
 	Addr         string
 	DailySync    bool
+	DailyRates   bool
 	AllowedHosts []string
 	StaticDir    string
 }
@@ -71,6 +75,13 @@ func loadConfig(getenv func(string) string) (config, error) {
 	case "off":
 	default:
 		return cfg, fmt.Errorf("SCRYFALL_SYNC=%q: want daily or off", v)
+	}
+	switch v := getenv("RATES_SYNC"); v {
+	case "", "daily":
+		cfg.DailyRates = true
+	case "off":
+	default:
+		return cfg, fmt.Errorf("RATES_SYNC=%q: want daily or off", v)
 	}
 	if v := getenv("ALLOWED_HOSTS"); v != "" {
 		hosts, err := web.ParseHosts(v)
@@ -123,8 +134,9 @@ func run(ctx context.Context, cfg config) error {
 	q := store.New(pool)
 	accounts := auth.NewService(q)
 	owned := &collection.Service{Pool: pool} // the collection and custom groups
+	exchange := &rates.Service{Pool: pool, Source: rates.ECB{}, Log: slog.Default()}
 	handler := web.AllowHosts(cfg.AllowedHosts, web.New(api.NewHandler(api.Services{
-		DB: pool, Cards: &cards.Searcher{Q: q}, Auth: accounts, Collection: owned, CustomGroups: owned,
+		DB: pool, Cards: &cards.Searcher{Q: q}, Auth: accounts, Collection: owned, CustomGroups: owned, Rates: exchange,
 	}), static))
 
 	background := func(ctx context.Context) {
@@ -133,6 +145,9 @@ func run(ctx context.Context, cfg config) error {
 		if cfg.DailySync {
 			importer := &cards.Importer{Pool: pool, Source: scryfall.New(), LockKey: cards.DefaultLockKey, Log: slog.Default()}
 			wg.Go(func() { importer.RunDaily(ctx, syncCheckEvery) })
+		}
+		if cfg.DailyRates {
+			wg.Go(func() { exchange.RunDaily(ctx, syncCheckEvery) })
 		}
 		wg.Wait()
 	}

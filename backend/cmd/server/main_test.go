@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,21 +21,21 @@ func TestLoadConfigDefaultsToTheLocalDevelopmentSetup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := (config{DatabaseURL: db.DefaultURL, Addr: defaultAddr, DailySync: true, AllowedHosts: []string{"localhost", "127.0.0.1", "::1"}}); !reflect.DeepEqual(cfg, want) {
+	if want := (config{DatabaseURL: db.DefaultURL, Addr: defaultAddr, DailySync: true, DailyRates: true, AllowedHosts: []string{"localhost", "127.0.0.1", "::1"}}); !reflect.DeepEqual(cfg, want) {
 		t.Errorf("loadConfig() = %+v", cfg)
 	}
 }
 
 func TestLoadConfigReadsTheEnvironment(t *testing.T) {
 	cfg, err := loadConfig(env(map[string]string{
-		"DATABASE_URL": "postgres://u@db.example:5432/app", "ADDR": ":9000", "SCRYFALL_SYNC": "off",
+		"DATABASE_URL": "postgres://u@db.example:5432/app", "ADDR": ":9000", "SCRYFALL_SYNC": "off", "RATES_SYNC": "off",
 		"ALLOWED_HOSTS": "collection.example.com, www.collection.example.com", "STATIC_DIR": "../frontend/dist",
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := config{
-		DatabaseURL: "postgres://u@db.example:5432/app", Addr: ":9000", DailySync: false,
+		DatabaseURL: "postgres://u@db.example:5432/app", Addr: ":9000", DailySync: false, DailyRates: false,
 		AllowedHosts: []string{"collection.example.com", "www.collection.example.com"}, StaticDir: "../frontend/dist",
 	}
 	if !reflect.DeepEqual(cfg, want) {
@@ -46,6 +47,17 @@ func TestLoadConfigRejectsAnUnknownSyncSetting(t *testing.T) {
 	// A typo like "of" must not silently leave the daily import on (or off).
 	if _, err := loadConfig(env(map[string]string{"SCRYFALL_SYNC": "of"})); err == nil {
 		t.Error("SCRYFALL_SYNC=of was accepted")
+	}
+}
+
+func TestLoadConfigReadsRatesSync(t *testing.T) {
+	if cfg, err := loadConfig(env(map[string]string{"RATES_SYNC": "daily"})); err != nil || !cfg.DailyRates {
+		t.Errorf("RATES_SYNC=daily: %+v, %v; want the daily rates on", cfg, err)
+	}
+	// A typo must not silently leave the rates on (or off).
+	_, err := loadConfig(env(map[string]string{"RATES_SYNC": "x"}))
+	if err == nil || !strings.Contains(err.Error(), "RATES_SYNC") {
+		t.Errorf("RATES_SYNC=x: %v; want an error naming RATES_SYNC", err)
 	}
 }
 
