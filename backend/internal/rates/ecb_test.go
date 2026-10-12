@@ -2,6 +2,8 @@ package rates
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -71,5 +73,49 @@ func TestParseDailyAcceptsTomorrow(t *testing.T) {
 	}
 	if want := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC); !got.Date.Equal(want) {
 		t.Errorf("date %v, want %v", got.Date, want)
+	}
+}
+
+func TestECBDailyFetchesAndParses(t *testing.T) {
+	file, err := os.ReadFile("testdata/eurofxref-daily.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var agent string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		agent = r.Header.Get("User-Agent")
+		_, _ = w.Write(file)
+	}))
+	defer srv.Close()
+	got, err := ECB{URL: srv.URL, Client: srv.Client()}.Daily(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Currency != "GBP" || got.PerEUR != 0.8712 {
+		t.Errorf("got %+v, want GBP at 0.8712", got)
+	}
+	if agent != userAgent {
+		t.Errorf("User-Agent %q, want %q", agent, userAgent)
+	}
+}
+
+func TestECBDailyRefusesAnOversizedBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A valid file, padded past the cap: the cap, not the parser, must refuse it.
+		_, _ = w.Write([]byte(strings.Replace(daily("2026-10-09", `<Cube currency='GBP' rate='0.8712'/>`), "<Cube>", "<!--"+strings.Repeat("x", 65<<10)+"--><Cube>", 1)))
+	}))
+	defer srv.Close()
+	if _, err := (ECB{URL: srv.URL, Client: srv.Client()}).Daily(t.Context()); err == nil {
+		t.Error("a 65 KB body was accepted")
+	}
+}
+
+func TestECBDailyRefusesAnErrorStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+	if _, err := (ECB{URL: srv.URL, Client: srv.Client()}).Daily(t.Context()); err == nil {
+		t.Error("a 503 was accepted")
 	}
 }

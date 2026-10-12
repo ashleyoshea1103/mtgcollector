@@ -3,10 +3,13 @@
 package rates
 
 import (
+	"bytes"
+	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"regexp"
 	"strconv"
 	"time"
@@ -86,4 +89,73 @@ func ParseDaily(r io.Reader, currency string, now time.Time) (Rate, error) {
 		return Rate{}, fmt.Errorf("%w: the %s rate %s is outside %v–%v", ErrInvalid, currency, found[0], minRate, maxRate)
 	}
 	return Rate{Currency: currency, PerEUR: perEUR, Date: date}, nil
+}
+
+// DailyURL is the ECB's daily euro reference rates.
+const DailyURL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
+
+const (
+	fetchTimeout = 10 * time.Second
+	// The file is about 2 KB; anything near this is not the ECB's file.
+	maxBody   = 64 << 10
+	userAgent = "mtgcollector/0.1 (https://github.com/ashleyoshea1103/mtgcollector)"
+)
+
+// Source is where the rates come from: the ECB, or a fake in tests.
+type Source interface {
+	Daily(ctx context.Context) (Rate, error)
+}
+
+// The client for the ECB: it follows a redirect only to the ECB itself, over HTTPS.
+var ecbClient = &http.Client{
+	Timeout: fetchTimeout,
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if req.URL.Scheme != "https" || req.URL.Host != "www.ecb.europa.eu" || len(via) >= 5 {
+			return fmt.Errorf("redirected away from the ECB, to %s", req.URL.Redacted())
+		}
+		return nil
+	},
+}
+
+// ECB fetches today's GBP rate from the ECB's daily file. Its zero value is ready to use;
+// tests point URL and Client at a fake server.
+type ECB struct {
+	URL    string
+	Client *http.Client
+}
+
+// Daily fetches and parses the ECB's daily file, refusing an error status or a body over
+// 64 KB as well as everything ParseDaily refuses.
+func (e ECB) Daily(ctx context.Context) (Rate, error) {
+	url, client := e.URL, e.Client
+	if url == "" {
+		url = DailyURL
+	}
+	if client == nil {
+		client = ecbClient
+	}
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return Rate{}, err
+	}
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/xml, text/xml")
+	resp, err := client.Do(req)
+	if err != nil {
+		return Rate{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return Rate{}, fmt.Errorf("the ECB answered %s", resp.Status)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
+	if err != nil {
+		return Rate{}, err
+	}
+	if len(body) > maxBody {
+		return Rate{}, fmt.Errorf("%w: more than %d bytes", ErrInvalid, maxBody)
+	}
+	return ParseDaily(bytes.NewReader(body), "GBP", time.Now())
 }
