@@ -186,7 +186,7 @@ describe('GroupPage, more', () => {
   it("shows each card's value as the group's copies' value, not the whole entry's", async () => {
     renderApp(`/groups/${binder.id}`, groupApi());
     const bolts = (await main().findByRole('heading', { name: entries.bolts.card.name })).closest('article')!;
-    expect(within(bolts).getByText(/^Value/)).toHaveTextContent(`Value ${eur(members[0].value_eur)}`);
+    expect(bolts.querySelector(".entry-tile__value")).toHaveTextContent(`Value ${eur(members[0].value_eur)}`);
     expect(members[0].value_eur).not.toBe(entries.bolts.value_eur);
   });
 

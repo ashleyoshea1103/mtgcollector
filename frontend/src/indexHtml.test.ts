@@ -17,4 +17,11 @@ describe('index.html', () => {
     expect(fetchers.length).toBeGreaterThan(0);
     for (const at of fetchers) expect(meta).toBeLessThan(at);
   });
+
+  // A classic script in the head (not a module, not deferred) runs before the first paint, so
+  // a light-theme choice doesn't flash dark.
+  it('sets the theme before the page is drawn', () => {
+    const head = html.slice(html.indexOf('<head>'), html.indexOf('</head>'));
+    expect(head).toContain('<script src="/theme-init.js"></script>');
+  });
 });

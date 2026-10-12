@@ -17,7 +17,16 @@ export function CollectionPage() {
   return (
     <Stack as="section" className="collection-page" gap={5}>
       <title>Your collection · mtgcollector</title>
-      <h1>Your collection</h1>
+      <div className="page-head">
+        <div className="page-head__titles">
+          <h1>Your collection</h1>
+          <p className="page-head__subtitle">Values from Cardmarket, in euros</p>
+        </div>
+        {/* On a phone it floats at the bottom of the screen, in reach of a thumb. */}
+        <Link to="/search" className="button button--primary page-head__action collection-page__add">
+          Add cards
+        </Link>
+      </div>
       {stats.data === undefined ? (
         stats.isError ? (
           <ErrorState message={errorMessage(stats.error)} onRetry={() => void stats.refetch()} />

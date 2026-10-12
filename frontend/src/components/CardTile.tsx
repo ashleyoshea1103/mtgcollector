@@ -11,8 +11,8 @@ interface Props {
   card: CardSummary;
   /** Which price to show. Defaults to the printing's default finish. */
   finish?: Finish;
-  /** A known unit price (e.g. the server's price for an owned copy); otherwise it's worked out from the card's prices. */
-  unitPrice?: number | null;
+  /** Replaces the price line, which is otherwise worked out from the card's prices; null leaves it out (a tile showing its price its own way). */
+  price?: ReactNode;
   /** Rendered over the image, e.g. a quantity badge. */
   overlay?: ReactNode;
   /** Extra details below the standard ones. */
@@ -23,7 +23,7 @@ interface Props {
 }
 
 /** A card shown as an image with its name, printing and price. Used in search results and grids. */
-export function CardTile({ card, finish = defaultFinish(card), unitPrice, overlay, children, actions, className = '' }: Props) {
+export function CardTile({ card, finish = defaultFinish(card), price, overlay, children, actions, className = '' }: Props) {
   return (
     <article className={`card-tile card-tile--${finish} ${className}`}>
       <div className="card-tile__media">
@@ -36,9 +36,13 @@ export function CardTile({ card, finish = defaultFinish(card), unitPrice, overla
           <SetSymbol set={card.set} rarity={card.rarity} nameShown /> <span className="card-tile__set">{card.set.name}</span>{' '}
           <span className="card-tile__number">#{card.collector_number}</span> <NoLongerListed card={card} />
         </p>
-        <p className="card-tile__price">
-          {unitPrice !== undefined ? <Price value={unitPrice} /> : <Price prices={card.prices} finish={finish} />}
-        </p>
+        {price !== undefined ? (
+          price
+        ) : (
+          <p className="card-tile__price">
+            <Price prices={card.prices} finish={finish} />
+          </p>
+        )}
         {children}
       </div>
       {actions && (

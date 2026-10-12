@@ -19,7 +19,12 @@ export function EntryActions({ entry }: { entry: CollectionEntry }) {
       <Menu
         trigger={
           <Button variant="ghost" className="entry-actions">
-            Actions <VisuallyHidden>for {entry.card.name}</VisuallyHidden>
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+              <circle cx="4" cy="9" r="1.6" />
+              <circle cx="9" cy="9" r="1.6" />
+              <circle cx="14" cy="9" r="1.6" />
+            </svg>
+            <VisuallyHidden>Actions for {entry.card.name}</VisuallyHidden>
           </Button>
         }
         onAction={(id) => setAction(id as Action)}

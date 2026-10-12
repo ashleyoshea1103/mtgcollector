@@ -72,6 +72,25 @@ describe('CollectionSummary', () => {
     expect(screen.queryByText('Value (USD)')).not.toBeInTheDocument();
   });
 
+  // With a colour and a rarity that have no cards, which get no part of the bar.
+  const withNone = { ...stats, by_color: { ...stats.by_color, G: 0 }, by_rarity: { ...stats.by_rarity, bonus: 0 } };
+  it.each([
+    ['By color', withNone.by_color],
+    ['By rarity', withNone.by_rarity],
+  ] as const)('draws %s as a bar, each part as big as its count', (title, counts) => {
+    render(<CollectionSummary stats={withNone} />);
+    const section = screen.getByRole('heading', { name: title }).closest('section')!;
+    const bar = section.querySelector('.breakdown-bar')!;
+    expect(bar).toHaveAttribute('aria-hidden', 'true');
+    const parts = [...bar.querySelectorAll<HTMLElement>('.breakdown-bar__part')];
+    expect(parts.map((p) => [p.className.match(/swatch--(\w+)/)![1], Number(p.style.flexGrow)])).toEqual(
+      Object.entries(counts)
+        .filter(([, n]) => n > 0)
+        .map(([key, n]) => [key.toLowerCase(), n]),
+    );
+    expect(parts).toHaveLength(Object.keys(counts).length - 1);
+  });
+
   it.each([
     ['By color', stats.by_color, COLORS],
     ['By rarity', stats.by_rarity, RARITIES],

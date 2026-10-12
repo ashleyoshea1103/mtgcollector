@@ -4,10 +4,10 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, type RouteObject } from 'react-router';
 // The DOM build: it can commit a navigation at once (flushSync), which logging out needs.
 import { RouterProvider } from 'react-router/dom';
-// Tokens first: the other stylesheets use them.
-import './styles/tokens.css';
-import './ui/ui.css';
-import './index.css';
+// The fonts, bundled (the site's CSP allows fonts from itself only), then the stylesheet.
+import '@fontsource-variable/instrument-sans';
+import '@fontsource/spectral/600.css';
+import './styles/app.css';
 import { createQueryClient } from './api/queryClient';
 import { routes } from './app/routes';
 import { LazyToaster } from './ui/LazyToaster';

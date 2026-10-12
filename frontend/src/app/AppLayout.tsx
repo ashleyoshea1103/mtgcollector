@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } fr
 import { useLogout, useMe } from '../api/queries';
 import { errorMessage } from '../lib/messages';
 import { Button, Cluster, toast } from '../ui';
+import { ThemeToggle } from './ThemeToggle';
 
 /** Every page's frame: the header with the app's sections and the account, then the page. */
 export function AppLayout() {
@@ -43,7 +44,7 @@ export function AppLayout() {
         Skip to content
       </a>
       <header className="app-header">
-        <Cluster justify="space-between" gap={4}>
+        <Cluster className="app-header__bar" justify="space-between" gap={4}>
           <Link to="/" className="app-header__home">
             mtgcollector
           </Link>
@@ -81,6 +82,7 @@ export function AppLayout() {
               </Cluster>
             )
           )}
+          <ThemeToggle />
         </Cluster>
       </header>
       <main id="main" ref={main} className="app-main" tabIndex={-1}>
