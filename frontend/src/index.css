@@ -76,6 +76,9 @@
 .theme-toggle {
   font-size: var(--text-sm);
 }
+.currency-switch .segmented-control__option {
+  padding: 0 var(--spacing-3);
+}
 /* Deleting is offered quietly beside the group's other actions; its confirmation is the loud one. */
 .group-page__actions .button--danger {
   border-color: var(--color-border-control);
@@ -1376,6 +1379,9 @@ html:has(.listing-controls) {
   .theme-toggle {
     width: var(--size-touch);
     padding: 0;
+  }
+  .currency-switch .segmented-control__option {
+    padding: 0 var(--spacing-2);
   }
   .theme-toggle__label {
     position: absolute;

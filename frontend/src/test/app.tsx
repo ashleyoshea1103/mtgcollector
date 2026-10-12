@@ -37,6 +37,8 @@ export type Routes = Record<string, Handler>;
 export const ann: User = { id: 1, email: 'ann@example.com' };
 export const signedIn: Routes = { 'GET /api/auth/me': { body: ann } };
 export const signedOut: Routes = { 'GET /api/auth/me': { status: 401, body: { error: 'not signed in' } } };
+/** The GBP rate the server has; renderApp answers with it unless a test's routes say otherwise. */
+export const ratesApi: Routes = { 'GET /api/rates': { body: { rates: [{ currency: 'GBP', per_eur: 0.8712, date: '2026-10-09' }] } } };
 
 function matchPath(pattern: string, path: string): Record<string, string> | null {
   const want = pattern.split('/');
@@ -110,7 +112,7 @@ export function fakeApi(routes: Routes) {
 
 /** Renders the app at path, its API answered by routes. */
 export function renderApp(path: string, routesForApi: Routes) {
-  const api = fakeApi(routesForApi);
+  const api = fakeApi({ ...ratesApi, ...routesForApi });
   const client = createQueryClient({ queries: { retry: false } });
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   const user = userEvent.setup();

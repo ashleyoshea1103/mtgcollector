@@ -27,6 +27,11 @@ export function useCardSearch(search: api.CardSearch, enabled: boolean) {
   });
 }
 
+/** The euro exchange rates (for pounds): they change once a working day, so an hour's copy is fresh enough. */
+export function useRates() {
+  return useQuery({ queryKey: keys.rates, queryFn: ({ signal }) => api.rates(signal), staleTime: 60 * 60_000 });
+}
+
 export function useCard(id: string, enabled = true) {
   return useQuery({ queryKey: keys.card(id), queryFn: ({ signal }) => api.card(id, signal), enabled });
 }
