@@ -6,16 +6,15 @@ import { cardPath } from '../lib/paths';
 import type { CardSummary } from '../types';
 
 /**
- * A page's larger view of its cards: `view(card)` opens it, and `viewer` goes in the page.
+ * A page's larger view of its cards: `view(card)` opens it, and `dialog` goes in the page.
  * While it's open the whole card is fetched, which brings a double-faced card's other face
  * (a listing or a search has only the front).
  */
 export function useCardViewer() {
   const [card, setCard] = useState<CardSummary | null>(null);
   const full = useCard(card?.id ?? '', card !== null);
-  const viewer = card && (
+  const dialog = card && (
     <CardViewer
-      key={card.id}
       card={full.data ?? card}
       isOpen
       onOpenChange={(open) => {
@@ -24,5 +23,5 @@ export function useCardViewer() {
       details={<Link to={cardPath(card.id)}>Card details</Link>}
     />
   );
-  return { view: setCard, viewer };
+  return { view: (shown: CardSummary) => setCard(shown), dialog };
 }

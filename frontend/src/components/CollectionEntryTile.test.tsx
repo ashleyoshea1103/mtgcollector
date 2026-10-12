@@ -10,6 +10,12 @@ import { CollectionEntryTile } from './CollectionEntryTile';
 const { lightningBolt, propaganda } = cards;
 
 describe('CardTile', () => {
+  it("offers no larger view of a card that has no image", () => {
+    render(<CardTile card={{ ...lightningBolt, images: null }} onView={() => {}} />);
+    expect(screen.queryByRole('button', { name: `View ${lightningBolt.name} larger` })).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: lightningBolt.name })).toBeInTheDocument();
+  });
+
   it('opens the larger view from its image when it offers one', async () => {
     const onView = vi.fn<() => void>();
     const name = `View ${lightningBolt.name} larger`;

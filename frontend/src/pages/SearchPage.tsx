@@ -21,7 +21,7 @@ export function SearchPage() {
   const ready = canSearch(search);
   const results = useCardSearch(search, ready);
   const [adding, setAdding] = useState<CardSummary | null>(null);
-  const viewing = useCardViewer();
+  const viewer = useCardViewer();
 
   // The text boxes keep what's typed, and the page writes it to the URL. A URL the page didn't
   // write (going back or forward, or a link to another search) starts them afresh from it.
@@ -68,7 +68,7 @@ export function SearchPage() {
               <li key={card.id}>
                 <CardTile
                   card={card}
-                  onView={() => viewing.view(card)}
+                  onView={() => viewer.view(card)}
                   actions={
                     <>
                       <Link to={cardPath(card.id)}>
@@ -93,7 +93,7 @@ export function SearchPage() {
         </div>
       )}
       {adding && <AddCardDialog card={adding} pickPrinting onClose={() => setAdding(null)} />}
-      {viewing.viewer}
+      {viewer.dialog}
     </Stack>
   );
 }

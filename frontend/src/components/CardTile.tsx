@@ -19,7 +19,7 @@ interface Props {
   children?: ReactNode;
   /** Buttons such as "Add". */
   actions?: ReactNode;
-  /** Shows the card larger (see CardViewer): given, the image is a button that calls it. */
+  /** Shows the card larger (see CardViewer): given, the image is a button that calls it (a card with no image has nothing to show larger). */
   onView?: () => void;
   className?: string;
 }
@@ -30,7 +30,7 @@ export function CardTile({ card, finish = defaultFinish(card), price, overlay, c
   return (
     <article className={`card-tile card-tile--${finish} ${className}`}>
       <div className="card-tile__media">
-        {onView ? (
+        {onView && card.images ? (
           <Button variant="ghost" className="card-tile__view" aria-label={`View ${card.name} larger`} onPress={onView}>
             {image}
           </Button>

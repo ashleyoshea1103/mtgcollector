@@ -25,12 +25,23 @@ const OPEN_ALL_UP_TO = 8;
 const firstToggle = (part: HTMLElement) => part.querySelector<HTMLElement>('.group-bucket__toggle');
 
 /** A listing's cards in sections by the chosen grouping, each fetching its entries a page at a time while open. */
-export function Listing({ listing, params, renderActions, empty }: Props) {
+export function Listing(props: Props) {
+  // A card shown larger stays while the listing behind it reloads or empties (from another
+  // tab, say), rather than going with it and coming back by itself.
+  const viewer = useCardViewer();
+  return (
+    <>
+      <Groups {...props} onViewCard={viewer.view} />
+      {viewer.dialog}
+    </>
+  );
+}
+
+function Groups({ listing, params, renderActions, empty, onViewCard }: Props & { onViewCard: (card: CardSummary) => void }) {
   const groups = useListingGroups(listing, params.groupBy);
   const client = useQueryClient();
   // A section that goes (its last card removed) takes focus with it: to the first section, then.
   const keepFocus = useFocusFallback<HTMLDivElement>(firstToggle, groups.data);
-  const cards = useCardViewer();
   // A refresh that fails keeps what's shown; only a first load that fails shows the error.
   if (groups.data === undefined) {
     return groups.isError ? <ErrorState message={errorMessage(groups.error)} onRetry={() => void groups.refetch()} /> : <Loading />;
@@ -62,11 +73,10 @@ export function Listing({ listing, params, renderActions, empty }: Props) {
             params={params}
             defaultOpen={list.length <= OPEN_ALL_UP_TO || i === 0}
             renderActions={renderActions}
-            onViewCard={cards.view}
+            onViewCard={onViewCard}
           />
         </ErrorBoundary>
       ))}
-      {cards.viewer}
     </div>
   );
 }
