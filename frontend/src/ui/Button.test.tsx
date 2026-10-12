@@ -4,6 +4,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { Button, IconButton, ToggleButton } from './Button';
 
 describe('Button', () => {
+  it('can be named apart from what it shows', () => {
+    render(
+      <Button aria-label="View Lightning Bolt larger">
+        <img src="bolt.jpg" alt="Lightning Bolt" />
+      </Button>,
+    );
+    expect(screen.getByRole('button')).toHaveAccessibleName('View Lightning Bolt larger');
+  });
+
   it('is a button named by its text, classed by variant, that reports presses', async () => {
     const onPress = vi.fn<() => void>();
     render(

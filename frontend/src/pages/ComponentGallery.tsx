@@ -4,6 +4,7 @@ import { AuthForm } from '../components/AuthForm';
 import { CardDetail } from '../components/CardDetail';
 import { CardImage } from '../components/CardImage';
 import { CardTile } from '../components/CardTile';
+import { CardViewer } from '../components/CardViewer';
 import { CollectionEntryTable } from '../components/CollectionEntryTable';
 import { CollectionEntryTile } from '../components/CollectionEntryTile';
 import { CollectionSummary } from '../components/CollectionSummary';
@@ -38,6 +39,7 @@ export function ComponentGallery() {
   const [view, setView] = useState<CollectionView>('grid');
   const [printing, setPrinting] = useState(allCards[0].id);
   const [detailKey, setDetailKey] = useState<keyof typeof cards>('delver');
+  const [viewing, setViewing] = useState<Card | null>(null);
   const [submitted, setSubmitted] = useState<NewEntry | null>(null);
   const [formOutput, setFormOutput] = useState<unknown>(null);
   const [search, setSearch] = useState<CardSearch>(EMPTY_SEARCH);
@@ -99,12 +101,31 @@ export function ComponentGallery() {
         </ul>
       </Section>
 
-      <Section name="CardTile" note="Search result shape, with an action slot. Foil-only Propaganda is priced at its foil price; the last Ragavan is a printing Scryfall no longer lists.">
+      <Section name="CardTile" note="Search result shape, with an action slot. Each image opens the larger view (CardViewer). Foil-only Propaganda is priced at its foil price; the last Ragavan is a printing Scryfall no longer lists.">
         <Grid minItemWidth="180px" className="entry-grid">
           {allCards.map((c) => (
-            <CardTile key={c.id} card={c} actions={<button type="button">Add</button>} />
+            <CardTile key={c.id} card={c} onView={() => setViewing(c)} actions={<button type="button">Add</button>} />
           ))}
         </Grid>
+      </Section>
+
+      <Section name="CardViewer" note="A card shown large, opened from a tile's image (above). Double-faced Delver turns over; a page gives it the whole card, fetched on opening.">
+        <Grid minItemWidth="180px" className="entry-grid">
+          {[cards.lightningBolt, cards.delver].map((c) => (
+            <CardTile key={c.id} card={c} price={null} onView={() => setViewing(c)} />
+          ))}
+        </Grid>
+        {viewing && (
+          <CardViewer
+            key={viewing.id}
+            card={viewing}
+            isOpen
+            onOpenChange={(open) => {
+              if (!open) setViewing(null);
+            }}
+            details={<a href={`#${slug('CardDetail')}`}>Card details</a>}
+          />
+        )}
       </Section>
 
       <Section name="PrintingOption" note="Click to select. The last is a printing Scryfall no longer lists.">
@@ -217,6 +238,7 @@ const SECTIONS = [
   'ManaCost / SetSymbol / RarityBadge',
   'Price',
   'CardTile',
+  'CardViewer',
   'PrintingOption',
   'CollectionEntryTile',
   'CollectionEntryTable',

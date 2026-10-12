@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, type ReactNode } from 'react';
 import { countOf } from '../lib/format';
-import type { CollectionEntry, GroupSummary } from '../types';
+import type { CardSummary, CollectionEntry, GroupSummary } from '../types';
 import { Button, Disclosure, EmptyState, ErrorState, Grid, Loading, useDisclosureState } from '../ui';
 import { CollectionEntryTable } from './CollectionEntryTable';
 import { CollectionEntryTile } from './CollectionEntryTile';
@@ -30,6 +30,8 @@ interface Props {
   /** Called by that retry; defaults to onLoad. */
   onRetry?: () => void;
   renderActions?: (entry: CollectionEntry) => ReactNode;
+  /** Shows a card larger, from its tile's image. */
+  onViewCard?: (card: CardSummary) => void;
 }
 
 /**
@@ -49,6 +51,7 @@ export function GroupBucketSection({
   loadFailed = false,
   onRetry = onLoad,
   renderActions,
+  onViewCard,
 }: Props) {
   const [isOpen, setOpen] = useDisclosureState({ open, defaultOpen, onOpenChange });
 
@@ -94,7 +97,7 @@ export function GroupBucketSection({
           {view === 'grid' ? (
             <Grid minItemWidth="180px" className="entry-grid">
               {entries.map((entry) => (
-                <CollectionEntryTile key={entry.id} entry={entry} actions={renderActions?.(entry)} />
+                <CollectionEntryTile key={entry.id} entry={entry} actions={renderActions?.(entry)} onView={onViewCard && (() => onViewCard(entry.card))} />
               ))}
             </Grid>
           ) : (

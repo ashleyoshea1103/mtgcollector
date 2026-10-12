@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { colorGroups, customGroups, entries, makeEntry, makeGroup, cards, stats } from '../fixtures';
 import { keys } from '../api/keys';
 import { renderApp, signedIn, type FakeRequest, type Routes } from '../test/app';
-import type { CollectionEntry, GroupSummary } from '../types';
+import { cardPath } from '../lib/paths';
+import type { CardSummary, CollectionEntry, GroupSummary } from '../types';
 
 const all = Object.values(entries);
 const allGroup = makeGroup('all', 'All cards', all);
@@ -20,6 +21,40 @@ const collection: Routes = {
 const main = () => within(screen.getByRole('main'));
 const section = (label: RegExp) => screen.getByRole('button', { name: label }).closest('.group-bucket') as HTMLElement;
 const keysAsked = (requests: FakeRequest[]) => requests.map((r) => r.query.get('key'));
+
+describe('CollectionPage, the larger card view', () => {
+  it("opens from a card's image, links to the card's page, and gives focus back on closing", async () => {
+    const bolt = entries.bolts.card;
+    const { api, user } = renderApp('/collection', { ...collection, 'GET /api/cards/:id': { body: bolt } });
+    const view = await main().findByRole('button', { name: `View ${bolt.name} larger` });
+    await user.click(view);
+    const dialog = await screen.findByRole('dialog', { name: bolt.name });
+    expect(within(dialog).getByRole('img', { name: bolt.name })).toHaveAttribute('src', bolt.images!.large);
+    expect(within(dialog).getByRole('link', { name: 'Card details' })).toHaveAttribute('href', cardPath(bolt.id));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(view).toHaveFocus();
+    expect(api.unhandled).toEqual([]);
+  });
+
+  it('turns a double-faced card over once the whole card has come, fetched only on opening', async () => {
+    // What a listing really carries: no faces, only the front image.
+    const { faces: _faces, ...delverSummary } = cards.delver;
+    const delver: CardSummary = delverSummary;
+    const { api, user } = renderApp('/collection', {
+      ...collection,
+      'GET /api/collection/entries': { body: { entries: [makeEntry(3, delver, { quantity: 2 })], next_cursor: null } },
+      'GET /api/cards/:id': (req) => ({ body: req.params.id === cards.delver.id ? cards.delver : undefined, status: req.params.id === cards.delver.id ? 200 : 404 }),
+    });
+    const view = await main().findByRole('button', { name: `View ${delver.name} larger` });
+    expect(api.sent('GET /api/cards/:id')).toHaveLength(0);
+    await user.click(view);
+    const dialog = await screen.findByRole('dialog', { name: delver.name });
+    await user.click(await within(dialog).findByRole('button', { name: 'Turn over' }));
+    expect(within(dialog).getByRole('img')).toHaveAccessibleName(cards.delver.faces![1].name);
+    expect(api.sent('GET /api/cards/:id')).toHaveLength(1);
+  });
+});
 
 describe('CollectionPage', () => {
   it('shows the totals and every card, grouped as nothing by default', async () => {

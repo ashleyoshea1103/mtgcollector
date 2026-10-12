@@ -347,6 +347,22 @@ a.button:hover {
   font-size: var(--text-sm);
 }
 
+/* A tile whose image opens the larger view: the image is a button, drawn as just the image. */
+.button.card-tile__view {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  cursor: zoom-in;
+}
+.button.card-tile__view:is([data-hovered], [data-pressed]) {
+  background: none;
+  transform: none;
+}
+
 /* An owned copy's tile: a count on the image, its copy as chips, its value. */
 .entry-tile__quantity {
   padding: 0.125rem 0.5625rem;
@@ -1049,6 +1065,90 @@ html:has(.listing-controls) {
 }
 .search-page__more {
   justify-self: center;
+}
+
+/* A card shown larger, over the page */
+
+.dialog-modal:has(.card-viewer) {
+  position: relative;
+  width: min(33rem, 100%);
+}
+.card-viewer {
+  gap: var(--spacing-3);
+}
+.card-viewer .dialog__title {
+  padding-right: var(--size-touch);
+}
+.button.card-viewer__close {
+  position: absolute;
+  top: var(--spacing-3);
+  right: var(--spacing-3);
+  width: var(--size-touch);
+  min-height: var(--size-touch);
+  padding: 0;
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+}
+.card-viewer__printing {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+/* As big as the screen allows (its height less the dialog's title and buttons), in the
+   card's proportions. */
+.card-viewer__card {
+  width: 100%;
+  max-width: min(30rem, calc((100dvh - 15rem) * 63 / 88));
+  aspect-ratio: 63 / 88;
+  margin-inline: auto;
+  perspective: 1800px;
+}
+/* A double-faced card's faces, back to back: turning it over turns them round together. */
+.card-viewer__faces {
+  position: relative;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.55s var(--ease-out);
+}
+.card-viewer__faces--turned {
+  transform: rotateY(180deg);
+}
+.card-viewer__face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+.card-viewer__face--back {
+  transform: rotateY(180deg);
+}
+.card-viewer__face .card-image {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  box-shadow: var(--shadow-lg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-viewer__faces {
+    transition: none;
+  }
+}
+.card-viewer__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-3);
+}
+.card-viewer__side {
+  margin-right: auto;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.card-viewer__footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--size-touch);
+  font-weight: var(--font-weight-medium);
 }
 
 /* Adding a card */
