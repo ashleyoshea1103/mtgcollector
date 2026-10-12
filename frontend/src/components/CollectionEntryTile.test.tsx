@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { cards, entries, serverPricedBolts } from '../fixtures';
 import { eur, getAllByTooltip, getByTooltip, queryByTooltip } from '../test/helpers';
 import { corsIconUrl } from '../lib/urls';
@@ -9,6 +10,24 @@ import { CollectionEntryTile } from './CollectionEntryTile';
 const { lightningBolt, propaganda } = cards;
 
 describe('CardTile', () => {
+  it("offers no larger view of a card that has no image", () => {
+    render(<CardTile card={{ ...lightningBolt, images: null }} onView={() => {}} />);
+    expect(screen.queryByRole('button', { name: `View ${lightningBolt.name} larger` })).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: lightningBolt.name })).toBeInTheDocument();
+  });
+
+  it('opens the larger view from its image when it offers one', async () => {
+    const onView = vi.fn<() => void>();
+    const name = `View ${lightningBolt.name} larger`;
+    const { rerender } = render(<CardTile card={lightningBolt} />);
+    expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    rerender(<CardTile card={lightningBolt} onView={onView} />);
+    const view = screen.getByRole('button', { name });
+    expect(view.querySelector('img')).toHaveAttribute('src', lightningBolt.images!.normal);
+    await userEvent.click(view);
+    expect(onView).toHaveBeenCalledTimes(1);
+  });
+
   it('can bring its own price line, or none', () => {
     const { rerender } = render(<CardTile card={lightningBolt} price={<p>Priced elsewhere</p>} />);
     expect(screen.getByText('Priced elsewhere')).toBeInTheDocument();

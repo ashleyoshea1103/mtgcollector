@@ -312,6 +312,8 @@ a.button:hover {
   position: absolute;
   top: var(--spacing-2);
   left: var(--spacing-2);
+  /* Only shows things (a count): a press on it is a press on the image. */
+  pointer-events: none;
 }
 .card-tile__body {
   display: flex;
@@ -345,6 +347,22 @@ a.button:hover {
 .card-tile__actions a {
   color: var(--color-text);
   font-size: var(--text-sm);
+}
+
+/* A tile whose image opens the larger view: the image is a button, drawn as just the image. */
+.button.card-tile__view {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  cursor: zoom-in;
+}
+.button.card-tile__view:is([data-hovered], [data-pressed]) {
+  background: none;
+  transform: none;
 }
 
 /* An owned copy's tile: a count on the image, its copy as chips, its value. */
@@ -1049,6 +1067,132 @@ html:has(.listing-controls) {
 }
 .search-page__more {
   justify-self: center;
+}
+
+/* A card shown larger, over the page */
+
+.dialog-modal:has(.card-viewer) {
+  position: relative;
+  width: min(33rem, 100%);
+}
+.card-viewer {
+  gap: var(--spacing-3);
+}
+.card-viewer .dialog__title {
+  padding-right: var(--size-touch);
+  font-size: var(--text-lg);
+}
+.button.card-viewer__close {
+  position: absolute;
+  top: var(--spacing-3);
+  right: var(--spacing-3);
+  width: var(--size-touch);
+  min-height: var(--size-touch);
+  padding: 0;
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+}
+.button.card-viewer__close[data-hovered] {
+  background: var(--color-rule);
+  color: var(--color-text-strong);
+}
+.card-viewer__printing {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+/* As big as the screen's height allows (less the dialog's title, which can take two lines,
+   and its buttons), in the card's proportions; but never smaller than a tile, so on a short
+   screen the dialog scrolls instead. */
+.card-viewer__card {
+  width: 100%;
+  max-width: max(min(30rem, calc((100vh - 16rem) * 63 / 88)), min(100%, 15rem));
+  max-width: max(min(30rem, calc((100dvh - 16rem) * 63 / 88)), min(100%, 15rem));
+  aspect-ratio: 63 / 88;
+  margin-inline: auto;
+  perspective: 1800px;
+}
+/* A double-faced card's faces, back to back: turning it over turns them round together. */
+.card-viewer__faces {
+  position: relative;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.55s var(--ease-out);
+}
+.card-viewer__faces--turned {
+  transform: rotateY(180deg);
+}
+.card-viewer__face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+.card-viewer__face--back {
+  transform: rotateY(180deg);
+}
+.card-viewer__face .card-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+}
+/* The large image, over the stand-in: see-through until it has loaded. */
+.card-viewer__face > .card-image {
+  background: none;
+}
+.card-viewer__stand-in .card-image {
+  box-shadow: var(--shadow-lg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-viewer__faces {
+    transition: none;
+  }
+}
+.card-viewer__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-3);
+}
+.card-viewer__side {
+  margin-right: auto;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.card-viewer__footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--size-touch);
+  font-weight: var(--font-weight-medium);
+}
+/* A short, wide screen (a phone on its side): the card as tall as the dialog allows, with its
+   name and buttons beside it. */
+@media (max-height: 30rem) and (min-width: 36rem) {
+  .dialog-modal:has(.card-viewer) {
+    width: min(46rem, 100%);
+  }
+  .card-viewer {
+    grid-template-columns: auto minmax(0, 1fr);
+    /* The name and printing at the top, the buttons at the foot: the card's height goes between. */
+    grid-template-rows: auto auto 1fr;
+    column-gap: var(--spacing-5);
+  }
+  .card-viewer > * {
+    grid-column: 2;
+  }
+  .card-viewer > .card-viewer__card {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    width: calc((100vh - 5.5rem) * 63 / 88);
+    width: calc((100dvh - 5.5rem) * 63 / 88);
+    max-width: none;
+  }
+  .card-viewer__footer {
+    align-self: end;
+    justify-content: flex-start;
+  }
 }
 
 /* Adding a card */

@@ -27,8 +27,8 @@ export function useCardSearch(search: api.CardSearch, enabled: boolean) {
   });
 }
 
-export function useCard(id: string) {
-  return useQuery({ queryKey: keys.card(id), queryFn: ({ signal }) => api.card(id, signal) });
+export function useCard(id: string, enabled = true) {
+  return useQuery({ queryKey: keys.card(id), queryFn: ({ signal }) => api.card(id, signal), enabled });
 }
 
 export function usePrintings(id: string, enabled = true) {

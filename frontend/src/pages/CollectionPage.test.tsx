@@ -2,8 +2,9 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { colorGroups, customGroups, entries, makeEntry, makeGroup, cards, stats } from '../fixtures';
 import { keys } from '../api/keys';
-import { renderApp, signedIn, type FakeRequest, type Routes } from '../test/app';
-import type { CollectionEntry, GroupSummary } from '../types';
+import { ann, renderApp, signedIn, type FakeRequest, type Routes } from '../test/app';
+import { cardPath } from '../lib/paths';
+import type { CardSummary, CollectionEntry, GroupSummary } from '../types';
 
 const all = Object.values(entries);
 const allGroup = makeGroup('all', 'All cards', all);
@@ -20,6 +21,91 @@ const collection: Routes = {
 const main = () => within(screen.getByRole('main'));
 const section = (label: RegExp) => screen.getByRole('button', { name: label }).closest('.group-bucket') as HTMLElement;
 const keysAsked = (requests: FakeRequest[]) => requests.map((r) => r.query.get('key'));
+
+describe('CollectionPage, the larger card view', () => {
+  it("opens from a card's image, links to the card's page, and gives focus back on closing", async () => {
+    const bolt = entries.bolts.card;
+    const { api, user } = renderApp('/collection', { ...collection, 'GET /api/cards/:id': { body: bolt } });
+    const view = await main().findByRole('button', { name: `View ${bolt.name} larger` });
+    await user.click(view);
+    const dialog = await screen.findByRole('dialog', { name: bolt.name });
+    expect(within(dialog).getByRole('img', { name: bolt.name })).toHaveAttribute('src', bolt.images!.large);
+    expect(within(dialog).getByRole('link', { name: 'Card details' })).toHaveAttribute('href', cardPath(bolt.id));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    // React Aria gives focus back a frame after the dialog goes.
+    await waitFor(() => expect(view).toHaveFocus());
+
+    // And after its close button.
+    await user.click(view);
+    await user.click(within(await screen.findByRole('dialog', { name: bolt.name })).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    // React Aria gives focus back a frame after the dialog goes.
+    await waitFor(() => expect(view).toHaveFocus());
+    expect(api.unhandled).toEqual([]);
+  });
+
+  it("still shows the card if the whole card can't be fetched, just without turning over", async () => {
+    const { faces: _faces, ...delverSummary } = cards.delver;
+    const delver: CardSummary = delverSummary;
+    const { user } = renderApp('/collection', {
+      ...collection,
+      'GET /api/collection/entries': { body: { entries: [makeEntry(3, delver)], next_cursor: null } },
+      'GET /api/cards/:id': { status: 500, body: { error: 'the database is unavailable' } },
+    });
+    await user.click(await main().findByRole('button', { name: `View ${delver.name} larger` }));
+    const dialog = await screen.findByRole('dialog', { name: delver.name });
+    await waitFor(() => expect(within(dialog).getByRole('img', { name: delver.name })).toHaveAttribute('src', delver.images!.large));
+    expect(within(dialog).queryByRole('button', { name: 'Turn over' })).not.toBeInTheDocument();
+    expect(dialog).not.toHaveTextContent('unavailable');
+  });
+
+  it('stays open while the listing behind it reloads or empties, rather than going and coming back', async () => {
+    const bolt = entries.bolts.card;
+    let gone = false;
+    const { client, user } = renderApp('/collection', {
+      ...collection,
+      'GET /api/cards/:id': { body: bolt },
+      'GET /api/collection/groups': (req) => ({ body: { group_by: req.query.get('group_by'), groups: gone ? [] : headers[req.query.get('group_by')!] } }),
+    });
+    await user.click(await main().findByRole('button', { name: `View ${bolt.name} larger` }));
+    expect(await screen.findByRole('dialog', { name: bolt.name })).toBeInTheDocument();
+    // Another tab removes the cards: the listing behind shows the empty collection.
+    gone = true;
+    await act(() => client.invalidateQueries({ queryKey: ['collection'] }));
+    // (Hidden from screen readers while the dialog is open, so found by its text.)
+    expect(await screen.findByText('Your collection is empty')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: bolt.name })).toBeInTheDocument();
+  });
+
+  it('closes when someone else signs in (in another tab), not left over their collection', async () => {
+    const bolt = entries.bolts.card;
+    const { client, user } = renderApp('/collection', { ...collection, 'GET /api/cards/:id': { body: bolt } });
+    await user.click(await main().findByRole('button', { name: `View ${bolt.name} larger` }));
+    expect(await screen.findByRole('dialog', { name: bolt.name })).toBeInTheDocument();
+    act(() => client.setQueryData(keys.me, { id: ann.id + 1, email: 'bob@example.com' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(await main().findByRole('button', { name: `View ${bolt.name} larger` })).toBeInTheDocument();
+  });
+
+  it('turns a double-faced card over once the whole card has come, fetched only on opening', async () => {
+    // What a listing really carries: no faces, only the front image.
+    const { faces: _faces, ...delverSummary } = cards.delver;
+    const delver: CardSummary = delverSummary;
+    const { api, user } = renderApp('/collection', {
+      ...collection,
+      'GET /api/collection/entries': { body: { entries: [makeEntry(3, delver, { quantity: 2 })], next_cursor: null } },
+      'GET /api/cards/:id': (req) => ({ body: req.params.id === cards.delver.id ? cards.delver : undefined, status: req.params.id === cards.delver.id ? 200 : 404 }),
+    });
+    const view = await main().findByRole('button', { name: `View ${delver.name} larger` });
+    expect(api.sent('GET /api/cards/:id')).toHaveLength(0);
+    await user.click(view);
+    const dialog = await screen.findByRole('dialog', { name: delver.name });
+    await user.click(await within(dialog).findByRole('button', { name: 'Turn over' }));
+    expect(within(dialog).getByRole('img')).toHaveAccessibleName(cards.delver.faces![1].name);
+    expect(api.sent('GET /api/cards/:id')).toHaveLength(1);
+  });
+});
 
 describe('CollectionPage', () => {
   it('shows the totals and every card, grouped as nothing by default', async () => {

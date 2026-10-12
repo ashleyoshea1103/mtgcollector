@@ -10,6 +10,7 @@ import { canSearch, isSetCode, readSearch, writeSearch } from '../lib/search';
 import { MinSearchWord, type CardSummary } from '../types';
 import { Button, EmptyState, ErrorState, Grid, Loading, Stack, VisuallyHidden } from '../ui';
 import { AddCardDialog } from './AddCardDialog';
+import { useCardViewer } from './useCardViewer';
 
 /** Searching every card by name and filters; signed-in users can add what they find. The search is kept in the URL. */
 export function SearchPage() {
@@ -20,6 +21,7 @@ export function SearchPage() {
   const ready = canSearch(search);
   const results = useCardSearch(search, ready);
   const [adding, setAdding] = useState<CardSummary | null>(null);
+  const viewer = useCardViewer();
 
   // The text boxes keep what's typed, and the page writes it to the URL. A URL the page didn't
   // write (going back or forward, or a link to another search) starts them afresh from it.
@@ -66,6 +68,7 @@ export function SearchPage() {
               <li key={card.id}>
                 <CardTile
                   card={card}
+                  onView={() => viewer.view(card)}
                   actions={
                     <>
                       <Link to={cardPath(card.id)}>
@@ -90,6 +93,7 @@ export function SearchPage() {
         </div>
       )}
       {adding && <AddCardDialog card={adding} pickPrinting onClose={() => setAdding(null)} />}
+      {viewer.dialog}
     </Stack>
   );
 }

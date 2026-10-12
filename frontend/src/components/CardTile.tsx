@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { defaultFinish } from '../lib/price';
 import type { CardSummary, Finish } from '../types';
-import { Cluster } from '../ui';
+import { Button, Cluster } from '../ui';
 import { CardImage } from './CardImage';
 import { NoLongerListed } from './NoLongerListed';
 import { Price } from './Price';
@@ -19,15 +19,24 @@ interface Props {
   children?: ReactNode;
   /** Buttons such as "Add". */
   actions?: ReactNode;
+  /** Shows the card larger (see CardViewer): given, the image is a button that calls it (a card with no image has nothing to show larger). */
+  onView?: () => void;
   className?: string;
 }
 
 /** A card shown as an image with its name, printing and price. Used in search results and grids. */
-export function CardTile({ card, finish = defaultFinish(card), price, overlay, children, actions, className = '' }: Props) {
+export function CardTile({ card, finish = defaultFinish(card), price, overlay, children, actions, onView, className = '' }: Props) {
+  const image = <CardImage card={card} size="normal" />;
   return (
     <article className={`card-tile card-tile--${finish} ${className}`}>
       <div className="card-tile__media">
-        <CardImage card={card} size="normal" />
+        {onView && card.images ? (
+          <Button variant="ghost" className="card-tile__view" aria-label={`View ${card.name} larger`} onPress={onView}>
+            {image}
+          </Button>
+        ) : (
+          image
+        )}
         {overlay && <div className="card-tile__overlay">{overlay}</div>}
       </div>
       <div className="card-tile__body">

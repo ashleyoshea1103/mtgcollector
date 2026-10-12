@@ -5,8 +5,9 @@ import { useListingEntries, useListingGroups, type ListedEntry } from '../api/qu
 import { GroupBucketSection } from '../components/GroupBucketSection';
 import type { ListingParams } from '../lib/listingParams';
 import { errorMessage } from '../lib/messages';
-import type { GroupSummary } from '../types';
+import type { CardSummary, GroupSummary } from '../types';
 import { ErrorBoundary, ErrorState, Loading, toast, useFocusFallback } from '../ui';
+import { useCardViewer } from './useCardViewer';
 
 interface Props {
   /** The whole collection (null) or a custom group's id. */
@@ -24,7 +25,19 @@ const OPEN_ALL_UP_TO = 8;
 const firstToggle = (part: HTMLElement) => part.querySelector<HTMLElement>('.group-bucket__toggle');
 
 /** A listing's cards in sections by the chosen grouping, each fetching its entries a page at a time while open. */
-export function Listing({ listing, params, renderActions, empty }: Props) {
+export function Listing(props: Props) {
+  // A card shown larger stays while the listing behind it reloads or empties (from another
+  // tab, say), rather than going with it and coming back by itself.
+  const viewer = useCardViewer();
+  return (
+    <>
+      <Groups {...props} onViewCard={viewer.view} />
+      {viewer.dialog}
+    </>
+  );
+}
+
+function Groups({ listing, params, renderActions, empty, onViewCard }: Props & { onViewCard: (card: CardSummary) => void }) {
   const groups = useListingGroups(listing, params.groupBy);
   const client = useQueryClient();
   // A section that goes (its last card removed) takes focus with it: to the first section, then.
@@ -54,7 +67,14 @@ export function Listing({ listing, params, renderActions, empty }: Props) {
             />
           )}
         >
-          <Section listing={listing} group={group} params={params} defaultOpen={list.length <= OPEN_ALL_UP_TO || i === 0} renderActions={renderActions} />
+          <Section
+            listing={listing}
+            group={group}
+            params={params}
+            defaultOpen={list.length <= OPEN_ALL_UP_TO || i === 0}
+            renderActions={renderActions}
+            onViewCard={onViewCard}
+          />
         </ErrorBoundary>
       ))}
     </div>
@@ -67,9 +87,10 @@ interface SectionProps {
   params: ListingParams;
   defaultOpen: boolean;
   renderActions?: (row: ListedEntry) => ReactNode;
+  onViewCard: (card: CardSummary) => void;
 }
 
-function Section({ listing, group, params, defaultOpen, renderActions }: SectionProps) {
+function Section({ listing, group, params, defaultOpen, renderActions, onViewCard }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
   const entries = useListingEntries(listing, params.groupBy, group.key, params.sort, open);
   const rows = entries.data;
@@ -97,6 +118,7 @@ function Section({ listing, group, params, defaultOpen, renderActions }: Section
         // Busy while a refresh runs too: the next page follows the refreshed ones.
         loadingMore={entries.isFetching}
         loadFailed={entries.isError && rows === undefined}
+        onViewCard={onViewCard}
         renderActions={
           renderActions &&
           ((entry) => {

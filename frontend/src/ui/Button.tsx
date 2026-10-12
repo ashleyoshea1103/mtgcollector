@@ -4,7 +4,7 @@ import { Tooltip } from './Tooltip';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
-type SharedProps = Pick<AriaButtonProps, 'type' | 'onPress' | 'isDisabled' | 'slot' | 'form' | 'autoFocus' | 'aria-describedby'>;
+type SharedProps = Pick<AriaButtonProps, 'type' | 'onPress' | 'isDisabled' | 'slot' | 'form' | 'autoFocus' | 'aria-label' | 'aria-describedby'>;
 
 export interface ButtonProps extends SharedProps {
   variant?: ButtonVariant;

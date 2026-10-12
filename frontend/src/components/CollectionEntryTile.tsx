@@ -8,10 +8,12 @@ import { Price } from './Price';
 interface Props {
   entry: CollectionEntry;
   actions?: ReactNode;
+  /** Shows the card larger, from its image (see CardTile). */
+  onView?: () => void;
 }
 
 /** An owned card in grid view: the card tile plus quantity, finish, condition and line value. */
-export function CollectionEntryTile({ entry, actions }: Props) {
+export function CollectionEntryTile({ entry, actions, onView }: Props) {
   return (
     <CardTile
       card={entry.card}
@@ -20,6 +22,7 @@ export function CollectionEntryTile({ entry, actions }: Props) {
       className="entry-tile"
       overlay={<Badge className="entry-tile__quantity">{entry.quantity}×</Badge>}
       actions={actions}
+      onView={onView}
     >
       <Cluster as="p" className="entry-tile__copy">
         <TooltipText as="abbr" className="entry-tile__condition" tooltip={labelFor(CONDITIONS, entry.condition)}>

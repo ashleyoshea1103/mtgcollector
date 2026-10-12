@@ -82,6 +82,12 @@ describe('GroupsPage', () => {
 });
 
 describe('GroupPage', () => {
+  it("opens the larger view from a card's image", async () => {
+    const { user } = renderApp(`/groups/${binder.id}`, { ...groupApi(), 'GET /api/cards/:id': { body: entries.bolts.card } });
+    await user.click(await main().findByRole('button', { name: `View ${entries.bolts.card.name} larger` }));
+    expect(await screen.findByRole('dialog', { name: entries.bolts.card.name })).toBeInTheDocument();
+  });
+
   it("shows the group, and its cards with the group's copies", async () => {
     const { api } = renderApp(`/groups/${binder.id}`, groupApi());
     expect(await main().findByRole('heading', { level: 1, name: binder.name })).toBeInTheDocument();

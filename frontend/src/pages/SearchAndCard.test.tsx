@@ -17,6 +17,13 @@ const searchApi: Routes = {
 const main = () => within(screen.getByRole('main'));
 
 describe('SearchPage', () => {
+  it("opens the larger view from a result's image", async () => {
+    const { user } = renderApp('/search?q=bolt', { ...signedOut, ...searchApi, 'GET /api/cards/:id': { body: lightningBolt } });
+    await user.click(await main().findByRole('button', { name: `View ${lightningBolt.name} larger` }));
+    const dialog = await screen.findByRole('dialog', { name: lightningBolt.name });
+    expect(within(dialog).getByRole('img', { name: lightningBolt.name })).toHaveAttribute('src', lightningBolt.images!.large);
+  });
+
   it('asks for enough of a name before searching', async () => {
     const { api, user } = renderApp('/search', { ...signedOut, ...searchApi });
     expect(await main().findByText("Type at least 3 letters of a card's name, or a set code.")).toBeInTheDocument();
