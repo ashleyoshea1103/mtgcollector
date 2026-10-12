@@ -115,8 +115,7 @@ The contract test checks `per_eur` serialises as a JSON number and `date` as `YY
 ### The rate
 
 - **Fetching:** `useRates()` (TanStack Query) fetches `/api/rates`, keeps it fresh for an hour and
-  needs no sign-in. The `rates` key isn't under `collection` or `groups`, so a change of user
-  doesn't drop it.
+  needs no sign-in. A change of user drops it with the rest of the cache, and it's fetched again (it's public and small).
 - **Context:** `MoneyProvider` (in `src/app`, provided by `AppLayout`, every page's frame, so page tests get it too) combines the choice and the rate
   into a context, `{ currency: 'eur' | 'gbp', gbpPerEur: number | null, rateDate: string | null }`.
   The effective currency is GBP only when GBP is chosen and a rate is known.
