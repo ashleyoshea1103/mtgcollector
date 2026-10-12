@@ -1,5 +1,5 @@
 import { within } from '@testing-library/react';
-import { formatPrice } from '../lib/price';
+import { formatPrice, toPounds } from '../lib/price';
 
 /**
  * How a EUR / USD amount is displayed, in whatever locale the tests run in.
@@ -9,6 +9,8 @@ import { formatPrice } from '../lib/price';
 const normalise = (s: string) => s.replace(/\s+/g, ' ');
 export const eur = (amount: number | null) => (amount == null ? '—' : normalise(formatPrice(amount)));
 export const usd = (amount: number | null) => (amount == null ? '—' : normalise(formatPrice(amount, 'usd')));
+/** A euro amount as it's shown in pounds at the test rate (ratesApi's 0.8712): "≈", the hidden "about ", the amount. */
+export const pounds = (euros: number | null, rate = 0.8712) => (euros == null ? '—' : `≈about ${normalise(formatPrice(toPounds(euros, rate), 'gbp'))}`);
 
 /** A table row's cells keyed by their column header text, so assertions can't hit the wrong column. */
 export function cellsByColumn(row: HTMLElement): Record<string, HTMLElement> {

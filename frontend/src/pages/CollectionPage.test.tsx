@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { colorGroups, customGroups, entries, makeEntry, makeGroup, cards, stats } from '../fixtures';
 import { keys } from '../api/keys';
 import { ann, renderApp, signedIn, type FakeRequest, type Routes } from '../test/app';
+import { pounds } from '../test/helpers';
 import { cardPath } from '../lib/paths';
 import type { CardSummary, CollectionEntry, GroupSummary } from '../types';
 
@@ -21,6 +22,21 @@ const collection: Routes = {
 const main = () => within(screen.getByRole('main'));
 const section = (label: RegExp) => screen.getByRole('button', { name: label }).closest('.group-bucket') as HTMLElement;
 const keysAsked = (requests: FakeRequest[]) => requests.map((r) => r.query.get('key'));
+
+describe('CollectionPage, in pounds', () => {
+  afterEach(() => localStorage.clear());
+
+  it('shows every value in pounds when GBP is chosen, a missing price still as a dash', async () => {
+    localStorage.setItem('mtgcollector-currency', 'gbp');
+    renderApp('/collection', collection);
+    const summary = await main().findByRole('region', { name: 'Collection summary' });
+    expect(summary).toHaveTextContent(pounds(stats.value_eur));
+    for (const e of all) {
+      const tile = (await main().findByRole('heading', { name: e.card.name })).closest('article')!;
+      expect(tile.querySelector('.entry-tile__value')).toHaveTextContent(e.value_eur == null ? '—' : `Value ${pounds(e.value_eur)}`);
+    }
+  });
+});
 
 describe('CollectionPage, the larger card view', () => {
   it("opens from a card's image, links to the card's page, and gives focus back on closing", async () => {
