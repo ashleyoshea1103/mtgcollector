@@ -2,8 +2,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, entries, serverPricedBolts } from '../fixtures';
-import { eur, getAllByTooltip, getByTooltip, pounds, poundsSeen, queryByTooltip, visibleText } from '../test/helpers';
-import { MoneyContext, type Money } from '../lib/money';
+import { eur, getAllByTooltip, getByTooltip, inPounds, pounds, poundsSeen, queryByTooltip, visibleText } from '../test/helpers';
+import { MoneyContext } from '../lib/money';
 import { corsIconUrl } from '../lib/urls';
 import { CardTile } from './CardTile';
 import { CollectionEntryTile } from './CollectionEntryTile';
@@ -68,7 +68,6 @@ describe('CardTile', () => {
 });
 
 describe('CollectionEntryTile, the unit price', () => {
-  const inPounds: Money = { chosen: 'gbp', currency: 'gbp', gbpPerEur: 0.8712, rateDate: '2026-10-09', rateStatus: 'ready', choose: () => {} };
   const unit = () => screen.getByRole('article').querySelector('.entry-tile__unit')!;
 
   it('says "each" after a euro price', () => {

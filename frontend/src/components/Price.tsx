@@ -3,16 +3,19 @@ import { formatPrice, priceFor, toPounds, type Currency } from '../lib/price';
 import type { Finish, Prices } from '../types';
 import { TooltipText, VisuallyHidden } from '../ui';
 
-interface Shared {
+interface SharedProps {
   currency?: Currency;
-  /** A price for one copy: " each" follows it. After a price in pounds only screen readers get it ("about £1.79 each"); "≈£1.79" shows. */
+  /**
+   * A price for one copy: " each" follows it. Among pounds (a converted price, or the dash in
+   * its place) only screen readers get it ("about £1.79 each"); "≈£1.79" shows.
+   */
   each?: boolean;
 }
 
 type Props =
-  | (Shared & { prices: Prices; finish?: Finish; value?: never })
+  | (SharedProps & { prices: Prices; finish?: Finish; value?: never })
   /** An already-computed amount, e.g. a line or group total. */
-  | (Shared & { value: number | null; prices?: never; finish?: never });
+  | (SharedProps & { value: number | null; prices?: never; finish?: never });
 
 /**
  * A formatted price, or a dash when Scryfall has no price for it. A euro price shows in
@@ -22,6 +25,9 @@ type Props =
 export function Price({ prices, finish, value, currency = 'eur', each = false }: Props) {
   const money = useMoney();
   const amount = prices ? priceFor(prices, finish, currency) : value;
+  const gbpPerEur = currency === 'eur' && money.currency === 'gbp' ? money.gbpPerEur : null;
+  // Among pounds (a converted price, or the dash beside them), "each" is for screen readers only.
+  const perCopy = each && (gbpPerEur !== null ? <VisuallyHidden> each</VisuallyHidden> : ' each');
 
   if (amount == null) {
     return (
@@ -29,13 +35,13 @@ export function Price({ prices, finish, value, currency = 'eur', each = false }:
         <TooltipText className="price price--none" tooltip="No price available">
           —
         </TooltipText>
-        {each && ' each'}
+        {perCopy}
       </>
     );
   }
 
-  if (currency === 'eur' && money.currency === 'gbp' && money.gbpPerEur !== null) {
-    const pounds = toPounds(amount, money.gbpPerEur);
+  if (gbpPerEur !== null) {
+    const pounds = toPounds(amount, gbpPerEur);
     return (
       <>
         <data className="price price--gbp" value={pounds}>
@@ -43,7 +49,7 @@ export function Price({ prices, finish, value, currency = 'eur', each = false }:
           <VisuallyHidden>about </VisuallyHidden>
           {formatPrice(pounds, 'gbp')}
         </data>
-        {each && <VisuallyHidden> each</VisuallyHidden>}
+        {perCopy}
       </>
     );
   }
@@ -53,7 +59,7 @@ export function Price({ prices, finish, value, currency = 'eur', each = false }:
       <data className={`price price--${currency}`} value={amount}>
         {formatPrice(amount, currency)}
       </data>
-      {each && ' each'}
+      {perCopy}
     </>
   );
 }

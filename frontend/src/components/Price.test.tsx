@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { cards, unpricedCard } from '../fixtures';
 import type { ReactNode } from 'react';
 import { MoneyContext, type Money } from '../lib/money';
-import { eur, getByTooltip, pounds, usd } from '../test/helpers';
+import { eur, getByTooltip, inPounds, pounds, poundsSeen, readText, usd, visibleText } from '../test/helpers';
 import { Price } from './Price';
 import { TotalValue } from './TotalValue';
 
@@ -48,7 +48,6 @@ describe('Price', () => {
   });
 });
 
-const inPounds: Money = { chosen: 'gbp', currency: 'gbp', gbpPerEur: 0.8712, rateDate: '2026-10-09', rateStatus: 'ready', choose: () => {} };
 const showing = (money: Money) => ({ wrapper: ({ children }: { children: ReactNode }) => <MoneyContext value={money}>{children}</MoneyContext> });
 
 describe('Price, in pounds', () => {
@@ -77,6 +76,37 @@ describe('Price, in pounds', () => {
     const { container } = render(<Price value={2.06} />, showing({ ...inPounds, chosen: 'gbp', currency: 'eur' }));
     expect(container).toHaveTextContent(eur(2.06));
     expect(container).not.toHaveTextContent('≈');
+  });
+
+  describe('a price for one copy (each)', () => {
+    it('says "each" after euros, dollars and the dash while euros are in effect', () => {
+      const { container, rerender } = render(<Price value={2.06} each />);
+      expect(visibleText(container)).toBe(`${eur(2.06)} each`);
+      rerender(<Price prices={ragavan.prices} currency="usd" each />);
+      expect(visibleText(container)).toBe(`${usd(ragavan.prices.usd)} each`);
+      rerender(<Price value={null} each />);
+      expect(visibleText(container)).toBe('— each');
+    });
+
+    it('shows no "each" after pounds, or after the dash among them, though both still read it out', () => {
+      const { container, rerender } = render(<Price value={2.06} each />, showing(inPounds));
+      expect(visibleText(container)).toBe(poundsSeen(2.06));
+      expect(readText(container)).toBe(`${pounds(2.06)} each`);
+      rerender(<Price value={null} each />);
+      expect(visibleText(container)).toBe('—');
+      // The dash's tooltip is read out between them.
+      expect(readText(container)).toMatch(/^—.* each$/);
+    });
+
+    it('keeps "each" after dollars while pounds are in effect, as dollars are not converted', () => {
+      const { container } = render(<Price prices={ragavan.prices} currency="usd" each />, showing(inPounds));
+      expect(visibleText(container)).toBe(`${usd(ragavan.prices.usd)} each`);
+    });
+
+    it('says nothing after a price that is not for one copy', () => {
+      const { container } = render(<Price value={2.06} />, showing(inPounds));
+      expect(readText(container)).toBe(pounds(2.06));
+    });
   });
 
   it("converts a partly priced total, keeping the count of cards it couldn't price", () => {

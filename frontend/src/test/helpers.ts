@@ -1,4 +1,5 @@
 import { within } from '@testing-library/react';
+import type { Money } from '../lib/money';
 import { formatPrice, toPounds } from '../lib/price';
 
 /**
@@ -15,11 +16,17 @@ export const pounds = (euros: number | null, rate = 0.8712) => (euros == null ? 
 /** A euro amount in pounds as sighted readers see it: "≈£1.79", without the hidden "about ". */
 export const poundsSeen = (euros: number, rate = 0.8712) => `≈${normalise(formatPrice(toPounds(euros, rate), 'gbp'))}`;
 
+/** Pounds in effect at the test rate, for rendering a component in a MoneyContext. */
+export const inPounds: Money = { chosen: 'gbp', currency: 'gbp', gbpPerEur: 0.8712, rateDate: '2026-10-09', rateStatus: 'ready', choose: () => {} };
+
+/** An element's text as it's read out (visually hidden parts included), spaces normalised. */
+export const readText = (el: Element): string => normalise(el.textContent ?? '').trim();
+
 /** The text sighted readers see in an element: without its visually hidden parts, spaces normalised. */
 export function visibleText(el: Element): string {
   const copy = el.cloneNode(true) as Element;
   copy.querySelectorAll('.visually-hidden').forEach((hidden) => hidden.remove());
-  return normalise(copy.textContent ?? '').trim();
+  return readText(copy);
 }
 
 /** A table row's cells keyed by their column header text, so assertions can't hit the wrong column. */

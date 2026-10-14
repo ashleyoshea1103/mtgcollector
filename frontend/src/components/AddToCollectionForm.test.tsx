@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, customGroups } from '../fixtures';
 import { LANGUAGES } from '../lib/labels';
-import { eur, getByTooltip, pounds, poundsSeen, visibleText } from '../test/helpers';
-import { MoneyContext, type Money } from '../lib/money';
+import { eur, getByTooltip, inPounds, pounds, poundsSeen, readText, visibleText } from '../test/helpers';
+import { MoneyContext } from '../lib/money';
 import { corsIconUrl } from '../lib/urls';
 import type { NewEntry } from '../types';
 import { AddToCollectionForm } from './AddToCollectionForm';
@@ -24,7 +24,6 @@ describe('AddToCollectionForm', () => {
   });
 
   it('says "each" after a euro price, and not after a pound price, though it is still read out', () => {
-    const inPounds: Money = { chosen: 'gbp', currency: 'gbp', gbpPerEur: 0.8712, rateDate: '2026-10-09', rateStatus: 'ready', choose: () => {} };
     const { container, rerender } = render(<AddToCollectionForm card={lightningBolt} onSubmit={vi.fn<(entry: NewEntry) => void>()} />);
     // What follows the last " at ": the price, and whatever comes after it.
     const atThePrice = (text: string) => text.slice(text.lastIndexOf(' at ') + 1);
@@ -38,7 +37,7 @@ describe('AddToCollectionForm', () => {
     );
     const inGbp = container.querySelector('.add-form__card')!;
     expect(atThePrice(visibleText(inGbp))).toBe(`at ${poundsSeen(lightningBolt.prices.eur!)}`);
-    expect(atThePrice(inGbp.textContent!.replace(/\s+/g, ' ').trim())).toBe(`at ${pounds(lightningBolt.prices.eur)} each`);
+    expect(atThePrice(readText(inGbp))).toBe(`at ${pounds(lightningBolt.prices.eur)} each`);
   });
 
   it('submits one near-mint English copy by default', async () => {

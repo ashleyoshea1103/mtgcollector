@@ -88,7 +88,7 @@ export function ComponentGallery() {
         </ul>
       </Section>
 
-      <Section name="Price" note="Foil falls back to the non-foil price when there's no foil price; etched USD uses the etched price; missing prices show a dash.">
+      <Section name="Price" note={`Foil falls back to the non-foil price when there's no foil price; etched USD uses the etched price; missing prices show a dash. A price for one copy says "each"; among pounds, only to screen readers.`}>
         <ul>
           <li>
             Ragavan non-foil: <Price prices={cards.ragavan.prices} />
@@ -105,6 +105,9 @@ export function ComponentGallery() {
           <li>
             Unpriced Llanowar Elves: <Price prices={unpricedCard.prices} />
           </li>
+          <li>
+            Ragavan non-foil, one copy: <Price prices={cards.ragavan.prices} each />
+          </li>
           <MoneyContext value={IN_POUNDS}>
             <li>
               Ragavan non-foil, in pounds: <Price prices={cards.ragavan.prices} />
@@ -114,6 +117,9 @@ export function ComponentGallery() {
             </li>
             <li>
               Unpriced Llanowar Elves, in pounds: <Price prices={unpricedCard.prices} />
+            </li>
+            <li>
+              Ragavan non-foil, one copy, in pounds ("each" is read out, not shown): <Price prices={cards.ragavan.prices} each />
             </li>
           </MoneyContext>
         </ul>
