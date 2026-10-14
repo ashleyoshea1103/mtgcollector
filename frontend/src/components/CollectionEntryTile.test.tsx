@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { cards, entries, serverPricedBolts } from '../fixtures';
+import { cards, entries, makeEntry, serverPricedBolts } from '../fixtures';
 import { eur, getAllByTooltip, getByTooltip, inPounds, pounds, poundsSeen, queryByTooltip, visibleText } from '../test/helpers';
 import { MoneyContext } from '../lib/money';
 import { corsIconUrl } from '../lib/urls';
@@ -83,6 +83,22 @@ describe('CollectionEntryTile, the unit price', () => {
     );
     expect(visibleText(unit())).toBe(poundsSeen(entries.bolts.unit_price_eur!));
     expect(unit()).toHaveTextContent(`${pounds(entries.bolts.unit_price_eur)} each`);
+  });
+
+  it('is left out for a single copy, whose value is the same amount', () => {
+    const one = makeEntry(9, cards.lightningBolt, { quantity: 1 });
+    const { rerender } = render(<CollectionEntryTile entry={one} />);
+    const tile = screen.getByRole('article');
+    expect(tile.querySelector('.entry-tile__unit')).toBeNull();
+    expect(tile.querySelector('.entry-tile__value')).toHaveTextContent(`Value ${eur(one.value_eur)}`);
+
+    rerender(
+      <MoneyContext value={inPounds}>
+        <CollectionEntryTile entry={one} />
+      </MoneyContext>,
+    );
+    expect(screen.getByRole('article').querySelector('.entry-tile__unit')).toBeNull();
+    expect(screen.getByRole('article').querySelector('.entry-tile__value')).toHaveTextContent(`Value ${pounds(one.value_eur)}`);
   });
 });
 
