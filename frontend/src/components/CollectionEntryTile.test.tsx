@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { cards, entries, makeEntry, serverPricedBolts } from '../fixtures';
+import { cards, entries, makeEntry, serverPricedBolts, unpricedCard } from '../fixtures';
 import { eur, getAllByTooltip, getByTooltip, inPounds, pounds, poundsSeen, queryByTooltip, visibleText } from '../test/helpers';
 import { MoneyContext } from '../lib/money';
 import { corsIconUrl } from '../lib/urls';
@@ -91,6 +91,7 @@ describe('CollectionEntryTile, the unit price', () => {
     const tile = screen.getByRole('article');
     expect(tile.querySelector('.entry-tile__unit')).toBeNull();
     expect(tile.querySelector('.entry-tile__value')).toHaveTextContent(`Value ${eur(one.value_eur)}`);
+    expect(tile).not.toHaveTextContent(/each/);
 
     rerender(
       <MoneyContext value={inPounds}>
@@ -99,6 +100,12 @@ describe('CollectionEntryTile, the unit price', () => {
     );
     expect(screen.getByRole('article').querySelector('.entry-tile__unit')).toBeNull();
     expect(screen.getByRole('article').querySelector('.entry-tile__value')).toHaveTextContent(`Value ${pounds(one.value_eur)}`);
+    expect(screen.getByRole('article')).not.toHaveTextContent(/each/);
+  });
+
+  it('shows an unpriced single copy as one dash', () => {
+    render(<CollectionEntryTile entry={makeEntry(10, unpricedCard, { quantity: 1 })} />);
+    expect(screen.getByRole('article').querySelectorAll('.price--none')).toHaveLength(1);
   });
 });
 

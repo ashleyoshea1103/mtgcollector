@@ -404,7 +404,6 @@ a.button:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
   gap: var(--spacing-2);
   margin-top: 0.125rem;
 }

@@ -226,6 +226,14 @@ describe('GroupPage, more', () => {
     expect(members[0].value_eur).not.toBe(entries.bolts.value_eur);
   });
 
+  it('shows only the value for one copy in the group, though the collection holds more', async () => {
+    const one = member(entries.bolts, 1);
+    renderApp(`/groups/${binder.id}`, { ...groupApi(), 'GET /api/groups/:id/members': { body: { members: [one], next_cursor: null } } });
+    const bolts = (await main().findByRole('heading', { name: entries.bolts.card.name })).closest('article')!;
+    expect(bolts.querySelector('.entry-tile__unit')).toBeNull();
+    expect(bolts.querySelector('.entry-tile__value')).toHaveTextContent(`Value ${eur(one.value_eur)}`);
+  });
+
   it('takes a deleted group out of the groups list at once, before the list is fetched again', async () => {
     let slowList = false;
     const { user } = renderApp('/groups', {
