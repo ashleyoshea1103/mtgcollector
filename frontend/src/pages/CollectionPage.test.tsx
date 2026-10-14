@@ -2,7 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { colorGroups, customGroups, entries, makeEntry, makeGroup, cards, stats } from '../fixtures';
 import { keys } from '../api/keys';
-import { ann, renderApp, signedIn, type FakeRequest, type Routes } from '../test/app';
+import { ann, ratesApi, renderApp, signedIn, type FakeRequest, type Reply, type Routes } from '../test/app';
 import { pounds } from '../test/helpers';
 import { cardPath } from '../lib/paths';
 import type { CardSummary, CollectionEntry, GroupSummary } from '../types';
@@ -41,6 +41,37 @@ describe('CollectionPage, in pounds', () => {
     const summary = await main().findByRole('region', { name: 'Collection summary' });
     expect(summary).not.toHaveTextContent('≈');
     expect(summary).toHaveTextContent('€');
+  });
+
+  it("doesn't say the rate is missing while it's still coming", async () => {
+    localStorage.setItem('mtgcollector-currency', 'gbp');
+    let send!: () => void;
+    const sent = new Promise<void>((resolve) => (send = resolve));
+    renderApp('/collection', {
+      ...collection,
+      'GET /api/rates': async () => {
+        await sent;
+        return ratesApi['GET /api/rates'] as Reply;
+      },
+    });
+    await main().findByRole('region', { name: 'Collection summary' });
+    expect(main().queryByText("Pound prices aren't available yet, so these are in euros.")).not.toBeInTheDocument();
+    send();
+    expect(await main().findByText("Cardmarket's euro prices in pounds, at the ECB rate of 9 Oct 2026 (€1 = £0.8712)")).toBeInTheDocument();
+  });
+
+  it('treats a malformed rate as no rate', async () => {
+    localStorage.setItem('mtgcollector-currency', 'gbp');
+    for (const rate of [
+      { currency: 'GBP', per_eur: 0, date: '2026-10-09' },
+      { currency: 'GBP', per_eur: -0.87, date: '2026-10-09' },
+      { currency: 'GBP', per_eur: 0.8712, date: 'soon' },
+    ]) {
+      const { unmount } = renderApp('/collection', { ...collection, 'GET /api/rates': { body: { rates: [rate] } } });
+      expect(await main().findByText("Pound prices aren't available yet, so these are in euros.")).toBeInTheDocument();
+      expect(await main().findByRole('region', { name: 'Collection summary' })).not.toHaveTextContent('≈');
+      unmount();
+    }
   });
 
   it('shows every value in pounds when GBP is chosen, a missing price still as a dash', async () => {

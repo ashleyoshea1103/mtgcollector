@@ -17,7 +17,8 @@ function day(date: string): string {
 
 /**
  * Says once, on a page that shows prices, where pounds come from: Cardmarket's euro prices at
- * the ECB's rate of a given day. Pounds chosen without a rate say why prices are in euros.
+ * the ECB's rate of a given day. Pounds chosen without a rate say why prices are in euros, once
+ * it's known there isn't one: nothing is said while the rate is still coming.
  */
 export function RateNote({ euros, className }: Props) {
   const money = useMoney();
@@ -25,7 +26,7 @@ export function RateNote({ euros, className }: Props) {
   if (money.currency === 'gbp' && money.gbpPerEur !== null && money.rateDate !== null) {
     text = `Cardmarket's euro prices in pounds, at the ECB rate of ${day(money.rateDate)} (€1 = £${money.gbpPerEur})`;
   } else if (money.chosen === 'gbp') {
-    text = "Pound prices aren't available yet, so these are in euros.";
+    text = money.rateStatus === 'pending' ? undefined : "Pound prices aren't available yet, so these are in euros.";
   } else {
     text = euros;
   }

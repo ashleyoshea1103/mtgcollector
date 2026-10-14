@@ -48,7 +48,7 @@ describe('Price', () => {
   });
 });
 
-const inPounds: Money = { chosen: 'gbp', currency: 'gbp', gbpPerEur: 0.8712, rateDate: '2026-10-09', choose: () => {} };
+const inPounds: Money = { chosen: 'gbp', currency: 'gbp', gbpPerEur: 0.8712, rateDate: '2026-10-09', rateStatus: 'ready', choose: () => {} };
 const showing = (money: Money) => ({ wrapper: ({ children }: { children: ReactNode }) => <MoneyContext value={money}>{children}</MoneyContext> });
 
 describe('Price, in pounds', () => {

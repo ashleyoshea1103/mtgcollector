@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { useCreateGroup, useCustomGroups } from '../api/queries';
 import { CustomGroupCard } from '../components/CustomGroupCard';
 import { GroupForm } from '../components/GroupForm';
+import { RateNote } from '../components/RateNote';
 import { errorMessage } from '../lib/messages';
 import { groupPath } from '../lib/paths';
 import { Button, Cluster, Dialog, EmptyState, ErrorState, Grid, Loading, Stack, toast } from '../ui';
@@ -43,6 +44,7 @@ export function GroupsPage() {
         </EmptyState>
       ) : (
         <>
+          <RateNote />
           <h2 className="visually-hidden">Your groups</h2>
           <Grid as="ul" minItemWidth="260px" className="group-grid">
             {groups.data.map((g) => (

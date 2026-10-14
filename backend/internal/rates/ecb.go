@@ -52,8 +52,8 @@ type envelope struct {
 
 // ParseDaily reads the ECB's daily rates file and returns currency's rate. It refuses (with
 // ErrInvalid) a file that isn't the ECB's shape, a missing, repeated or malformed rate, a rate
-// outside a sane range, and a date after tomorrow: ECB time is ahead of UTC, so late in a UTC
-// day the file can be dated tomorrow, but no further.
+// outside a sane range, and a date after today in UTC: the ECB publishes a day's rates that
+// afternoon, so a real file never is, and the store would keep a future date's rate for days.
 func ParseDaily(r io.Reader, currency string, now time.Time) (Rate, error) {
 	var file envelope
 	if err := xml.NewDecoder(r).Decode(&file); err != nil {
@@ -67,8 +67,7 @@ func ParseDaily(r io.Reader, currency string, now time.Time) (Rate, error) {
 	if err != nil {
 		return Rate{}, fmt.Errorf("%w: the day %q isn't a date", ErrInvalid, day.Time)
 	}
-	today := now.UTC()
-	if tomorrow := time.Date(today.Year(), today.Month(), today.Day()+1, 0, 0, 0, 0, time.UTC); date.After(tomorrow) {
+	if today := now.UTC().Truncate(24 * time.Hour); date.After(today) {
 		return Rate{}, fmt.Errorf("%w: the rates are dated %s, in the future", ErrInvalid, day.Time)
 	}
 
@@ -106,12 +105,16 @@ type Source interface {
 	Daily(ctx context.Context) (Rate, error)
 }
 
-// The client for the ECB: it follows a redirect only to the ECB itself, over HTTPS.
+// The client for the ECB: it follows a redirect only to the ECB itself, over HTTPS, and at most
+// five of them.
 var ecbClient = &http.Client{
 	Timeout: fetchTimeout,
 	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if req.URL.Scheme != "https" || req.URL.Host != "www.ecb.europa.eu" || len(via) >= 5 {
+		if req.URL.Scheme != "https" || req.URL.Host != "www.ecb.europa.eu" {
 			return fmt.Errorf("redirected away from the ECB, to %s", req.URL.Redacted())
+		}
+		if len(via) >= 5 {
+			return fmt.Errorf("too many redirects within the ECB, the last to %s", req.URL.Redacted())
 		}
 		return nil
 	},

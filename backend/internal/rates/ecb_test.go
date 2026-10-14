@@ -64,15 +64,26 @@ func TestParseDailyRefusesUnusableFiles(t *testing.T) {
 	}
 }
 
-// ECB time (Frankfurt) is ahead of UTC, so late in a UTC day the file can be dated tomorrow.
-func TestParseDailyAcceptsTomorrow(t *testing.T) {
-	late := time.Date(2026, 10, 10, 23, 0, 0, 0, time.UTC)
+// The ECB publishes a day's rates that afternoon (about 16:00 Frankfurt time, 14:00 or 15:00
+// UTC), so a real file is never dated after today in UTC. One dated tomorrow is refused, even
+// late in the UTC day: the store keeps the latest date, so it would pin its rate for days.
+func TestParseDailyRefusesTomorrow(t *testing.T) {
+	late := time.Date(2026, 10, 10, 23, 59, 0, 0, time.UTC)
 	got, err := ParseDaily(strings.NewReader(daily("2026-10-11", `<Cube currency='GBP' rate='0.8712'/>`)), "GBP", late)
+	if !errors.Is(err, ErrInvalid) {
+		t.Errorf("got %+v, %v; want a file dated tomorrow refused", got, err)
+	}
+}
+
+// Today is the day, whatever the time: the check compares dates.
+func TestParseDailyAcceptsToday(t *testing.T) {
+	midnight := time.Date(2026, 10, 10, 0, 0, 0, 0, time.UTC)
+	got, err := ParseDaily(strings.NewReader(daily("2026-10-10", `<Cube currency='GBP' rate='0.8712'/>`)), "GBP", midnight)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC); !got.Date.Equal(want) {
-		t.Errorf("date %v, want %v", got.Date, want)
+	if !got.Date.Equal(midnight) {
+		t.Errorf("date %v, want %v", got.Date, midnight)
 	}
 }
 
@@ -107,6 +118,48 @@ func TestECBDailyRefusesAnOversizedBody(t *testing.T) {
 	defer srv.Close()
 	if _, err := (ECB{URL: srv.URL, Client: srv.Client()}).Daily(t.Context()); err == nil {
 		t.Error("a 65 KB body was accepted")
+	}
+}
+
+// The ECB client follows redirects only within the ECB, over HTTPS, and only a few of them; the
+// error says which refusal it was.
+func TestECBClientRedirectsOnlyWithinTheECB(t *testing.T) {
+	to := func(url string) *http.Request {
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return req
+	}
+	from := []*http.Request{to(DailyURL)}
+	if err := ecbClient.CheckRedirect(to("https://www.ecb.europa.eu/stats/eurofxref/moved.xml"), from); err != nil {
+		t.Errorf("a redirect within the ECB was refused: %v", err)
+	}
+	for _, url := range []string{
+		"http://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml",
+		"https://ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml",
+		"https://www.ecb.europa.eu.example.com/eurofxref-daily.xml",
+		"https://example.com/eurofxref-daily.xml",
+	} {
+		if err := ecbClient.CheckRedirect(to(url), from); err == nil || !strings.Contains(err.Error(), "away from the ECB") {
+			t.Errorf("redirect to %s: got %v, want it refused as leaving the ECB", url, err)
+		}
+	}
+	loop := []*http.Request{from[0], from[0], from[0], from[0], from[0]}
+	if err := ecbClient.CheckRedirect(to(DailyURL), loop); err == nil || !strings.Contains(err.Error(), "too many redirects") {
+		t.Errorf("a sixth redirect within the ECB: got %v, want it refused as too many redirects", err)
+	}
+}
+
+// Daily's default client is the ECB client: a redirect elsewhere is refused before it's followed.
+func TestECBDailyRefusesARedirectAway(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "https://example.com/eurofxref-daily.xml", http.StatusFound)
+	}))
+	defer srv.Close()
+	_, err := ECB{URL: srv.URL}.Daily(t.Context())
+	if err == nil || !strings.Contains(err.Error(), "away from the ECB") {
+		t.Errorf("got %v, want the redirect refused", err)
 	}
 }
 

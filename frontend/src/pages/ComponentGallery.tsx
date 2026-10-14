@@ -37,8 +37,8 @@ const allEntries = Object.values(entries);
 const imageless: Card = { ...cards.lightningBolt, id: 'imageless', images: null };
 
 // How prices are shown, in each state, for the gallery's examples (the app's comes from the server's rate).
-const IN_EUROS: Money = { chosen: 'eur', currency: 'eur', gbpPerEur: null, rateDate: null, choose: () => {} };
-const IN_POUNDS: Money = { ...IN_EUROS, chosen: 'gbp', currency: 'gbp', gbpPerEur: 0.8712, rateDate: '2026-10-09' };
+const IN_EUROS: Money = { chosen: 'eur', currency: 'eur', gbpPerEur: null, rateDate: null, rateStatus: 'unavailable', choose: () => {} };
+const IN_POUNDS: Money = { ...IN_EUROS, chosen: 'gbp', currency: 'gbp', gbpPerEur: 0.8712, rateDate: '2026-10-09', rateStatus: 'ready' };
 const NO_RATE: Money = { ...IN_EUROS, chosen: 'gbp' };
 
 /** Every presentational component rendered with fixture data, then every src/ui primitive, for review before styling. */

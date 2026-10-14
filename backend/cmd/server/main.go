@@ -8,10 +8,10 @@
 //	               the password comes from pgpass, see scripts/setup-dev-db.sh)
 //	ADDR           address to listen on (default: 127.0.0.1:8080, where the Vite dev proxy sends /api)
 //	SCRYFALL_SYNC  "daily" (the default) or "off"; `go run ./cmd/sync` imports on demand.
-//	RATES_SYNC     "daily" (the default) or "off": fetching the ECB's euro exchange rate,
-//	               for showing prices in pounds.
 //	               With several server instances, leave it on for one: the others would
 //	               only find the import lock taken.
+//	RATES_SYNC     "daily" (the default) or "off": fetching the ECB's euro exchange rate,
+//	               for showing prices in pounds.
 //	ALLOWED_HOSTS  the host names the site is reached by, comma-separated (default:
 //	               localhost,127.0.0.1,::1). Requests for any other Host are refused.
 //	STATIC_DIR     the built frontend (frontend/dist) to serve at /, with its

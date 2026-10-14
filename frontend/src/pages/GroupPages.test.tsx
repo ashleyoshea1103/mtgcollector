@@ -81,6 +81,24 @@ describe('GroupsPage', () => {
   });
 });
 
+describe('GroupsPage, in pounds', () => {
+  afterEach(() => localStorage.clear());
+
+  it("notes the rate once beside the groups' values, and nothing in euros", async () => {
+    const { user } = renderApp('/groups', groupApi());
+    await main().findByRole('heading', { name: binder.name });
+    expect(main().queryByText(/ECB rate/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'GBP' }));
+    expect(await main().findAllByText("Cardmarket's euro prices in pounds, at the ECB rate of 9 Oct 2026 (€1 = £0.8712)")).toHaveLength(1);
+  });
+
+  it("says why the values are in euros when there's no rate yet", async () => {
+    localStorage.setItem('mtgcollector-currency', 'gbp');
+    renderApp('/groups', { ...groupApi(), 'GET /api/rates': { body: { rates: [] } } });
+    expect(await main().findByText("Pound prices aren't available yet, so these are in euros.")).toBeInTheDocument();
+  });
+});
+
 describe('GroupPage, in pounds', () => {
   afterEach(() => localStorage.clear());
 

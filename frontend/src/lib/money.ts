@@ -1,6 +1,9 @@
 import { createContext, useContext } from 'react';
 import type { DisplayCurrency } from './currency';
 
+/** Whether the GBP rate is known yet: still coming, here, or not to be had (an error, or none). */
+export type RateStatus = 'pending' | 'ready' | 'unavailable';
+
 /**
  * How prices are shown: the currency chosen, and the one in effect (pounds only once there's
  * a rate to convert with), with the rate and its date. Components read it with useMoney; the
@@ -14,6 +17,7 @@ export interface Money {
   /** Pounds to the euro, and the ECB's date for it (YYYY-MM-DD); null until known. */
   gbpPerEur: number | null;
   rateDate: string | null;
+  rateStatus: RateStatus;
   choose: (currency: DisplayCurrency) => void;
 }
 
@@ -23,6 +27,7 @@ export const MoneyContext = createContext<Money>({
   currency: 'eur',
   gbpPerEur: null,
   rateDate: null,
+  rateStatus: 'unavailable',
   choose: () => {},
 });
 
