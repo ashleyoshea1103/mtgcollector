@@ -12,6 +12,16 @@ export const usd = (amount: number | null) => (amount == null ? '—' : normalis
 /** A euro amount as it's shown in pounds at the test rate (ratesApi's 0.8712): "≈", the hidden "about ", the amount. */
 export const pounds = (euros: number | null, rate = 0.8712) => (euros == null ? '—' : `≈about ${normalise(formatPrice(toPounds(euros, rate), 'gbp'))}`);
 
+/** A euro amount in pounds as sighted readers see it: "≈£1.79", without the hidden "about ". */
+export const poundsSeen = (euros: number, rate = 0.8712) => `≈${normalise(formatPrice(toPounds(euros, rate), 'gbp'))}`;
+
+/** The text sighted readers see in an element: without its visually hidden parts, spaces normalised. */
+export function visibleText(el: Element): string {
+  const copy = el.cloneNode(true) as Element;
+  copy.querySelectorAll('.visually-hidden').forEach((hidden) => hidden.remove());
+  return normalise(copy.textContent ?? '').trim();
+}
+
 /** A table row's cells keyed by their column header text, so assertions can't hit the wrong column. */
 export function cellsByColumn(row: HTMLElement): Record<string, HTMLElement> {
   const table = row.closest('table')!;

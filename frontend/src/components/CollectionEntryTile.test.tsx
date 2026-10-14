@@ -2,7 +2,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, entries, serverPricedBolts } from '../fixtures';
-import { eur, getAllByTooltip, getByTooltip, queryByTooltip } from '../test/helpers';
+import { eur, getAllByTooltip, getByTooltip, pounds, poundsSeen, queryByTooltip, visibleText } from '../test/helpers';
+import { MoneyContext, type Money } from '../lib/money';
 import { corsIconUrl } from '../lib/urls';
 import { CardTile } from './CardTile';
 import { CollectionEntryTile } from './CollectionEntryTile';
@@ -64,6 +65,26 @@ describe('CardTile', () => {
     expect(queryByTooltip(document.body, 'No price available')).not.toBeInTheDocument();
   });
 
+});
+
+describe('CollectionEntryTile, the unit price', () => {
+  const inPounds: Money = { chosen: 'gbp', currency: 'gbp', gbpPerEur: 0.8712, rateDate: '2026-10-09', rateStatus: 'ready', choose: () => {} };
+  const unit = () => screen.getByRole('article').querySelector('.entry-tile__unit')!;
+
+  it('says "each" after a euro price', () => {
+    render(<CollectionEntryTile entry={entries.bolts} />);
+    expect(visibleText(unit())).toBe(`${eur(entries.bolts.unit_price_eur)} each`);
+  });
+
+  it('shows a pound price without "each", though it is still read out', () => {
+    render(
+      <MoneyContext value={inPounds}>
+        <CollectionEntryTile entry={entries.bolts} />
+      </MoneyContext>,
+    );
+    expect(visibleText(unit())).toBe(poundsSeen(entries.bolts.unit_price_eur!));
+    expect(unit()).toHaveTextContent(`${pounds(entries.bolts.unit_price_eur)} each`);
+  });
 });
 
 describe('CollectionEntryTile', () => {

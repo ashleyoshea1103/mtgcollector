@@ -37,7 +37,7 @@ export function CollectionEntryTile({ entry, actions, onView }: Props) {
       </Cluster>
       <p className="entry-tile__price">
         <span className="entry-tile__unit">
-          <Price value={entry.unit_price_eur} /> each
+          <Price value={entry.unit_price_eur} each />
         </span>
         <span className="entry-tile__value">
           <VisuallyHidden>Value </VisuallyHidden>
