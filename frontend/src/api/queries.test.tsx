@@ -1,12 +1,12 @@
 import { QueryClientProvider, type QueryKey } from '@tanstack/react-query';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { cards, customGroups, entries } from '../fixtures';
 import { EMPTY_SEARCH } from '../lib/search';
-import { ann, fakeApi, type Routes } from '../test/app';
-import { MaxSearchPage } from '../types';
-import { keys } from './keys';
+import { ann, fakeApi, type FakeRequest, type Reply, type Routes } from '../test/app';
+import { MaxSearchPage, type GroupBy } from '../types';
+import { keys, type ListingId } from './keys';
 import * as q from './queries';
 import { createQueryClient } from './queryClient';
 
@@ -17,15 +17,15 @@ const [binder, deck] = customGroups;
 const cached: Record<string, QueryKey> = {
   stats: keys.stats,
   copies: keys.copies(cards.lightningBolt.id),
-  'collection groups': keys.listingGroups(null, 'none'),
-  'collection entries': keys.listingEntries(null, 'none', 'all', 'name'),
+  'collection groups': keys.listingGroups(null, 'none', ''),
+  'collection entries': keys.listingEntries(null, 'none', 'all', 'name', ''),
   'groups list': keys.groupList,
   'binder': keys.group(binder.id),
-  'binder groups': keys.listingGroups(binder.id, 'none'),
-  'binder entries': keys.listingEntries(binder.id, 'none', 'all', 'name'),
+  'binder groups': keys.listingGroups(binder.id, 'none', ''),
+  'binder entries': keys.listingEntries(binder.id, 'none', 'all', 'name', ''),
   'binder member': keys.member(binder.id, entries.bolts.id),
   'deck': keys.group(deck.id),
-  'deck entries': keys.listingEntries(deck.id, 'none', 'all', 'name'),
+  'deck entries': keys.listingEntries(deck.id, 'none', 'all', 'name', ''),
   'a card': keys.card(cards.lightningBolt.id),
 };
 
@@ -129,5 +129,87 @@ describe('useGroupMember', () => {
     renderHook(() => q.useGroupMember(null, entries.bolts.id), { wrapper });
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(api.requests).toEqual([]);
+  });
+});
+
+describe('a searched listing', () => {
+  const groupsOf = (req: FakeRequest): Reply => ({ body: { group_by: req.query.get('group_by'), groups: [] } });
+  // One entry for "goblin", none for anything else.
+  const entriesOf = (req: FakeRequest): Reply => ({ body: { entries: req.query.get('q') === 'goblin' ? [entries.bolts] : [], next_cursor: null } });
+  /** Routes that answer a search for "slow" only when release() is called. */
+  function slowRoutes(answer: (req: FakeRequest) => Reply, ...routes: string[]) {
+    const held = { release: () => {} };
+    const handler = (req: FakeRequest) =>
+      req.query.get('q') === 'slow' ? new Promise<Reply>((resolve) => (held.release = () => resolve(answer(req)))) : answer(req);
+    return { held, routes: Object.fromEntries(routes.map((r) => [r, handler])) as Routes };
+  }
+
+  it('sends the search only when there is one, as typed, and its groups say which search they are for', async () => {
+    const { wrapper, api } = setup({ 'GET /api/collection/groups': groupsOf, 'GET /api/groups/:id/groups': groupsOf });
+    const { rerender, result } = renderHook(({ id, search }) => q.useListingGroups(id, 'color', search), {
+      wrapper,
+      initialProps: { id: null as ListingId, search: '' },
+    });
+    await waitFor(() => expect(result.current.data?.q).toBe(''));
+    rerender({ id: null, search: "R&D's +1 #2" });
+    await waitFor(() => expect(result.current.data?.q).toBe("R&D's +1 #2"));
+    rerender({ id: binder.id, search: 'goblin' });
+    await waitFor(() => expect(result.current.data?.q).toBe('goblin'));
+    expect(api.requests.map((r) => [r.path, r.query.get('q')])).toEqual([
+      ['/api/collection/groups', null],
+      ['/api/collection/groups', "R&D's +1 #2"],
+      [`/api/groups/${binder.id}/groups`, 'goblin'],
+    ]);
+  });
+
+  it("keeps the last search's groups up while the next search's load, but not another grouping's or listing's", async () => {
+    const { held, routes } = slowRoutes(groupsOf, 'GET /api/collection/groups', 'GET /api/groups/:id/groups');
+    const { wrapper } = setup(routes);
+    const { rerender, result } = renderHook(({ id, groupBy, search }) => q.useListingGroups(id, groupBy, search), {
+      wrapper,
+      initialProps: { id: null as ListingId, groupBy: 'color' as GroupBy, search: 'goblin' },
+    });
+    await waitFor(() => expect(result.current.data?.q).toBe('goblin'));
+
+    rerender({ id: null, groupBy: 'color', search: 'slow' });
+    await waitFor(() => expect(result.current.isFetching).toBe(true));
+    expect(result.current.isPlaceholderData).toBe(true);
+    expect(result.current.data?.q).toBe('goblin');
+    act(() => held.release());
+    await waitFor(() => expect(result.current.data?.q).toBe('slow'));
+    expect(result.current.isPlaceholderData).toBe(false);
+
+    rerender({ id: null, groupBy: 'type', search: 'slow' });
+    await waitFor(() => expect(result.current.isFetching).toBe(true));
+    expect(result.current.data).toBeUndefined();
+    act(() => held.release());
+    await waitFor(() => expect(result.current.data?.group_by).toBe('type'));
+
+    rerender({ id: binder.id, groupBy: 'type', search: 'slow' });
+    await waitFor(() => expect(result.current.isFetching).toBe(true));
+    expect(result.current.data).toBeUndefined();
+  });
+
+  it("sends a section's search with its pages, and keeps the last search's entries up while the next search's load", async () => {
+    const { held, routes } = slowRoutes(entriesOf, 'GET /api/collection/entries');
+    const { wrapper, api } = setup(routes);
+    const { rerender, result } = renderHook(({ groupBy, key, search }) => q.useListingEntries(null, groupBy, key, 'cmc', search, true), {
+      wrapper,
+      initialProps: { groupBy: 'none' as GroupBy, key: 'all', search: 'goblin' },
+    });
+    await waitFor(() => expect(result.current.data).toHaveLength(1));
+    expect(api.requests[0].query.get('q')).toBe('goblin');
+
+    rerender({ groupBy: 'none', key: 'all', search: 'slow' });
+    await waitFor(() => expect(result.current.isFetching).toBe(true));
+    expect(result.current.isPlaceholderData).toBe(true);
+    expect(result.current.data).toHaveLength(1);
+    act(() => held.release());
+    await waitFor(() => expect(result.current.data).toEqual([]));
+    expect(result.current.isPlaceholderData).toBe(false);
+
+    rerender({ groupBy: 'color', key: 'R', search: 'slow' });
+    await waitFor(() => expect(result.current.isFetching).toBe(true));
+    expect(result.current.data).toBeUndefined();
   });
 });

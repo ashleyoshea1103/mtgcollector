@@ -6,6 +6,8 @@ export interface ListingParams {
   groupBy: GroupBy;
   sort: SortBy;
   view: CollectionView;
+  /** Words every card listed has in its name or type line, one space apart; '' lists every card. */
+  q: string;
 }
 
 export const GROUP_BY_LABELS: Record<GroupBy, string> = {
@@ -26,7 +28,10 @@ export const SORT_LABELS: Record<SortBy, string> = {
 
 export const VIEW_LABELS: Record<CollectionView, string> = { grid: 'Grid', list: 'List' };
 
-export const DEFAULT_LISTING: ListingParams = { groupBy: 'none', sort: 'name', view: 'grid' };
+export const DEFAULT_LISTING: ListingParams = { groupBy: 'none', sort: 'name', view: 'grid', q: '' };
+
+/** A search as the listing keeps it: its words, one space apart (the server splits it the same way). */
+export const normaliseSearch = (text: string) => text.split(/\s+/).filter(Boolean).join(' ');
 
 const oneOf = <T extends string>(labels: Record<T, string>, value: string | null, fallback: T): T =>
   value !== null && Object.hasOwn(labels, value) ? (value as T) : fallback;
@@ -37,6 +42,7 @@ export function readListing(params: URLSearchParams): ListingParams {
     groupBy: oneOf(GROUP_BY_LABELS, params.get('group_by'), DEFAULT_LISTING.groupBy),
     sort: oneOf(SORT_LABELS, params.get('sort'), DEFAULT_LISTING.sort),
     view: oneOf(VIEW_LABELS, params.get('view'), DEFAULT_LISTING.view),
+    q: normaliseSearch(params.get('q') ?? ''),
   };
 }
 
@@ -47,5 +53,6 @@ export function writeListing(params: URLSearchParams, listing: ListingParams): U
   set('group_by', listing.groupBy, DEFAULT_LISTING.groupBy);
   set('sort', listing.sort, DEFAULT_LISTING.sort);
   set('view', listing.view, DEFAULT_LISTING.view);
+  set('q', normaliseSearch(listing.q), DEFAULT_LISTING.q);
   return out;
 }

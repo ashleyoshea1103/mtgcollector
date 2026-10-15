@@ -364,7 +364,7 @@ describe('refreshing after a change', () => {
     fail = true;
     await act(() => client.invalidateQueries({ queryKey: ['collection'] }));
     // The failures reach the page on a later tick.
-    await waitFor(() => expect(client.getQueryState(keys.listingGroups(null, 'none'))?.status).toBe('error'));
+    await waitFor(() => expect(client.getQueryState(keys.listingGroups(null, 'none', ''))?.status).toBe('error'));
     await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
     expect(main().getByRole('heading', { name: entries.bolts.card.name })).toBeInTheDocument();
     expect(screen.queryByText("Couldn't load these cards.")).not.toBeInTheDocument();

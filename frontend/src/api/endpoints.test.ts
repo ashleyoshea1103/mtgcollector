@@ -25,7 +25,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const page = { groupBy: 'set', key: 'mh2', sort: 'price', cursor: null } as const;
+const page = { groupBy: 'set', key: 'mh2', sort: 'price', cursor: null, q: '' } as const;
 
 describe('endpoints', () => {
   // Each endpoint's method, URL and body, with ids and keys that would break a URL if not encoded.
@@ -36,13 +36,14 @@ describe('endpoints', () => {
     ['autocomplete', () => api.autocomplete('bolt'), 'GET', '/api/cards/autocomplete?q=bolt'],
     ['card', () => api.card('a/b?c'), 'GET', '/api/cards/a%2Fb%3Fc'],
     ['printings', () => api.printings('id', 2), 'GET', '/api/cards/id/printings?page=2'],
-    ['collectionGroups', () => api.collectionGroups('color'), 'GET', '/api/collection/groups?group_by=color'],
+    ['collectionGroups', () => api.collectionGroups('color', ''), 'GET', '/api/collection/groups?group_by=color'],
+    ['collectionGroups, searched', () => api.collectionGroups('color', "R&D's +1 #2"), 'GET', '/api/collection/groups?group_by=color&q=R%26D%27s+%2B1+%232'],
     ['collectionEntries', () => api.collectionEntries(page), 'GET', '/api/collection/entries?group_by=set&key=mh2&sort=price'],
     [
       'collectionEntries, a later page',
-      () => api.collectionEntries({ groupBy: 'type', key: 'R&D', sort: 'name', cursor: 'abc+/=' }),
+      () => api.collectionEntries({ groupBy: 'type', key: 'R&D', sort: 'name', cursor: 'abc+/=', q: 'goblin king' }),
       'GET',
-      '/api/collection/entries?group_by=type&key=R%26D&sort=name&cursor=abc%2B%2F%3D',
+      '/api/collection/entries?group_by=type&key=R%26D&sort=name&cursor=abc%2B%2F%3D&q=goblin+king',
     ],
     ['collectionStats', () => api.collectionStats(), 'GET', '/api/collection/stats'],
     ['cardCopies', () => api.cardCopies('x#y'), 'GET', '/api/collection/cards/x%23y'],
@@ -51,7 +52,8 @@ describe('endpoints', () => {
     ['createGroup', () => api.createGroup({ name: 'B', kind: 'deck', description: '' }), 'POST', '/api/groups', { name: 'B', kind: 'deck', description: '' }],
     ['customGroup', () => api.customGroup(4), 'GET', '/api/groups/4'],
     ['changeGroup', () => api.changeGroup(4, { name: 'C' }), 'PATCH', '/api/groups/4', { name: 'C' }],
-    ['groupGroups', () => api.groupGroups(4, 'rarity'), 'GET', '/api/groups/4/groups?group_by=rarity'],
+    ['groupGroups', () => api.groupGroups(4, 'rarity', ''), 'GET', '/api/groups/4/groups?group_by=rarity'],
+    ['groupGroups, searched', () => api.groupGroups(4, 'rarity', 'elf'), 'GET', '/api/groups/4/groups?group_by=rarity&q=elf'],
     ['groupMembers', () => api.groupMembers(4, page), 'GET', '/api/groups/4/members?group_by=set&key=mh2&sort=price'],
     ['groupMember', () => api.groupMember(4, 7), 'GET', '/api/groups/4/members/7'],
   ])('%s', async (_, call, method, url, body) => {

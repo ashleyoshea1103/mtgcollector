@@ -38,7 +38,7 @@ export function Listing(props: Props) {
 }
 
 function Groups({ listing, params, renderActions, empty, onViewCard }: Props & { onViewCard: (card: CardSummary) => void }) {
-  const groups = useListingGroups(listing, params.groupBy);
+  const groups = useListingGroups(listing, params.groupBy, params.q);
   const client = useQueryClient();
   // A section that goes (its last card removed) takes focus with it: to the first section, then.
   const keepFocus = useFocusFallback<HTMLDivElement>(firstToggle, groups.data);
@@ -92,7 +92,7 @@ interface SectionProps {
 
 function Section({ listing, group, params, defaultOpen, renderActions, onViewCard }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
-  const entries = useListingEntries(listing, params.groupBy, group.key, params.sort, open);
+  const entries = useListingEntries(listing, params.groupBy, group.key, params.sort, params.q, open);
   const rows = entries.data;
   const byId = useMemo(() => new Map(rows?.map((r) => [r.entry.id, r])), [rows]);
   // A card removed (with the Actions button that had focus) leaves focus on the section's heading.

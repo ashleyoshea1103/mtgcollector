@@ -46,9 +46,11 @@ export interface ListingPage {
   sort: SortBy;
   /** The previous page's next_cursor; null for the first page. */
   cursor: string | null;
+  /** Words each entry has in its card's name or type line; '' for every entry (left out). */
+  q: string;
 }
 
-const listingQuery = ({ groupBy, key, sort, cursor }: ListingPage) => ({ group_by: groupBy, key, sort, cursor });
+const listingQuery = ({ groupBy, key, sort, cursor, q }: ListingPage) => ({ group_by: groupBy, key, sort, cursor, q });
 
 /** The signed-in user, or null when nobody is signed in. */
 export async function me(signal?: AbortSignal): Promise<User | null> {
@@ -74,8 +76,8 @@ export const card = (id: string, signal?: AbortSignal) => request<Card>('GET', `
 export const printings = (id: string, page: number, signal?: AbortSignal) =>
   request<CardPage>('GET', `/api/cards/${segment(id)}/printings`, { query: { page }, signal });
 
-export const collectionGroups = (groupBy: GroupBy, signal?: AbortSignal) =>
-  request<CollectionGroups>('GET', '/api/collection/groups', { query: { group_by: groupBy }, signal });
+export const collectionGroups = (groupBy: GroupBy, q: string, signal?: AbortSignal) =>
+  request<CollectionGroups>('GET', '/api/collection/groups', { query: { group_by: groupBy, q }, signal });
 export const collectionEntries = (p: ListingPage, signal?: AbortSignal) =>
   request<EntryPage>('GET', '/api/collection/entries', { query: listingQuery(p), signal });
 export const collectionStats = (signal?: AbortSignal) => request<CollectionStats>('GET', '/api/collection/stats', { signal });
@@ -96,8 +98,8 @@ export const createGroup = (g: NewGroup) => request<CustomGroup>('POST', '/api/g
 export const customGroup = (id: number, signal?: AbortSignal) => request<CustomGroup>('GET', `/api/groups/${segment(id)}`, { signal });
 export const changeGroup = (id: number, change: GroupChange) => request<CustomGroup>('PATCH', `/api/groups/${segment(id)}`, { body: change });
 export const deleteGroup = (id: number) => request<void>('DELETE', `/api/groups/${segment(id)}`);
-export const groupGroups = (id: number, groupBy: GroupBy, signal?: AbortSignal) =>
-  request<CollectionGroups>('GET', `/api/groups/${segment(id)}/groups`, { query: { group_by: groupBy }, signal });
+export const groupGroups = (id: number, groupBy: GroupBy, q: string, signal?: AbortSignal) =>
+  request<CollectionGroups>('GET', `/api/groups/${segment(id)}/groups`, { query: { group_by: groupBy, q }, signal });
 export const groupMembers = (id: number, p: ListingPage, signal?: AbortSignal) =>
   request<GroupMemberPage>('GET', `/api/groups/${segment(id)}/members`, { query: listingQuery(p), signal });
 

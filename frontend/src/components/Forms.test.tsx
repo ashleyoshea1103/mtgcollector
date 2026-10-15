@@ -231,7 +231,7 @@ describe('MemberForm', () => {
 describe('ListingControls', () => {
   it('reports each change with the rest kept', async () => {
     const onChange = vi.fn<(v: ListingParams) => void>();
-    const value: ListingParams = { groupBy: 'color', sort: 'name', view: 'grid' };
+    const value: ListingParams = { groupBy: 'color', sort: 'name', view: 'grid', q: '' };
     render(<ListingControls value={value} onChange={onChange} />);
     expect(screen.getByRole('combobox', { name: 'Group by' })).toHaveValue('color');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Group by' }), 'Mana value');
@@ -257,7 +257,7 @@ describe('ListingControls', () => {
     const measure = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({ height }) as DOMRect);
     onTestFinished(() => measure.mockRestore());
     const root = document.documentElement;
-    const { unmount } = render(<ListingControls value={{ groupBy: 'color', sort: 'name', view: 'grid' }} onChange={() => {}} />);
+    const { unmount } = render(<ListingControls value={{ groupBy: 'color', sort: 'name', view: 'grid', q: '' }} onChange={() => {}} />);
 
     report();
     expect(root.style.getPropertyValue('--toolbar-height')).toBe('66px');
