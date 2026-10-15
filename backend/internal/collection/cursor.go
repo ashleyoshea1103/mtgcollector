@@ -29,7 +29,9 @@ type cursor struct {
 	GroupBy contract.GroupBy `json:"g"`
 	Key     string           `json:"k"`
 	Sort    contract.SortBy  `json:"s"`
-	ID      int64            `json:"id"`
+	// The search's digest (search.digest); none when the listing isn't searched.
+	Search string `json:"q,omitempty"`
+	ID     int64  `json:"id"`
 	// The last entry's sort key: what its listing's order uses.
 	Name     string         `json:"name,omitempty"`
 	Unpriced bool           `json:"unpriced,omitempty"`
@@ -40,7 +42,7 @@ type cursor struct {
 
 // cursorAfter is the cursor for the page after the one ending with r.
 func cursorAfter(q EntryQuery, r store.ListingRow) cursor {
-	c := cursor{Version: cursorVersion, Group: q.group, GroupBy: q.GroupBy, Key: q.Key, Sort: q.Sort, ID: r.ID}
+	c := cursor{Version: cursorVersion, Group: q.group, GroupBy: q.GroupBy, Key: q.Key, Sort: q.Sort, Search: q.search.digest, ID: r.ID}
 	switch q.Sort {
 	case contract.SortByPrice:
 		c.Unpriced, c.Price = !r.UnitPrice.Valid, r.UnitPrice
@@ -81,7 +83,8 @@ func decodeCursor(s string, q EntryQuery) (cursor, error) {
 	if err := json.Unmarshal(b, &c); err != nil {
 		return cursor{}, bad
 	}
-	if c.Version != cursorVersion || c.Group != q.group || c.GroupBy != q.GroupBy || c.Key != q.Key || c.Sort != q.Sort {
+	if c.Version != cursorVersion || c.Group != q.group || c.GroupBy != q.GroupBy || c.Key != q.Key || c.Sort != q.Sort ||
+		c.Search != q.search.digest {
 		return cursor{}, bad
 	}
 	// Postgres text can't hold a NUL, so a name with one would fail the query (a 500).

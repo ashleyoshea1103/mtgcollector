@@ -128,14 +128,18 @@ func valueTotal(r store.GroupTotalsRow) contract.ValueTotal {
 }
 
 // EntryQuery is which entries to read: one group's (Key, for GroupBy; none for every entry),
-// in an order, from where a page's Cursor says the last page ended.
+// those matching Search, in an order, from where a page's Cursor says the last page ended.
 type EntryQuery struct {
 	GroupBy contract.GroupBy
 	Key     string
 	Sort    contract.SortBy
 	Cursor  string
+	// Words every entry listed has in its card's name or type line (?q=); empty for every entry.
+	Search string
 	// The collection (collectionGroup) or a custom group, set by Entries or Members.
 	group int64
+	// Search, parsed by listing.
+	search search
 }
 
 // Entries returns a page of one group's entries.

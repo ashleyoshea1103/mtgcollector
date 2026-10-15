@@ -128,9 +128,9 @@ func (s *Searcher) Search(ctx context.Context, q Search) (contract.CardPage, err
 	var rows []store.CardListing
 	if byName {
 		res, err := s.Q.SearchCardsByName(ctx, store.SearchCardsByNameParams{
-			LeadPattern: contains(lead), NamePatterns: containsEach(words),
+			LeadPattern: contains(lead), NamePatterns: ContainsEach(words),
 			IncludeExtras: q.IncludeExtras, ExtraLayouts: extraLayouts, ExtraTypes: extraTypes,
-			SetCode: pgtype.Text{String: set, Valid: set != ""}, Rarity: rarity, TypePatterns: containsEach(strings.Fields(q.Type)),
+			SetCode: pgtype.Text{String: set, Valid: set != ""}, Rarity: rarity, TypePatterns: ContainsEach(strings.Fields(q.Type)),
 			Colors: colors, Colorless: colorless, RegularSetTypes: regularSetTypes,
 			PrefixPattern: likeEscape(strings.Join(words, " ")) + "%",
 			RowLimit:      limit, RowOffset: offset,
@@ -143,9 +143,9 @@ func (s *Searcher) Search(ctx context.Context, q Search) (contract.CardPage, err
 		}
 	} else {
 		res, err := s.Q.SearchCardsInSet(ctx, store.SearchCardsInSetParams{
-			SetCode: set, NamePatterns: containsEach(words),
+			SetCode: set, NamePatterns: ContainsEach(words),
 			IncludeExtras: q.IncludeExtras, ExtraLayouts: extraLayouts, ExtraTypes: extraTypes,
-			Rarity: rarity, TypePatterns: containsEach(strings.Fields(q.Type)), Colors: colors, Colorless: colorless,
+			Rarity: rarity, TypePatterns: ContainsEach(strings.Fields(q.Type)), Colors: colors, Colorless: colorless,
 			RowLimit: limit, RowOffset: offset,
 		})
 		if err != nil {
@@ -307,8 +307,9 @@ func parseColors(s string) (colors []string, colorless bool, err error) {
 // contains is an ILIKE pattern matching text that contains s.
 func contains(s string) string { return "%" + likeEscape(s) + "%" }
 
-// containsEach is a pattern for each word; an empty list matches everything.
-func containsEach(words []string) []string {
+// ContainsEach is an ILIKE pattern for each word (the collection's search uses them too);
+// an empty list matches everything.
+func ContainsEach(words []string) []string {
 	patterns := make([]string, len(words))
 	for i, w := range words {
 		patterns[i] = contains(w)

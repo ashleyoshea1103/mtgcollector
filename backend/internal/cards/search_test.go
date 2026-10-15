@@ -45,8 +45,8 @@ func TestLikeEscapeMatchesTextLiterally(t *testing.T) {
 	if got := likeEscape(`100% b_lt \o/`); got != `100\% b\_lt \\o/` {
 		t.Errorf("likeEscape = %q", got)
 	}
-	if got := containsEach([]string{"a%", "b"}); !reflect.DeepEqual(got, []string{`%a\%%`, "%b%"}) {
-		t.Errorf("containsEach = %q", got)
+	if got := ContainsEach([]string{"a%", "b"}); !reflect.DeepEqual(got, []string{`%a\%%`, "%b%"}) {
+		t.Errorf("ContainsEach = %q", got)
 	}
 }
 

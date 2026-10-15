@@ -2,12 +2,14 @@ package collection
 
 import (
 	"encoding/base64"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/ashleyoshea1103/mtgcollector/backend/internal/apperr"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/contract"
 	"github.com/ashleyoshea1103/mtgcollector/backend/internal/store"
 )
@@ -144,6 +146,80 @@ func TestACursorIsOnlyForItsListing(t *testing.T) {
 	}
 	if _, err := decodeCursor(strings.Repeat("A", maxCursorLength+1), q); err == nil {
 		t.Error("an over-long cursor was accepted")
+	}
+}
+
+func TestASearchIsAPatternForEachWord(t *testing.T) {
+	for _, tc := range []struct {
+		q    string
+		want []string
+	}{
+		{"", []string{}},
+		{"  \t ", []string{}},
+		{"bolt  Light", []string{"%bolt%", "%Light%"}},
+		{`100%_a\b`, []string{`%100\%\_a\\b%`}},
+	} {
+		s, err := parseSearch(tc.q)
+		if err != nil || s.patterns == nil || !slices.Equal(s.patterns, tc.want) {
+			t.Errorf("parseSearch(%q) = %q, %v; want %q", tc.q, s.patterns, err, tc.want)
+		}
+		if len(tc.want) == 0 && s.digest != "" {
+			t.Errorf("no search has digest %q, want none", s.digest)
+		}
+	}
+	digest := func(q string) string {
+		s, err := parseSearch(q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s.digest
+	}
+	if a, b := digest(" bolt light "), digest("bolt light"); a == "" || a != b {
+		t.Errorf("the same words have digests %q and %q", a, b)
+	}
+	if digest("bolt") == digest("bolt light") {
+		t.Error("different searches have the same digest")
+	}
+}
+
+func TestASearchTheServerCantRunIsRefused(t *testing.T) {
+	for name, q := range map[string]string{
+		"too long": strings.Repeat("a", contract.MaxSearchLength+1),
+		"a NUL":    "bolt\x00",
+	} {
+		if _, err := parseSearch(q); apperr.KindOf(err) != apperr.Invalid {
+			t.Errorf("%s: %v, want invalid", name, err)
+		}
+	}
+	// The cap is in characters, not bytes.
+	if _, err := parseSearch(strings.Repeat("é", contract.MaxSearchLength)); err != nil {
+		t.Errorf("%d characters: %v", contract.MaxSearchLength, err)
+	}
+}
+
+func TestACursorIsOnlyForItsSearch(t *testing.T) {
+	searched := func(q string) EntryQuery {
+		s, err := parseSearch(q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return EntryQuery{GroupBy: contract.GroupByNone, Key: "all", Sort: contract.SortByName, Search: q, search: s}
+	}
+	goblin := cursorAfter(searched("goblin"), row(1, "Goblin Guide", "1", "1", time.Now())).encode()
+	if _, err := decodeCursor(goblin, searched(" goblin ")); err != nil {
+		t.Errorf("a cursor for the same search was refused: %v", err)
+	}
+	for name, other := range map[string]EntryQuery{"another search": searched("elf"), "no search": searched("")} {
+		if _, err := decodeCursor(goblin, other); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+	plain := cursorAfter(searched(""), row(1, "Bolt", "1", "1", time.Now())).encode()
+	if _, err := decodeCursor(plain, searched("")); err != nil {
+		t.Errorf("a cursor without a search was refused without one: %v", err)
+	}
+	if _, err := decodeCursor(plain, searched("goblin")); err == nil {
+		t.Error("a cursor without a search was accepted for one")
 	}
 }
 
