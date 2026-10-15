@@ -82,7 +82,9 @@ SELECT card_group(@group_by, p.set_code, p.color_identity, p.type_line, p.rarity
        coalesce(sum(p.count) FILTER (WHERE p.unit_price IS NULL), 0)::integer AS unpriced_count
   FROM listing_rows p
  WHERE p.group_id = @group_id AND p.user_id = @user_id
-   AND concat_ws(' ', p.name, p.type_line) ILIKE ALL (@search_patterns::text[])
+   AND (cardinality(@search_patterns::text[]) = 0
+        OR lower(concat_ws(' ', p.name, p.type_line) COLLATE "unicode")
+           LIKE ALL (ARRAY(SELECT lower(w COLLATE "unicode") FROM unnest(@search_patterns::text[]) w)))
  GROUP BY 1;
 
 -- name: CollectionStats :many
@@ -110,14 +112,18 @@ SELECT code, name, icon_svg_uri, released_at FROM sets WHERE code = ANY (@codes:
 -- order. Each order is its own query, so each can page by keyset: the page after the row
 -- whose sort key is the cursor's. A search lists only entries whose card's name or type line
 -- matches every one of its patterns (one per word, none for every entry). Words have no
--- whitespace, so none matches across the space joining the two.
+-- whitespace, so none matches across the space joining the two. Case is ignored by lowering
+-- each row once (ILIKE lowers it again for every pattern: 12 times slower at 75 words over
+-- 50,000 rows), in the "unicode" collation, as the database's own may only lower A to Z.
 
 -- name: EntriesByName :many
 SELECT sqlc.embed(p), sqlc.embed(v)
   FROM listing_rows p
   JOIN card_listing v ON v.id = p.card_id
  WHERE p.group_id = @group_id AND p.user_id = @user_id
-   AND concat_ws(' ', p.name, p.type_line) ILIKE ALL (@search_patterns::text[])
+   AND (cardinality(@search_patterns::text[]) = 0
+        OR lower(concat_ws(' ', p.name, p.type_line) COLLATE "unicode")
+           LIKE ALL (ARRAY(SELECT lower(w COLLATE "unicode") FROM unnest(@search_patterns::text[]) w)))
    AND card_group(@group_by, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = @group_key
    AND (sqlc.narg(after_id)::bigint IS NULL
         OR (p.name COLLATE "unicode", p.id) > (sqlc.narg(after_name)::text COLLATE "unicode", sqlc.narg(after_id)::bigint))
@@ -130,7 +136,9 @@ SELECT sqlc.embed(p), sqlc.embed(v)
   FROM listing_rows p
   JOIN card_listing v ON v.id = p.card_id
  WHERE p.group_id = @group_id AND p.user_id = @user_id
-   AND concat_ws(' ', p.name, p.type_line) ILIKE ALL (@search_patterns::text[])
+   AND (cardinality(@search_patterns::text[]) = 0
+        OR lower(concat_ws(' ', p.name, p.type_line) COLLATE "unicode")
+           LIKE ALL (ARRAY(SELECT lower(w COLLATE "unicode") FROM unnest(@search_patterns::text[]) w)))
    AND card_group(@group_by, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = @group_key
    AND (sqlc.narg(after_id)::bigint IS NULL
         OR (p.unit_price IS NULL, -coalesce(p.unit_price, 0), p.id)
@@ -143,7 +151,9 @@ SELECT sqlc.embed(p), sqlc.embed(v)
   FROM listing_rows p
   JOIN card_listing v ON v.id = p.card_id
  WHERE p.group_id = @group_id AND p.user_id = @user_id
-   AND concat_ws(' ', p.name, p.type_line) ILIKE ALL (@search_patterns::text[])
+   AND (cardinality(@search_patterns::text[]) = 0
+        OR lower(concat_ws(' ', p.name, p.type_line) COLLATE "unicode")
+           LIKE ALL (ARRAY(SELECT lower(w COLLATE "unicode") FROM unnest(@search_patterns::text[]) w)))
    AND card_group(@group_by, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = @group_key
    AND (sqlc.narg(after_id)::bigint IS NULL
         OR (p.cmc, p.name COLLATE "unicode", p.id)
@@ -157,7 +167,9 @@ SELECT sqlc.embed(p), sqlc.embed(v)
   FROM listing_rows p
   JOIN card_listing v ON v.id = p.card_id
  WHERE p.group_id = @group_id AND p.user_id = @user_id
-   AND concat_ws(' ', p.name, p.type_line) ILIKE ALL (@search_patterns::text[])
+   AND (cardinality(@search_patterns::text[]) = 0
+        OR lower(concat_ws(' ', p.name, p.type_line) COLLATE "unicode")
+           LIKE ALL (ARRAY(SELECT lower(w COLLATE "unicode") FROM unnest(@search_patterns::text[]) w)))
    AND card_group(@group_by, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = @group_key
    AND (sqlc.narg(after_id)::bigint IS NULL
         OR (p.listed_at, p.id) < (sqlc.narg(after_added)::timestamptz, sqlc.narg(after_id)::bigint))

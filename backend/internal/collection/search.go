@@ -3,6 +3,7 @@ package collection
 import (
 	"fmt"
 	"hash/fnv"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -19,6 +20,8 @@ type search struct {
 	digest string
 }
 
+var curlyApostrophes = strings.NewReplacer("‘", "'", "’", "'", "ʼ", "'")
+
 // parseSearch reads a search, refusing one the database couldn't run: longer than any card's
 // name or type, not UTF-8, or with a NUL (which Postgres text can't hold).
 func parseSearch(q string) (search, error) {
@@ -31,7 +34,11 @@ func parseSearch(q string) (search, error) {
 	if strings.ContainsRune(q, 0) {
 		return search{}, invalid("a search can't contain the character NUL")
 	}
-	words := strings.Fields(q)
+	// Card names and type lines use straight apostrophes, which phones often type curly.
+	q = curlyApostrophes.Replace(q)
+	// A dash on its own is the one between a type line's types ("Creature — Goblin"): as a word,
+	// typed as a hyphen, it would find nothing.
+	words := slices.DeleteFunc(strings.Fields(q), func(w string) bool { return strings.Trim(w, "-–—") == "" })
 	s := search{patterns: cards.ContainsEach(words)}
 	if len(words) > 0 {
 		h := fnv.New64a()

@@ -158,6 +158,11 @@ func TestASearchIsAPatternForEachWord(t *testing.T) {
 		{"  \t ", []string{}},
 		{"bolt  Light", []string{"%bolt%", "%Light%"}},
 		{`100%_a\b`, []string{`%100\%\_a\\b%`}},
+		// Curly apostrophes (as phones type them) are the straight ones card names use.
+		{"vryn’s ‘urza’s jace’", []string{"%vryn's%", "%'urza's%", "%jace'%"}},
+		// A dash on its own is the one between card types ("Creature — Goblin"): no word to find.
+		{"creature - goblin — – scout", []string{"%creature%", "%goblin%", "%scout%"}},
+		{"-", []string{}},
 	} {
 		s, err := parseSearch(tc.q)
 		if err != nil || s.patterns == nil || !slices.Equal(s.patterns, tc.want) {

@@ -51,18 +51,29 @@ func TestASearchNarrowsTheEntries(t *testing.T) {
 		{name: "Llanowar Elves", typeLine: "Creature — Elf Druid", identity: []string{"G"}, cmc: 1},
 		{name: "100% Juice", typeLine: "Instant", cmc: 2},
 		{name: "Æther Vial", typeLine: "Artifact", identity: []string{}, cmc: 1, eur: euros(3)},
+		{name: "Urza's Saga", typeLine: "Enchantment Land — Urza's Saga", identity: []string{}},
 	} {
 		f.add(t, f.ann, newEntry(f.card(t, c), 1))
 	}
 	// Bob's goblin is never in Ann's results.
 	f.add(t, f.bob, newEntry(f.card(t, testCard{name: "Goblin King", typeLine: "Creature — Goblin"}), 1))
 
-	all := []string{"100% Juice", "Goblin Guide", "Lightning Bolt", "Llanowar Elves", "Æther Vial"}
+	all := []string{"100% Juice", "Goblin Guide", "Lightning Bolt", "Llanowar Elves", "Urza's Saga", "Æther Vial"}
 	for _, tc := range []struct {
 		q    string
 		want []string
 	}{
 		{"", all},
+		// As a phone types it.
+		{"urza’s", []string{"Urza's Saga"}},
+		{"creature - goblin", []string{"Goblin Guide"}},
+		// Words that mean something to SQL arrays or to LIKE match only themselves.
+		{`{a,b}`, nil},
+		{`"`, nil},
+		{"NULL", nil},
+		{`\`, nil},
+		// Many words: each must still be there.
+		{strings.Repeat("z ", 75), []string{"Urza's Saga"}},
 		{"goblin", []string{"Goblin Guide"}},
 		{"GOBLIN", []string{"Goblin Guide"}},
 		{"gob", []string{"Goblin Guide"}},
@@ -162,6 +173,31 @@ func TestASearchNarrowsTheGroups(t *testing.T) {
 		}
 		if !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("%s %q:\n got  %v\n want %v", tc.by, tc.q, got, tc.want)
+		}
+	}
+}
+
+// Each group's heading counts exactly the entries its pages list, for the same search: the
+// totals query and the pages' queries match entries alike.
+func TestASearchsGroupsCountWhatTheirPagesList(t *testing.T) {
+	f := newFixture(t)
+	f.collection(t)
+	for _, by := range []contract.GroupBy{contract.GroupByNone, contract.GroupBySet, contract.GroupByColor, contract.GroupByType, contract.GroupByRarity, contract.GroupByCMC} {
+		for _, q := range []string{"creature", "e", "instant bolt"} {
+			res, err := f.s.Groups(t.Context(), f.ann, by, q)
+			if err != nil {
+				t.Fatalf("%s %q: %v", by, q, err)
+			}
+			for _, g := range res.Groups {
+				listed := f.every(t, f.ann, EntryQuery{GroupBy: by, Key: g.Key, Search: q})
+				copies := 0
+				for _, e := range listed {
+					copies += e.Quantity
+				}
+				if len(listed) != g.EntryCount || copies != g.CardCount {
+					t.Errorf("%s %q group %s: heading says %d entries, %d cards; pages list %d, %d", by, q, g.Key, g.EntryCount, g.CardCount, len(listed), copies)
+				}
+			}
 		}
 	}
 }
