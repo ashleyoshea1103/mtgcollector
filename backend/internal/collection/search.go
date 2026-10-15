@@ -20,10 +20,13 @@ type search struct {
 }
 
 // parseSearch reads a search, refusing one the database couldn't run: longer than any card's
-// name or type, or with a NUL (which Postgres text can't hold).
+// name or type, not UTF-8, or with a NUL (which Postgres text can't hold).
 func parseSearch(q string) (search, error) {
 	if utf8.RuneCountInString(q) > contract.MaxSearchLength {
 		return search{}, invalid("a search can be at most %d characters", contract.MaxSearchLength)
+	}
+	if !utf8.ValidString(q) {
+		return search{}, invalid("a search must be UTF-8 text")
 	}
 	if strings.ContainsRune(q, 0) {
 		return search{}, invalid("a search can't contain the character NUL")

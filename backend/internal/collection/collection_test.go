@@ -186,6 +186,8 @@ func TestASearchTheServerCantRunIsRefused(t *testing.T) {
 	for name, q := range map[string]string{
 		"too long": strings.Repeat("a", contract.MaxSearchLength+1),
 		"a NUL":    "bolt\x00",
+		// Postgres refuses text that isn't UTF-8, which would fail the query (a 500).
+		"bad UTF-8": "bolt\xff",
 	} {
 		if _, err := parseSearch(q); apperr.KindOf(err) != apperr.Invalid {
 			t.Errorf("%s: %v, want invalid", name, err)

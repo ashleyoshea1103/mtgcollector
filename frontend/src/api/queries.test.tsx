@@ -190,26 +190,22 @@ describe('a searched listing', () => {
     expect(result.current.data).toBeUndefined();
   });
 
-  it("sends a section's search with its pages, and keeps the last search's entries up while the next search's load", async () => {
+  it("sends a section's search with its pages, and never stands the last search's entries in for the next's", async () => {
     const { held, routes } = slowRoutes(entriesOf, 'GET /api/collection/entries');
     const { wrapper, api } = setup(routes);
-    const { rerender, result } = renderHook(({ groupBy, key, search }) => q.useListingEntries(null, groupBy, key, 'cmc', search, true), {
+    const { rerender, result } = renderHook(({ search }) => q.useListingEntries(null, 'none', 'all', 'cmc', search, true), {
       wrapper,
-      initialProps: { groupBy: 'none' as GroupBy, key: 'all', search: 'goblin' },
+      initialProps: { search: 'goblin' },
     });
     await waitFor(() => expect(result.current.data).toHaveLength(1));
     expect(api.requests[0].query.get('q')).toBe('goblin');
 
-    rerender({ groupBy: 'none', key: 'all', search: 'slow' });
-    await waitFor(() => expect(result.current.isFetching).toBe(true));
-    expect(result.current.isPlaceholderData).toBe(true);
-    expect(result.current.data).toHaveLength(1);
-    act(() => held.release());
-    await waitFor(() => expect(result.current.data).toEqual([]));
-    expect(result.current.isPlaceholderData).toBe(false);
-
-    rerender({ groupBy: 'color', key: 'R', search: 'slow' });
+    // A section's heading is already the new search's by now, so its cards wait for the new search too.
+    rerender({ search: 'slow' });
     await waitFor(() => expect(result.current.isFetching).toBe(true));
     expect(result.current.data).toBeUndefined();
+    act(() => held.release());
+    await waitFor(() => expect(result.current.data).toEqual([]));
+    expect(api.requests.map((r) => r.query.get('q'))).toEqual(['goblin', 'slow']);
   });
 });

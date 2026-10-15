@@ -540,7 +540,7 @@ describe('searching the collection', () => {
     await main().findByRole('heading', { name: entries.bolts.card.name });
     await user.type(box(), 'creature');
     await waitFor(() => expect(main().queryByRole('heading', { name: entries.bolts.card.name })).not.toBeInTheDocument());
-    for (const e of creatures) expect(main().getByRole('heading', { name: e.card.name })).toBeInTheDocument();
+    for (const e of creatures) expect(await main().findByRole('heading', { name: e.card.name })).toBeInTheDocument();
     expect(location().search).toBe('?q=creature');
     expect(api.sent('GET /api/collection/groups').at(-1)!.query.get('q')).toBe('creature');
     expect(api.sent('GET /api/collection/entries').at(-1)!.query.get('q')).toBe('creature');
@@ -608,6 +608,25 @@ describe('searching the collection', () => {
     expect(bolts).toBeInTheDocument();
     act(() => release());
     expect(await main().findByText('No cards match “zzz”')).toBeInTheDocument();
+  });
+
+  it("never shows the last search's cards under the next search's heading", async () => {
+    let release = () => {};
+    const { user } = renderApp('/collection', {
+      ...searchable,
+      'GET /api/collection/entries': (req) =>
+        req.query.get('q') === 'creature'
+          ? new Promise((resolve) => (release = () => resolve((searchable['GET /api/collection/entries'] as (r: FakeRequest) => Reply)(req))))
+          : (searchable['GET /api/collection/entries'] as (r: FakeRequest) => Reply)(req),
+    });
+    await main().findByRole('heading', { name: entries.bolts.card.name });
+    await user.type(box(), 'creature');
+    // The new search's groups are in (its heading counts only the creatures), its cards not yet.
+    const copies = creatures.reduce((n, e) => n + e.quantity, 0);
+    await waitFor(() => expect(screen.getByRole('button', { name: /^All cards/ })).toHaveTextContent(countOf(copies, 'card')));
+    expect(main().queryByRole('heading', { name: entries.bolts.card.name })).not.toBeInTheDocument();
+    act(() => release());
+    for (const e of creatures) expect(await main().findByRole('heading', { name: e.card.name })).toBeInTheDocument();
   });
 
   it('brings every card back when the search is cleared', async () => {

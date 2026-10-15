@@ -294,7 +294,7 @@ describe('searching a group', () => {
     await main().findByRole('heading', { name: entries.bolts.card.name });
     await user.type(main().getByRole('searchbox', { name: 'Search' }), 'elf');
     await waitFor(() => expect(main().queryByRole('heading', { name: entries.bolts.card.name })).not.toBeInTheDocument());
-    expect(main().getByRole('heading', { name: entries.unpricedElves.card.name })).toBeInTheDocument();
+    expect(await main().findByRole('heading', { name: entries.unpricedElves.card.name })).toBeInTheDocument();
     expect(location().search).toBe('?q=elf');
     expect(api.sent('GET /api/groups/:id/groups').at(-1)!.query.get('q')).toBe('elf');
     expect(api.sent('GET /api/groups/:id/members').at(-1)!.query.get('q')).toBe('elf');
