@@ -106,9 +106,10 @@ primitive (`src/ui/Field.tsx`).
   (`SearchPage`'s "own write" approach).
 - **Wide screens:** the field grows to fill the space between Sort by and View, up to a sensible
   maximum. View keeps its place at the right.
-- **Phone width:** the field takes a full row of its own, as the other fields there do with
-  labels above. The sticky toolbar's height is already measured (`useToolbarHeight`), so the
-  section headings still stick below it.
+- **Phone width:** labels go above, as for the other fields there. The field shares the second
+  row with View, which keeps the sticky toolbar short. (A row of its own was the first idea; the
+  shared row looked better and saves about 50 px of sticky bar.) The sticky toolbar's height is
+  already measured (`useToolbarHeight`), so the section headings still stick below it.
 - **Themes:** it uses the existing tokens and `.search-input` styles, so both themes are covered.
   It is checked in both at desktop and phone width.
 
