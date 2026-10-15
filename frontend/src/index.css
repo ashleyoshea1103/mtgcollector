@@ -653,6 +653,15 @@ a.button:hover {
 .listing-controls .select {
   width: auto;
 }
+/* The search takes the room between the selects and the view switch, up to a line's worth. */
+.listing-controls__search {
+  flex: 1 1 12rem;
+  max-width: 22rem;
+}
+.listing-controls__search .search-input {
+  flex: 1;
+  min-width: 0;
+}
 .listing-controls__view {
   margin-left: auto;
 }
@@ -1400,6 +1409,11 @@ html:has(.listing-controls) {
   }
   .listing-controls .select {
     width: 100%;
+  }
+  /* The search on a row of its own, as wide as the screen. */
+  .listing-controls__search {
+    flex-basis: 100%;
+    max-width: none;
   }
   /* Cards two to a row. */
   :is(.entry-grid, .card-grid).grid {

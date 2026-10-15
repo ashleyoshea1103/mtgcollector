@@ -1,10 +1,10 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { EMPTY_SEARCH } from '../lib/search';
 import { cards, customGroups, entries, makeEntry } from '../fixtures';
 import type { CardSearch } from '../api/endpoints';
-import { MaxGroupDescriptionLength, type Credentials, type EntryChange, type NewGroup } from '../types';
+import { MaxGroupDescriptionLength, MaxSearchLength, type Credentials, type EntryChange, type NewGroup } from '../types';
 import { AuthForm } from './AuthForm';
 import { EntryChangeForm } from './EntryChangeForm';
 import { GroupForm } from './GroupForm';
@@ -240,6 +240,51 @@ describe('ListingControls', () => {
     expect(onChange).toHaveBeenLastCalledWith({ ...value, sort: 'added' });
     await userEvent.click(screen.getByRole('radio', { name: 'List' }));
     expect(onChange).toHaveBeenLastCalledWith({ ...value, view: 'list' });
+  });
+
+  it('has the search box between Sort by and View', () => {
+    render(<ListingControls value={{ groupBy: 'color', sort: 'name', view: 'grid', q: '' }} onChange={() => {}} />);
+    const follows = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const sort = screen.getByRole('combobox', { name: 'Sort by' });
+    const search = screen.getByRole('searchbox', { name: 'Search' });
+    expect(follows(sort, search)).toBe(true);
+    expect(follows(search, screen.getByRole('radiogroup', { name: 'View' }))).toBe(true);
+    expect(search).toHaveAttribute('placeholder', 'Name or type');
+    expect(search).toHaveAttribute('maxLength', String(MaxSearchLength));
+  });
+
+  it('reports a search once typing pauses, as its words, with the rest kept', async () => {
+    const onChange = vi.fn<(v: ListingParams) => void>();
+    const value: ListingParams = { groupBy: 'color', sort: 'price', view: 'list', q: '' };
+    render(<ListingControls value={value} onChange={onChange} />);
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), '  goblin   king ');
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith({ ...value, q: 'goblin king' }));
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts afresh from a search it was given rather than typed (a link, or the URL edited)', () => {
+    const value: ListingParams = { groupBy: 'none', sort: 'name', view: 'grid', q: 'goblin' };
+    const { rerender } = render(<ListingControls value={value} onChange={() => {}} />);
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('goblin');
+    rerender(<ListingControls value={{ ...value, q: '' }} onChange={() => {}} />);
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('');
+  });
+
+  it('keeps what is typed when its own searches come back after more typing', async () => {
+    const onChange = vi.fn<(v: ListingParams) => void>();
+    const value: ListingParams = { groupBy: 'none', sort: 'name', view: 'grid', q: '' };
+    const { rerender } = render(<ListingControls value={value} onChange={onChange} />);
+    const box = screen.getByRole('searchbox', { name: 'Search' });
+    await userEvent.type(box, 'gob');
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith({ ...value, q: 'gob' }));
+    await userEvent.type(box, 'lin');
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith({ ...value, q: 'goblin' }));
+    await userEvent.type(box, ' k');
+    // The URL catches up with the first search, then the second, while "goblin k" waits to be reported.
+    rerender(<ListingControls value={{ ...value, q: 'gob' }} onChange={onChange} />);
+    rerender(<ListingControls value={{ ...value, q: 'goblin' }} onChange={onChange} />);
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('goblin k');
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith({ ...value, q: 'goblin k' }));
   });
   it("sets --toolbar-height to the bar's height while it's shown, for the headings that stick below it", () => {
     let report = () => {};
