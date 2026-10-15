@@ -70,8 +70,8 @@ export function useGroupMember(groupId: number | null, entryId: number) {
 
 /**
  * Whether two listing keys differ only in their search (the last part, keys.listing*): then
- * the last search's groups stay up while the next one's load, rather than blinking out at each
- * pause in typing. Another listing or grouping still shows as loading.
+ * the last search's results stay up while the next one's load, rather than blinking out at each
+ * pause in typing. Another listing, grouping or order still shows as loading.
  */
 const onlySearchChanged = (a: QueryKey, b: QueryKey) => a.length === b.length && a.slice(0, -1).every((part, i) => part === b[i]);
 
@@ -113,10 +113,15 @@ const asListed = (member: GroupMember): ListedEntry => ({
   member,
 });
 
-/** One group's entries matching q, a page at a time, fetched while enabled (its section is open). */
+/**
+ * One group's entries matching q, a page at a time, fetched while enabled (its section is open).
+ * While only the search changed, the last search's entries stand in (isPlaceholderData): the
+ * section then shows them with the heading they came with.
+ */
 export function useListingEntries(id: ListingId, groupBy: GroupBy, key: string, sort: SortBy, q: string, enabled: boolean) {
+  const queryKey = keys.listingEntries(id, groupBy, key, sort, q);
   return useInfiniteQuery({
-    queryKey: keys.listingEntries(id, groupBy, key, sort, q),
+    queryKey,
     queryFn: async ({ pageParam, signal }): Promise<ListedPage> => {
       const page = { groupBy, key, sort, cursor: pageParam, q };
       if (id === null) {
@@ -129,8 +134,7 @@ export function useListingEntries(id: ListingId, groupBy: GroupBy, key: string, 
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.next_cursor,
     select: (data) => uniqueItems(data.pages.map((p) => p.rows), (r) => r.entry.id),
-    // No stand-in from the last search here: the section's heading is already the new search's
-    // (the groups' stand-in covers the wait until then), and its cards must match it.
+    placeholderData: (previous, previousQuery) => (previousQuery && onlySearchChanged(previousQuery.queryKey, queryKey) ? previous : undefined),
     enabled,
   });
 }

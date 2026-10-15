@@ -610,23 +610,54 @@ describe('searching the collection', () => {
     expect(await main().findByText('No cards match “zzz”')).toBeInTheDocument();
   });
 
-  it("never shows the last search's cards under the next search's heading", async () => {
+  it("keeps a section's heading and cards from the same search, without blinking, while its next cards load", async () => {
     let release = () => {};
-    const { user } = renderApp('/collection', {
+    const { api, user } = renderApp('/collection', {
       ...searchable,
       'GET /api/collection/entries': (req) =>
         req.query.get('q') === 'creature'
           ? new Promise((resolve) => (release = () => resolve((searchable['GET /api/collection/entries'] as (r: FakeRequest) => Reply)(req))))
           : (searchable['GET /api/collection/entries'] as (r: FakeRequest) => Reply)(req),
     });
-    await main().findByRole('heading', { name: entries.bolts.card.name });
+    const bolts = await main().findByRole('heading', { name: entries.bolts.card.name });
+    const heading = screen.getByRole('button', { name: /^All cards/ });
+    const everyCopy = all.reduce((n, e) => n + e.quantity, 0);
     await user.type(box(), 'creature');
-    // The new search's groups are in (its heading counts only the creatures), its cards not yet.
-    const copies = creatures.reduce((n, e) => n + e.quantity, 0);
-    await waitFor(() => expect(screen.getByRole('button', { name: /^All cards/ })).toHaveTextContent(countOf(copies, 'card')));
-    expect(main().queryByRole('heading', { name: entries.bolts.card.name })).not.toBeInTheDocument();
+    // The new search's groups are in, its cards not yet: the section stays as it was, busy.
+    await waitFor(() => expect(api.sent('GET /api/collection/entries').some((r) => r.query.get('q') === 'creature')).toBe(true));
+    expect(bolts).toBeInTheDocument();
+    expect(heading).toHaveTextContent(countOf(everyCopy, 'card'));
+    expect(main().queryByText('Loading…')).not.toBeInTheDocument();
+    expect(bolts.closest('.listing__section')).toHaveAttribute('aria-busy', 'true');
+    expect(main().queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument();
+
     act(() => release());
     for (const e of creatures) expect(await main().findByRole('heading', { name: e.card.name })).toBeInTheDocument();
+    expect(main().queryByRole('heading', { name: entries.bolts.card.name })).not.toBeInTheDocument();
+    expect(heading).toHaveTextContent(countOf(creatures.reduce((n, e) => n + e.quantity, 0), 'card'));
+    expect(heading.closest('.listing__section')).not.toHaveAttribute('aria-busy');
+  });
+
+  it('opens the sections a search leaves, as a fresh page would, when it narrows many groups to a few', async () => {
+    // Twelve sets (only the first starts open); the search leaves sets 3 and 7.
+    const many = Array.from({ length: 12 }, (_, i) => makeGroup(`s${i}`, `Set ${i}`, [makeEntry(100 + i, cards.lightningBolt)]));
+    const found = (q: string | null) => (q ? many.filter((g) => g.group.key === 's3' || g.group.key === 's7') : many);
+    const { api, user } = renderApp('/collection?group_by=set', {
+      ...collection,
+      'GET /api/collection/groups': (req) => ({ body: { group_by: 'set', groups: found(req.query.get('q')).map((g) => g.group) } }),
+      'GET /api/collection/entries': (req) => ({ body: { entries: many.find((g) => g.group.key === req.query.get('key'))!.entries, next_cursor: null } }),
+    });
+    await screen.findByRole('button', { name: /^Set 11/ });
+    expect(screen.getByRole('button', { name: /^Set 3/ })).toHaveAttribute('aria-expanded', 'false');
+    // One the user opened stays open; the others follow what a fresh page would do.
+    await user.click(screen.getByRole('button', { name: /^Set 7/ }));
+    await user.type(box(), 'bolt');
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Set 11/ })).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /^Set 3/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /^Set 7/ })).toHaveAttribute('aria-expanded', 'true');
+    await waitFor(() =>
+      expect(api.sent('GET /api/collection/entries').filter((r) => r.query.get('q') === 'bolt').map((r) => r.query.get('key'))).toEqual(expect.arrayContaining(['s3', 's7'])),
+    );
   });
 
   it('brings every card back when the search is cleared', async () => {

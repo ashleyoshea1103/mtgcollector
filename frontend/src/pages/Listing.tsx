@@ -118,11 +118,24 @@ interface SectionProps {
 
 function Section({ listing, group, params, q, defaultOpen, renderActions, onViewCard }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
+  // A new search opens the section if a fresh page would (a search that leaves few groups opens
+  // them all), but never closes one that's open.
+  const [openedFor, setOpenedFor] = useState(q);
+  if (openedFor !== q) {
+    setOpenedFor(q);
+    if (defaultOpen) setOpen(true);
+  }
   const entries = useListingEntries(listing, params.groupBy, group.key, params.sort, q, open);
   const rows = entries.data;
   const byId = useMemo(() => new Map(rows?.map((r) => [r.entry.id, r])), [rows]);
   // A card removed (with the Actions button that had focus) leaves focus on the section's heading.
   const keepFocus = useFocusFallback<HTMLDivElement>(firstToggle, rows);
+  // While the last search's cards stand in for the next one's, the heading they came with stays
+  // too, so the count and value are always those of the cards shown.
+  const standIn = entries.isPlaceholderData;
+  const [shown, setShown] = useState(group);
+  if (!standIn && shown !== group) setShown(group);
+  const heading = standIn ? shown : group;
 
   async function loadMore() {
     // Not cancelling a refresh under way (after a change), which would leave the old pages up.
@@ -131,16 +144,17 @@ function Section({ listing, group, params, q, defaultOpen, renderActions, onView
   }
 
   return (
-    <div className="listing__section" {...keepFocus}>
+    <div className="listing__section" aria-busy={standIn || undefined} {...keepFocus}>
       <GroupBucketSection
-        group={group}
+        group={heading}
         entries={rows?.map((r) => r.entry)}
         view={params.view}
         open={open}
         onOpenChange={setOpen}
         // Opening fetches by itself: the query is enabled while the section is open.
         onRetry={() => void entries.refetch()}
-        onLoadMore={entries.hasNextPage ? () => void loadMore() : undefined}
+        // Not for the cards standing in: their next page is the last search's.
+        onLoadMore={entries.hasNextPage && !standIn ? () => void loadMore() : undefined}
         // Busy while a refresh runs too: the next page follows the refreshed ones.
         loadingMore={entries.isFetching}
         loadFailed={entries.isError && rows === undefined}

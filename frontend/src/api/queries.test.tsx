@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { cards, customGroups, entries } from '../fixtures';
 import { EMPTY_SEARCH } from '../lib/search';
 import { ann, fakeApi, type FakeRequest, type Reply, type Routes } from '../test/app';
-import { MaxSearchPage, type GroupBy } from '../types';
+import { MaxSearchPage, type GroupBy, type SortBy } from '../types';
 import { keys, type ListingId } from './keys';
 import * as q from './queries';
 import { createQueryClient } from './queryClient';
@@ -190,22 +190,32 @@ describe('a searched listing', () => {
     expect(result.current.data).toBeUndefined();
   });
 
-  it("sends a section's search with its pages, and never stands the last search's entries in for the next's", async () => {
+  it("sends a section's search with its pages, and stands the last search's entries in only while just the search changed", async () => {
     const { held, routes } = slowRoutes(entriesOf, 'GET /api/collection/entries');
     const { wrapper, api } = setup(routes);
-    const { rerender, result } = renderHook(({ search }) => q.useListingEntries(null, 'none', 'all', 'cmc', search, true), {
+    const { rerender, result } = renderHook(({ groupBy, key, sort, search }) => q.useListingEntries(null, groupBy, key, sort, search, true), {
       wrapper,
-      initialProps: { search: 'goblin' },
+      initialProps: { groupBy: 'none' as GroupBy, key: 'all', sort: 'cmc' as SortBy, search: 'goblin' },
     });
     await waitFor(() => expect(result.current.data).toHaveLength(1));
     expect(api.requests[0].query.get('q')).toBe('goblin');
 
-    // A section's heading is already the new search's by now, so its cards wait for the new search too.
-    rerender({ search: 'slow' });
+    rerender({ groupBy: 'none', key: 'all', sort: 'cmc', search: 'slow' });
+    await waitFor(() => expect(result.current.isFetching).toBe(true));
+    expect(result.current.isPlaceholderData).toBe(true);
+    expect(result.current.data).toHaveLength(1);
+    act(() => held.release());
+    await waitFor(() => expect(result.current.data).toEqual([]));
+    expect(result.current.isPlaceholderData).toBe(false);
+
+    // Another order, or another group, starts from nothing.
+    rerender({ groupBy: 'none', key: 'all', sort: 'price', search: 'slow' });
     await waitFor(() => expect(result.current.isFetching).toBe(true));
     expect(result.current.data).toBeUndefined();
     act(() => held.release());
     await waitFor(() => expect(result.current.data).toEqual([]));
-    expect(api.requests.map((r) => r.query.get('q'))).toEqual(['goblin', 'slow']);
+    rerender({ groupBy: 'color', key: 'R', sort: 'price', search: 'slow' });
+    await waitFor(() => expect(result.current.isFetching).toBe(true));
+    expect(result.current.data).toBeUndefined();
   });
 });
