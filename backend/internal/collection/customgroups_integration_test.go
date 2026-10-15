@@ -394,11 +394,11 @@ func TestAGroupsCardsAreGroupedAndPagedLikeTheCollection(t *testing.T) {
 	}
 	inDeck := len(page.Entries) - 1
 
-	groups, err := f.s.GroupGroups(t.Context(), f.ann, g.ID, contract.GroupByNone)
+	groups, err := f.s.GroupGroups(t.Context(), f.ann, g.ID, contract.GroupByNone, "")
 	if err != nil || len(groups.Groups) != 1 || groups.Groups[0].CardCount != inDeck || groups.Groups[0].EntryCount != inDeck {
 		t.Errorf("the deck's one group = %+v, %v; want %d cards (one copy of each)", groups, err, inDeck)
 	}
-	byColor, _ := f.s.GroupGroups(t.Context(), f.ann, g.ID, contract.GroupByColor)
+	byColor, _ := f.s.GroupGroups(t.Context(), f.ann, g.ID, contract.GroupByColor, "")
 	total := 0
 	for _, gr := range byColor.Groups {
 		total += gr.CardCount
@@ -433,7 +433,7 @@ func TestAGroupsCardsAreGroupedAndPagedLikeTheCollection(t *testing.T) {
 	if _, err := f.s.Members(t.Context(), f.bob, g.ID, EntryQuery{}); !errors.Is(err, ErrGroupNotFound) {
 		t.Errorf("Bob listing Ann's group = %v", err)
 	}
-	if _, err := f.s.GroupGroups(t.Context(), f.bob, g.ID, contract.GroupByNone); !errors.Is(err, ErrGroupNotFound) {
+	if _, err := f.s.GroupGroups(t.Context(), f.bob, g.ID, contract.GroupByNone, ""); !errors.Is(err, ErrGroupNotFound) {
 		t.Errorf("Bob grouping Ann's group = %v", err)
 	}
 }
@@ -527,7 +527,7 @@ func TestGroupResultsHaveNoNilListsOrMaps(t *testing.T) {
 	check("list", l, err)
 	one, err := f.s.Group(t.Context(), f.ann, g.ID)
 	check("group", one, err)
-	gg, err := f.s.GroupGroups(t.Context(), f.ann, g.ID, contract.GroupBySet)
+	gg, err := f.s.GroupGroups(t.Context(), f.ann, g.ID, contract.GroupBySet, "")
 	check("group groups", gg, err)
 	m, err := f.s.Members(t.Context(), f.ann, g.ID, EntryQuery{})
 	check("members", m, err)
@@ -816,7 +816,7 @@ func TestAGroupsTotalsCountItsCopies(t *testing.T) {
 	unpriced := f.add(t, f.ann, newEntry(f.card(t, testCard{}), 5))
 	f.member(t, f.ann, g.ID, priced.ID, 1)
 	f.member(t, f.ann, g.ID, unpriced.ID, 2)
-	groups, err := f.s.GroupGroups(t.Context(), f.ann, g.ID, contract.GroupByNone)
+	groups, err := f.s.GroupGroups(t.Context(), f.ann, g.ID, contract.GroupByNone, "")
 	want := contract.ValueTotal{CardCount: 3, ValueEUR: 2, UnpricedCount: 2}
 	if err != nil || len(groups.Groups) != 1 || groups.Groups[0].ValueTotal != want {
 		t.Errorf("= %+v, %v; want %+v", groups.Groups, err, want)

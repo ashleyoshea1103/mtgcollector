@@ -42,9 +42,10 @@ var setCode = regexp.MustCompile(`^[a-z0-9]{1,8}$`)
 // Groups returns the groups of the user's collection for one way of grouping (none if not
 // given), in order: by set, newest set first (sets released the same day by name, those with no
 // date last); otherwise in the order of fixedGroups. Groups the user has no cards in are left
-// out, but for none's one group, which is always there.
-func (s *Service) Groups(ctx context.Context, userID int64, by contract.GroupBy) (contract.CollectionGroups, error) {
-	return s.groupsOf(ctx, userID, collectionGroup, by)
+// out, but for none's one group, which is always there. Given a search (q), only the entries
+// matching it count, and groups with none are left out.
+func (s *Service) Groups(ctx context.Context, userID int64, by contract.GroupBy, q string) (contract.CollectionGroups, error) {
+	return s.groupsOf(ctx, userID, collectionGroup, by, q)
 }
 
 // collectionGroup is the listing_rows group_id of the collection itself: its entries, rather
@@ -53,16 +54,20 @@ const collectionGroup = 0
 
 // groupsOf groups the collection (collectionGroup) or the members of one of the user's
 // custom groups.
-func (s *Service) groupsOf(ctx context.Context, userID, groupID int64, by contract.GroupBy) (contract.CollectionGroups, error) {
+func (s *Service) groupsOf(ctx context.Context, userID, groupID int64, by contract.GroupBy, q string) (contract.CollectionGroups, error) {
 	if by == "" {
 		by = contract.GroupByNone
 	}
 	if err := checkEnum(by); err != nil {
 		return contract.CollectionGroups{}, invalid("%s", err)
 	}
+	search, err := parseSearch(q)
+	if err != nil {
+		return contract.CollectionGroups{}, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	rows, err := s.q().GroupTotals(ctx, store.GroupTotalsParams{UserID: userID, GroupID: groupID, GroupBy: string(by)})
+	rows, err := s.q().GroupTotals(ctx, store.GroupTotalsParams{UserID: userID, GroupID: groupID, GroupBy: string(by), SearchPatterns: search.patterns})
 	if err != nil {
 		return contract.CollectionGroups{}, db.Error(ctx, "group collection", err)
 	}
@@ -175,6 +180,10 @@ func (s *Service) listing(ctx context.Context, userID int64, q EntryQuery) ([]st
 	if err := checkKey(&q); err != nil {
 		return nil, nil, err
 	}
+	var err error
+	if q.search, err = parseSearch(q.Search); err != nil {
+		return nil, nil, err
+	}
 	var after *cursor
 	if q.Cursor != "" {
 		c, err := decodeCursor(q.Cursor, q)
@@ -235,25 +244,25 @@ func (s *Service) page(ctx context.Context, userID int64, q EntryQuery, after *c
 	switch q.Sort {
 	case contract.SortByPrice:
 		rows, err := s.q().EntriesByPrice(ctx, store.EntriesByPriceParams{
-			UserID: userID, GroupID: q.group, GroupBy: string(q.GroupBy), GroupKey: q.Key, RowLimit: limit, AfterID: afterID,
+			UserID: userID, GroupID: q.group, GroupBy: string(q.GroupBy), GroupKey: q.Key, SearchPatterns: q.search.patterns, RowLimit: limit, AfterID: afterID,
 			AfterUnpriced: pgtype.Bool{Bool: c.Unpriced, Valid: after != nil}, AfterPrice: c.Price,
 		})
 		return sameRows(rows, err)
 	case contract.SortByCMC:
 		rows, err := s.q().EntriesByCMC(ctx, store.EntriesByCMCParams{
-			UserID: userID, GroupID: q.group, GroupBy: string(q.GroupBy), GroupKey: q.Key, RowLimit: limit, AfterID: afterID,
+			UserID: userID, GroupID: q.group, GroupBy: string(q.GroupBy), GroupKey: q.Key, SearchPatterns: q.search.patterns, RowLimit: limit, AfterID: afterID,
 			AfterCmc: c.CMC, AfterName: pgtype.Text{String: c.Name, Valid: after != nil},
 		})
 		return sameRows(rows, err)
 	case contract.SortByAdded:
 		rows, err := s.q().EntriesByAdded(ctx, store.EntriesByAddedParams{
-			UserID: userID, GroupID: q.group, GroupBy: string(q.GroupBy), GroupKey: q.Key, RowLimit: limit, AfterID: afterID,
+			UserID: userID, GroupID: q.group, GroupBy: string(q.GroupBy), GroupKey: q.Key, SearchPatterns: q.search.patterns, RowLimit: limit, AfterID: afterID,
 			AfterAdded: pgtype.Timestamptz{Time: c.Added, Valid: after != nil},
 		})
 		return sameRows(rows, err)
 	default:
 		return s.q().EntriesByName(ctx, store.EntriesByNameParams{
-			UserID: userID, GroupID: q.group, GroupBy: string(q.GroupBy), GroupKey: q.Key, RowLimit: limit, AfterID: afterID,
+			UserID: userID, GroupID: q.group, GroupBy: string(q.GroupBy), GroupKey: q.Key, SearchPatterns: q.search.patterns, RowLimit: limit, AfterID: afterID,
 			AfterName: pgtype.Text{String: c.Name, Valid: after != nil},
 		})
 	}

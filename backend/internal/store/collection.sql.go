@@ -244,21 +244,23 @@ SELECT p.group_id, p.id, p.user_id, p.card_id, p.quantity, p.finish, p.condition
   FROM listing_rows p
   JOIN card_listing v ON v.id = p.card_id
  WHERE p.group_id = $1 AND p.user_id = $2
-   AND card_group($3, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $4
-   AND ($5::bigint IS NULL
-        OR (p.listed_at, p.id) < ($6::timestamptz, $5::bigint))
+   AND concat_ws(' ', p.name, p.type_line) ILIKE ALL ($3::text[])
+   AND card_group($4, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $5
+   AND ($6::bigint IS NULL
+        OR (p.listed_at, p.id) < ($7::timestamptz, $6::bigint))
  ORDER BY p.listed_at DESC, p.id DESC
- LIMIT $7
+ LIMIT $8
 `
 
 type EntriesByAddedParams struct {
-	GroupID    int64
-	UserID     int64
-	GroupBy    string
-	GroupKey   string
-	AfterID    pgtype.Int8
-	AfterAdded pgtype.Timestamptz
-	RowLimit   int32
+	GroupID        int64
+	UserID         int64
+	SearchPatterns []string
+	GroupBy        string
+	GroupKey       string
+	AfterID        pgtype.Int8
+	AfterAdded     pgtype.Timestamptz
+	RowLimit       int32
 }
 
 type EntriesByAddedRow struct {
@@ -271,6 +273,7 @@ func (q *Queries) EntriesByAdded(ctx context.Context, arg EntriesByAddedParams) 
 	rows, err := q.db.Query(ctx, entriesByAdded,
 		arg.GroupID,
 		arg.UserID,
+		arg.SearchPatterns,
 		arg.GroupBy,
 		arg.GroupKey,
 		arg.AfterID,
@@ -348,23 +351,25 @@ SELECT p.group_id, p.id, p.user_id, p.card_id, p.quantity, p.finish, p.condition
   FROM listing_rows p
   JOIN card_listing v ON v.id = p.card_id
  WHERE p.group_id = $1 AND p.user_id = $2
-   AND card_group($3, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $4
-   AND ($5::bigint IS NULL
+   AND concat_ws(' ', p.name, p.type_line) ILIKE ALL ($3::text[])
+   AND card_group($4, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $5
+   AND ($6::bigint IS NULL
         OR (p.cmc, p.name COLLATE "unicode", p.id)
-         > ($6::numeric, $7::text COLLATE "unicode", $5::bigint))
+         > ($7::numeric, $8::text COLLATE "unicode", $6::bigint))
  ORDER BY p.cmc, p.name COLLATE "unicode", p.id
- LIMIT $8
+ LIMIT $9
 `
 
 type EntriesByCMCParams struct {
-	GroupID   int64
-	UserID    int64
-	GroupBy   string
-	GroupKey  string
-	AfterID   pgtype.Int8
-	AfterCmc  pgtype.Numeric
-	AfterName pgtype.Text
-	RowLimit  int32
+	GroupID        int64
+	UserID         int64
+	SearchPatterns []string
+	GroupBy        string
+	GroupKey       string
+	AfterID        pgtype.Int8
+	AfterCmc       pgtype.Numeric
+	AfterName      pgtype.Text
+	RowLimit       int32
 }
 
 type EntriesByCMCRow struct {
@@ -376,6 +381,7 @@ func (q *Queries) EntriesByCMC(ctx context.Context, arg EntriesByCMCParams) ([]E
 	rows, err := q.db.Query(ctx, entriesByCMC,
 		arg.GroupID,
 		arg.UserID,
+		arg.SearchPatterns,
 		arg.GroupBy,
 		arg.GroupKey,
 		arg.AfterID,
@@ -455,21 +461,23 @@ SELECT p.group_id, p.id, p.user_id, p.card_id, p.quantity, p.finish, p.condition
   FROM listing_rows p
   JOIN card_listing v ON v.id = p.card_id
  WHERE p.group_id = $1 AND p.user_id = $2
-   AND card_group($3, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $4
-   AND ($5::bigint IS NULL
-        OR (p.name COLLATE "unicode", p.id) > ($6::text COLLATE "unicode", $5::bigint))
+   AND concat_ws(' ', p.name, p.type_line) ILIKE ALL ($3::text[])
+   AND card_group($4, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $5
+   AND ($6::bigint IS NULL
+        OR (p.name COLLATE "unicode", p.id) > ($7::text COLLATE "unicode", $6::bigint))
  ORDER BY p.name COLLATE "unicode", p.id
- LIMIT $7
+ LIMIT $8
 `
 
 type EntriesByNameParams struct {
-	GroupID   int64
-	UserID    int64
-	GroupBy   string
-	GroupKey  string
-	AfterID   pgtype.Int8
-	AfterName pgtype.Text
-	RowLimit  int32
+	GroupID        int64
+	UserID         int64
+	SearchPatterns []string
+	GroupBy        string
+	GroupKey       string
+	AfterID        pgtype.Int8
+	AfterName      pgtype.Text
+	RowLimit       int32
 }
 
 type EntriesByNameRow struct {
@@ -480,11 +488,14 @@ type EntriesByNameRow struct {
 // A page of the entries of the collection (group_id 0) or the members of a custom group, in
 // one of the groups card_group makes of them (group_by 'none' is every one: key 'all'), in one
 // order. Each order is its own query, so each can page by keyset: the page after the row
-// whose sort key is the cursor's.
+// whose sort key is the cursor's. A search lists only entries whose card's name or type line
+// matches every one of its patterns (one per word, none for every entry). Words have no
+// whitespace, so none matches across the space joining the two.
 func (q *Queries) EntriesByName(ctx context.Context, arg EntriesByNameParams) ([]EntriesByNameRow, error) {
 	rows, err := q.db.Query(ctx, entriesByName,
 		arg.GroupID,
 		arg.UserID,
+		arg.SearchPatterns,
 		arg.GroupBy,
 		arg.GroupKey,
 		arg.AfterID,
@@ -562,23 +573,25 @@ SELECT p.group_id, p.id, p.user_id, p.card_id, p.quantity, p.finish, p.condition
   FROM listing_rows p
   JOIN card_listing v ON v.id = p.card_id
  WHERE p.group_id = $1 AND p.user_id = $2
-   AND card_group($3, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $4
-   AND ($5::bigint IS NULL
+   AND concat_ws(' ', p.name, p.type_line) ILIKE ALL ($3::text[])
+   AND card_group($4, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc) = $5
+   AND ($6::bigint IS NULL
         OR (p.unit_price IS NULL, -coalesce(p.unit_price, 0), p.id)
-         > ($6::boolean, -coalesce($7::numeric, 0), $5::bigint))
+         > ($7::boolean, -coalesce($8::numeric, 0), $6::bigint))
  ORDER BY p.unit_price IS NULL, -coalesce(p.unit_price, 0), p.id
- LIMIT $8
+ LIMIT $9
 `
 
 type EntriesByPriceParams struct {
-	GroupID       int64
-	UserID        int64
-	GroupBy       string
-	GroupKey      string
-	AfterID       pgtype.Int8
-	AfterUnpriced pgtype.Bool
-	AfterPrice    pgtype.Numeric
-	RowLimit      int32
+	GroupID        int64
+	UserID         int64
+	SearchPatterns []string
+	GroupBy        string
+	GroupKey       string
+	AfterID        pgtype.Int8
+	AfterUnpriced  pgtype.Bool
+	AfterPrice     pgtype.Numeric
+	RowLimit       int32
 }
 
 type EntriesByPriceRow struct {
@@ -591,6 +604,7 @@ func (q *Queries) EntriesByPrice(ctx context.Context, arg EntriesByPriceParams) 
 	rows, err := q.db.Query(ctx, entriesByPrice,
 		arg.GroupID,
 		arg.UserID,
+		arg.SearchPatterns,
 		arg.GroupBy,
 		arg.GroupKey,
 		arg.AfterID,
@@ -780,13 +794,15 @@ SELECT card_group($1, p.set_code, p.color_identity, p.type_line, p.rarity, p.cmc
        coalesce(sum(p.count) FILTER (WHERE p.unit_price IS NULL), 0)::integer AS unpriced_count
   FROM listing_rows p
  WHERE p.group_id = $2 AND p.user_id = $3
+   AND concat_ws(' ', p.name, p.type_line) ILIKE ALL ($4::text[])
  GROUP BY 1
 `
 
 type GroupTotalsParams struct {
-	GroupBy string
-	GroupID int64
-	UserID  int64
+	GroupBy        string
+	GroupID        int64
+	UserID         int64
+	SearchPatterns []string
 }
 
 type GroupTotalsRow struct {
@@ -799,9 +815,15 @@ type GroupTotalsRow struct {
 
 // The groups of the user's collection (group 0) or one of their custom groups, for one way of
 // grouping, with their totals: of the copies listed (a member's, in a custom group). Cards
-// with no price are counted apart from the value.
+// with no price are counted apart from the value. Only entries matching the search count (see
+// the listing queries below).
 func (q *Queries) GroupTotals(ctx context.Context, arg GroupTotalsParams) ([]GroupTotalsRow, error) {
-	rows, err := q.db.Query(ctx, groupTotals, arg.GroupBy, arg.GroupID, arg.UserID)
+	rows, err := q.db.Query(ctx, groupTotals,
+		arg.GroupBy,
+		arg.GroupID,
+		arg.UserID,
+		arg.SearchPatterns,
+	)
 	if err != nil {
 		return nil, err
 	}

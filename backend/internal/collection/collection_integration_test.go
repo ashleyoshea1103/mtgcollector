@@ -375,7 +375,7 @@ func TestACardNoLongerListedIsUnpriced(t *testing.T) {
 	if e.UnitPriceEUR != nil || e.ValueEUR != nil || !e.Card.NoLongerListed {
 		t.Errorf("entry = %+v, want unpriced and no longer listed", e)
 	}
-	groups, _ := f.s.Groups(t.Context(), f.ann, contract.GroupByNone)
+	groups, _ := f.s.Groups(t.Context(), f.ann, contract.GroupByNone, "")
 	if g := groups.Groups[0]; g.UnpricedCount != 2 || g.ValueEUR != 0 || g.CardCount != 2 {
 		t.Errorf("totals = %+v, want 2 unpriced cards and no value", g.ValueTotal)
 	}
@@ -495,7 +495,7 @@ func TestGroups(t *testing.T) {
 			{"aaa", "Alpha Test", 2, 12, 21, 0},
 		},
 	} {
-		res, err := f.s.Groups(t.Context(), f.ann, by)
+		res, err := f.s.Groups(t.Context(), f.ann, by, "")
 		if err != nil {
 			t.Fatalf("%s: %v", by, err)
 		}
@@ -513,23 +513,23 @@ func TestGroups(t *testing.T) {
 			t.Errorf("%s:\n got  %v\n want %v", by, got, want)
 		}
 	}
-	if _, err := f.s.Groups(t.Context(), f.ann, "price"); !isInputError(err) {
+	if _, err := f.s.Groups(t.Context(), f.ann, "price", ""); !isInputError(err) {
 		t.Errorf("grouping by price = %v, want an apperr.Invalid", err)
 	}
 }
 
 func TestAnEmptyCollectionStillHasItsOneGroup(t *testing.T) {
 	f := newFixture(t)
-	got, err := f.s.Groups(t.Context(), f.ann, contract.GroupByNone)
+	got, err := f.s.Groups(t.Context(), f.ann, contract.GroupByNone, "")
 	want := []contract.GroupSummary{{Key: "all", Label: "All cards"}}
 	if err != nil || !reflect.DeepEqual(got.Groups, want) {
 		t.Errorf("= %+v, %v; want the all group with no cards", got.Groups, err)
 	}
-	if got, err := f.s.Groups(t.Context(), f.ann, ""); err != nil || got.GroupBy != contract.GroupByNone || len(got.Groups) != 1 {
+	if got, err := f.s.Groups(t.Context(), f.ann, "", ""); err != nil || got.GroupBy != contract.GroupByNone || len(got.Groups) != 1 {
 		t.Errorf("no group_by = %+v, %v; want none", got, err)
 	}
 	for _, by := range []contract.GroupBy{contract.GroupBySet, contract.GroupByColor} {
-		if got, _ := f.s.Groups(t.Context(), f.ann, by); len(got.Groups) != 0 {
+		if got, _ := f.s.Groups(t.Context(), f.ann, by, ""); len(got.Groups) != 0 {
 			t.Errorf("%s: groups %+v in an empty collection", by, got.Groups)
 		}
 	}
@@ -778,7 +778,7 @@ func TestResultsHaveNoNilListsOrMaps(t *testing.T) {
 			f.collection(t)
 		}
 		for _, by := range []contract.GroupBy{contract.GroupByNone, contract.GroupBySet, contract.GroupByColor} {
-			g, err := f.s.Groups(t.Context(), f.ann, by)
+			g, err := f.s.Groups(t.Context(), f.ann, by, "")
 			check("groups", g, err)
 		}
 		p, err := f.s.Entries(t.Context(), f.ann, EntryQuery{})
