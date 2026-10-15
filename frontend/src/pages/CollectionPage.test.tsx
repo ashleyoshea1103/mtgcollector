@@ -2,8 +2,9 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { colorGroups, customGroups, entries, makeEntry, makeGroup, cards, stats } from '../fixtures';
 import { keys } from '../api/keys';
-import { ann, renderApp, signedIn, type FakeRequest, type Routes } from '../test/app';
+import { ann, renderApp, signedIn, type FakeRequest, type Reply, type Routes } from '../test/app';
 import { cardPath } from '../lib/paths';
+import { countOf } from '../lib/format';
 import type { CardSummary, CollectionEntry, GroupSummary } from '../types';
 
 const all = Object.values(entries);
@@ -513,5 +514,127 @@ describe('putting copies in a group', () => {
     await screen.findByText(`${binder.name} now holds 1 × ${entries.bolts.card.name}`);
     const afterPut = api.requests.slice(api.requests.findIndex((r) => r.method === 'PUT') + 1);
     expect(afterPut.filter((r) => r.path.includes('/members/'))).toEqual([]);
+  });
+});
+
+describe('searching the collection', () => {
+  // As the server matches: every word in the card's name or type line, ignoring case.
+  const matches = (e: CollectionEntry, q: string | null) =>
+    (q ?? '').toLowerCase().split(' ').filter(Boolean).every((word) => `${e.card.name} ${e.card.type_line}`.toLowerCase().includes(word));
+  const searchedGroups = (by: string, q: string | null) =>
+    (by === 'none' ? [allGroup] : colorGroups)
+      .map((g) => makeGroup(g.group.key, g.group.label, g.entries.filter((e) => matches(e, q))))
+      .filter((g) => by === 'none' || g.entries.length > 0)
+      .map((g) => g.group);
+  const searchable: Routes = {
+    ...collection,
+    'GET /api/collection/groups': (req) => ({ body: { group_by: req.query.get('group_by'), groups: searchedGroups(req.query.get('group_by')!, req.query.get('q')) } }),
+    'GET /api/collection/entries': (req) => ({ body: { entries: (byKey[req.query.get('key')!] ?? []).filter((e) => matches(e, req.query.get('q'))), next_cursor: null } }),
+  };
+  const creatures = all.filter((e) => matches(e, 'creature'));
+  const box = () => main().getByRole('searchbox', { name: 'Search' });
+  const status = () => screen.getByText((_, el) => el?.classList.contains('listing__status') ?? false);
+
+  it('narrows the listing to the cards that match, keeping the search in the URL', async () => {
+    const { api, user, location } = renderApp('/collection', searchable);
+    await main().findByRole('heading', { name: entries.bolts.card.name });
+    await user.type(box(), 'creature');
+    await waitFor(() => expect(main().queryByRole('heading', { name: entries.bolts.card.name })).not.toBeInTheDocument());
+    for (const e of creatures) expect(main().getByRole('heading', { name: e.card.name })).toBeInTheDocument();
+    expect(location().search).toBe('?q=creature');
+    expect(api.sent('GET /api/collection/groups').at(-1)!.query.get('q')).toBe('creature');
+    expect(api.sent('GET /api/collection/entries').at(-1)!.query.get('q')).toBe('creature');
+    expect(api.unhandled).toEqual([]);
+  });
+
+  it('says when no cards match, rather than that the collection is empty', async () => {
+    const { user } = renderApp('/collection', searchable);
+    await main().findByRole('heading', { name: entries.bolts.card.name });
+    await user.type(box(), 'zzz');
+    expect(await main().findByText('No cards match “zzz”')).toBeInTheDocument();
+    expect(main().getByText('Check the spelling, or clear the search.')).toBeInTheDocument();
+    expect(main().queryByText('Your collection is empty')).not.toBeInTheDocument();
+  });
+
+  it('announces how many cards match', async () => {
+    const { user } = renderApp('/collection?q=creature', searchable);
+    const copies = creatures.reduce((n, e) => n + e.quantity, 0);
+    await waitFor(() => expect(status()).toHaveTextContent(`${countOf(copies, 'card')} match`));
+    expect(status()).toHaveAttribute('role', 'status');
+    await user.clear(box());
+    await user.type(box(), 'zzz');
+    await waitFor(() => expect(status()).toHaveTextContent('No cards match'));
+    // Not searching: nothing to announce.
+    await user.click(main().getByRole('button', { name: 'Clear search' }));
+    await waitFor(() => expect(status()).toHaveTextContent(/^$/));
+  });
+
+  it('sends the search with the cursor for more', async () => {
+    const { api, user } = renderApp('/collection?q=creature', {
+      ...searchable,
+      'GET /api/collection/entries': (req) =>
+        req.query.get('cursor') === 'page-2' ? { body: { entries: creatures.slice(1), next_cursor: null } } : { body: { entries: creatures.slice(0, 1), next_cursor: 'page-2' } },
+    });
+    await user.click(await screen.findByRole('button', { name: 'Show more' }));
+    await main().findByRole('heading', { name: creatures.at(-1)!.card.name });
+    expect(api.sent('GET /api/collection/entries').map((r) => [r.query.get('q'), r.query.get('cursor')])).toEqual([
+      ['creature', null],
+      ['creature', 'page-2'],
+    ]);
+  });
+
+  it('searches within the chosen grouping', async () => {
+    const { api } = renderApp('/collection?group_by=color&q=creature', searchable);
+    expect(await screen.findByRole('button', { name: /^Blue/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Red/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Green/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Multicolor/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(keysAsked(api.sent('GET /api/collection/entries'))).toEqual(expect.arrayContaining(['U', 'R', 'G'])));
+    expect(api.sent('GET /api/collection/entries').every((r) => r.query.get('q') === 'creature')).toBe(true);
+  });
+
+  it("keeps the last search's cards up while the next search's load", async () => {
+    let release = () => {};
+    const { user } = renderApp('/collection', {
+      ...searchable,
+      'GET /api/collection/groups': (req) =>
+        req.query.get('q') === 'zzz'
+          ? new Promise((resolve) => (release = () => resolve((searchable['GET /api/collection/groups'] as (r: FakeRequest) => Reply)(req))))
+          : (searchable['GET /api/collection/groups'] as (r: FakeRequest) => Reply)(req),
+    });
+    const bolts = await main().findByRole('heading', { name: entries.bolts.card.name });
+    await user.type(box(), 'zzz');
+    await waitFor(() => expect(bolts.closest('.listing')).toHaveAttribute('aria-busy', 'true'));
+    expect(bolts).toBeInTheDocument();
+    act(() => release());
+    expect(await main().findByText('No cards match “zzz”')).toBeInTheDocument();
+  });
+
+  it('brings every card back when the search is cleared', async () => {
+    const { user, location } = renderApp('/collection?q=creature', searchable);
+    await main().findByRole('heading', { name: creatures[0].card.name });
+    await user.click(main().getByRole('button', { name: 'Clear search' }));
+    for (const e of all) expect(await main().findByRole('heading', { name: e.card.name })).toBeInTheDocument();
+    expect(location().search).toBe('');
+    expect(box()).toHaveValue('');
+  });
+
+  it('refreshes the searched listing after a change, keeping the search', async () => {
+    const { api, user } = renderApp('/collection?q=bolt', { ...searchable, 'DELETE /api/collection/entries/:id': { status: 204 } });
+    await user.click(await screen.findByRole('button', { name: `Actions for ${entries.bolts.card.name}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Remove…' }));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(api.sent('GET /api/collection/groups')).toHaveLength(2));
+    expect(api.sent('GET /api/collection/groups').map((r) => r.query.get('q'))).toEqual(['bolt', 'bolt']);
+  });
+
+  it('starts the search afresh when the Collection link is followed', async () => {
+    const { user, location } = renderApp('/collection?q=creature', searchable);
+    await main().findByRole('heading', { name: creatures[0].card.name });
+    expect(box()).toHaveValue('creature');
+    await user.click(screen.getByRole('link', { name: 'Collection' }));
+    await waitFor(() => expect(location().search).toBe(''));
+    expect(box()).toHaveValue('');
+    for (const e of all) expect(await main().findByRole('heading', { name: e.card.name })).toBeInTheDocument();
   });
 });

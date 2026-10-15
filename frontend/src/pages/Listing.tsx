@@ -1,8 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
 import { keys, type ListingId } from '../api/keys';
-import { useListingEntries, useListingGroups, type ListedEntry } from '../api/queries';
+import { useListingEntries, useListingGroups, type ListedEntry, type ListingGroups } from '../api/queries';
 import { GroupBucketSection } from '../components/GroupBucketSection';
+import { countOf } from '../lib/format';
 import type { ListingParams } from '../lib/listingParams';
 import { errorMessage } from '../lib/messages';
 import type { CardSummary, GroupSummary } from '../types';
@@ -15,7 +16,7 @@ interface Props {
   params: ListingParams;
   /** Buttons for each entry, e.g. a menu of actions. */
   renderActions?: (row: ListedEntry) => ReactNode;
-  /** Shown when there are no cards to list. */
+  /** Shown when there are no cards to list (none match, when searching). */
   empty: ReactNode;
 }
 
@@ -37,8 +38,27 @@ export function Listing(props: Props) {
   );
 }
 
-function Groups({ listing, params, renderActions, empty, onViewCard }: Props & { onViewCard: (card: CardSummary) => void }) {
-  const groups = useListingGroups(listing, params.groupBy, params.q);
+function Groups(props: Props & { onViewCard: (card: CardSummary) => void }) {
+  const groups = useListingGroups(props.listing, props.params.groupBy, props.params.q);
+  return (
+    <>
+      {/* First in every state, so the live region is there before what it says changes. */}
+      <p role="status" className="visually-hidden listing__status">
+        {groups.data && !groups.isPlaceholderData ? searchStatus(groups.data) : ''}
+      </p>
+      <GroupList {...props} groups={groups} />
+    </>
+  );
+}
+
+/** What a search found, for a screen reader: nothing to say when not searching. */
+function searchStatus({ q, groups }: ListingGroups) {
+  if (q === '') return '';
+  const cards = groups.reduce((n, g) => n + g.card_count, 0);
+  return cards === 0 ? 'No cards match' : `${countOf(cards, 'card')} ${cards === 1 ? 'matches' : 'match'}`;
+}
+
+function GroupList({ listing, params, renderActions, empty, onViewCard, groups }: Props & { onViewCard: (card: CardSummary) => void; groups: ReturnType<typeof useListingGroups> }) {
   const client = useQueryClient();
   // A section that goes (its last card removed) takes focus with it: to the first section, then.
   const keepFocus = useFocusFallback<HTMLDivElement>(firstToggle, groups.data);
@@ -46,10 +66,13 @@ function Groups({ listing, params, renderActions, empty, onViewCard }: Props & {
   if (groups.data === undefined) {
     return groups.isError ? <ErrorState message={errorMessage(groups.error)} onRetry={() => void groups.refetch()} /> : <Loading />;
   }
-  const list = groups.data.groups;
-  if (list.every((g) => g.card_count === 0)) return <>{empty}</>;
+  // The search these groups are for: while the next search's load, the last one's stand in, and
+  // their sections stay with them.
+  const { groups: list, q } = groups.data;
+  // Not the last search's "nothing matches" while the next one's results load.
+  if (list.every((g) => g.card_count === 0)) return groups.isPlaceholderData ? <Loading /> : <>{empty}</>;
   return (
-    <div className="listing" {...keepFocus}>
+    <div className="listing" aria-busy={groups.isPlaceholderData || undefined} {...keepFocus}>
       {list.map((group, i) => (
         // One section that can't be shown (a bad record) doesn't take the others with it.
         <ErrorBoundary
@@ -71,6 +94,7 @@ function Groups({ listing, params, renderActions, empty, onViewCard }: Props & {
             listing={listing}
             group={group}
             params={params}
+            q={q}
             defaultOpen={list.length <= OPEN_ALL_UP_TO || i === 0}
             renderActions={renderActions}
             onViewCard={onViewCard}
@@ -85,14 +109,16 @@ interface SectionProps {
   listing: ListingId;
   group: GroupSummary;
   params: ListingParams;
+  /** The search its group is from (not always params.q: see GroupList). */
+  q: string;
   defaultOpen: boolean;
   renderActions?: (row: ListedEntry) => ReactNode;
   onViewCard: (card: CardSummary) => void;
 }
 
-function Section({ listing, group, params, defaultOpen, renderActions, onViewCard }: SectionProps) {
+function Section({ listing, group, params, q, defaultOpen, renderActions, onViewCard }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
-  const entries = useListingEntries(listing, params.groupBy, group.key, params.sort, params.q, open);
+  const entries = useListingEntries(listing, params.groupBy, group.key, params.sort, q, open);
   const rows = entries.data;
   const byId = useMemo(() => new Map(rows?.map((r) => [r.entry.id, r])), [rows]);
   // A card removed (with the Actions button that had focus) leaves focus on the section's heading.
