@@ -45,8 +45,7 @@ describe('in pounds', () => {
     await user.click(main().getByRole('button', { name: `Add ${lightningBolt.name}` }));
     const dialog = screen.getByRole('dialog', { name: `Add ${lightningBolt.name}` });
     const printing = await within(dialog).findByRole('button', { name: new RegExp(`${otherBolt.set.name}.*#7`) });
-    expect(printing).toHaveTextContent('≈');
-    expect(printing).toHaveTextContent('£');
+    expect(printing).toHaveTextContent(pounds(otherBolt.prices.eur));
   });
 
   it("heads the card's price table in pounds, its dollars left alone", async () => {

@@ -77,8 +77,8 @@ describe('toPounds', () => {
     expect(toPounds(0, 0.8712)).toBe(0);
   });
 
-  it('formats as pounds', () => {
-    expect(formatPrice(1.8, 'gbp')).toContain('£');
-    expect(formatPrice(1.8, 'gbp')).toContain('1.80');
+  it('formats as pounds, in the reader\'s locale like euros and dollars', () => {
+    const gbp = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'GBP' }).format(1.8);
+    expect(formatPrice(1.8, 'gbp')).toBe(gbp);
   });
 });
