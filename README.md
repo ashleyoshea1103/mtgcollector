@@ -68,7 +68,7 @@ The API's own responses are JSON, shaped by the types in `backend/internal/contr
 
 Pages hold 60 cards, up to page 50.
 
-**Searching a listing.** `q` on the collection's and a group's groups and entries lists only the cards whose name or type line holds every word of it, ignoring case, in any order: `goblin` finds Goblin creatures, `bolt light` finds Lightning Bolt. It is at most 150 characters (`MaxSearchLength`). A cursor is only for the search it was made with.
+**Searching a listing.** `q` on the collection's and a group's groups and entries lists only the cards with every word of it somewhere in their name or type line, each word in either, ignoring case and order. For example, `goblin` finds Goblin creatures, `bolt light` finds Lightning Bolt, and `llanowar druid` finds Llanowar Elves (Creature — Elf Druid). Curly apostrophes match straight ones, and a dash on its own is ignored. It is at most 150 characters (`MaxSearchLength`); a longer one, or one with a NUL or that isn't UTF-8, is a 400. A cursor is only for the search it was made with.
 
 **The collection.** Every collection endpoint needs a signed-in user, and only ever sees that user's cards (another user's entry is a 404). An entry holds 1 to 999 copies; its finish must be one the printing comes in. A collection holds at most 50,000 entries (`MaxEntries`); past that, only copies of entries already there can be added. Its EUR price is the regular price for non-foil, and the foil price, else the regular one, for foil and etched (the rules in `testdata/pricing-cases.json`, which the frontend and the server's tests both run); a card Scryfall no longer lists has no price. Totals add up the priced cards and count the others as `unpriced_count`. The `group_by` values and their groups' keys:
 
