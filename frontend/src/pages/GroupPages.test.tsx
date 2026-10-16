@@ -1,5 +1,5 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { customGroups, entries, makeGroup } from '../fixtures';
 import { keys } from '../api/keys';
 import { renderApp, signedIn, type Routes } from '../test/app';
@@ -78,6 +78,36 @@ describe('GroupsPage', () => {
     await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), binder.name);
     await user.click(within(dialog).getByRole('button', { name: 'Make group' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('You already have a group with that name.');
+  });
+});
+
+describe('GroupsPage, in pounds', () => {
+  afterEach(() => localStorage.clear());
+
+  it("notes the rate once beside the groups' values, and nothing in euros", async () => {
+    const { user } = renderApp('/groups', groupApi());
+    await main().findByRole('heading', { name: binder.name });
+    expect(main().queryByText(/ECB rate/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'GBP' }));
+    expect(await main().findAllByText("Cardmarket's euro prices in pounds, at the ECB rate of 9 Oct 2026 (€1 = £0.8712)")).toHaveLength(1);
+  });
+
+  it("says why the values are in euros when there's no rate yet", async () => {
+    localStorage.setItem('mtgcollector-currency', 'gbp');
+    renderApp('/groups', { ...groupApi(), 'GET /api/rates': { body: { rates: [] } } });
+    expect(await main().findByText("Pound prices aren't available yet, so these are in euros.")).toBeInTheDocument();
+  });
+});
+
+describe('GroupPage, in pounds', () => {
+  afterEach(() => localStorage.clear());
+
+  it('notes the rate once in pounds, and nothing in euros', async () => {
+    const { user } = renderApp(`/groups/${binder.id}`, groupApi());
+    await main().findByRole('heading', { level: 1, name: binder.name });
+    expect(main().queryByText(/ECB rate/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'GBP' }));
+    expect(await main().findAllByText("Cardmarket's euro prices in pounds, at the ECB rate of 9 Oct 2026 (€1 = £0.8712)")).toHaveLength(1);
   });
 });
 
@@ -194,6 +224,14 @@ describe('GroupPage, more', () => {
     const bolts = (await main().findByRole('heading', { name: entries.bolts.card.name })).closest('article')!;
     expect(bolts.querySelector(".entry-tile__value")).toHaveTextContent(`Value ${eur(members[0].value_eur)}`);
     expect(members[0].value_eur).not.toBe(entries.bolts.value_eur);
+  });
+
+  it('shows only the value for one copy in the group, though the collection holds more', async () => {
+    const one = member(entries.bolts, 1);
+    renderApp(`/groups/${binder.id}`, { ...groupApi(), 'GET /api/groups/:id/members': { body: { members: [one], next_cursor: null } } });
+    const bolts = (await main().findByRole('heading', { name: entries.bolts.card.name })).closest('article')!;
+    expect(bolts.querySelector('.entry-tile__unit')).toBeNull();
+    expect(bolts.querySelector('.entry-tile__value')).toHaveTextContent(`Value ${eur(one.value_eur)}`);
   });
 
   it('takes a deleted group out of the groups list at once, before the list is fetched again', async () => {

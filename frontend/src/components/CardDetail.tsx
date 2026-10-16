@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { CONDITIONS, FINISHES, labelFor, LANGUAGES } from '../lib/labels';
+import { useMoney } from '../lib/money';
 import type { Card, CardFace, CollectionEntry, Finish } from '../types';
 import { DataTable, type Column } from '../ui';
 import { CardImage } from './CardImage';
@@ -7,6 +8,7 @@ import { ManaCost } from './ManaCost';
 import { NoLongerListed } from './NoLongerListed';
 import { OracleText } from './OracleText';
 import { Price } from './Price';
+import { RateNote } from './RateNote';
 import { RarityBadge } from './RarityBadge';
 import { SetSymbol } from './SetSymbol';
 
@@ -18,14 +20,16 @@ interface Props {
   headingLevel?: 1 | 2;
 }
 
-const priceColumns = (card: Card): Column<Finish>[] => [
+const priceColumns = (card: Card, inPounds: boolean): Column<Finish>[] => [
   { key: 'finish', header: 'Finish', hideHeader: true, rowHeader: true, cell: (f) => labelFor(FINISHES, f) },
-  { key: 'eur', header: 'EUR (Cardmarket)', cell: (f) => <Price prices={card.prices} finish={f} /> },
+  // Cardmarket's euro prices, which show in pounds when they're in effect.
+  { key: 'eur', header: inPounds ? 'GBP (from Cardmarket)' : 'EUR (Cardmarket)', cell: (f) => <Price prices={card.prices} finish={f} /> },
   { key: 'usd', header: 'USD', cell: (f) => <Price prices={card.prices} finish={f} currency="usd" /> },
 ];
 
 /** Everything about one printing: images, rules text, prices and owned copies. */
 export function CardDetail({ card, entries = [], headingLevel = 2 }: Props) {
+  const money = useMoney();
   const Title = headingLevel === 1 ? 'h1' : 'h2';
   const Sub = headingLevel === 1 ? 'h2' : 'h3';
   // Transform/modal cards have an image per face; split and adventure cards share one.
@@ -65,7 +69,8 @@ export function CardDetail({ card, entries = [], headingLevel = 2 }: Props) {
 
         <section className="card-detail__prices">
           <Sub>Prices</Sub>
-          <DataTable className="card-detail__price-table" columns={priceColumns(card)} rows={card.finishes} rowKey={(f) => f} />
+          <RateNote />
+          <DataTable className="card-detail__price-table" columns={priceColumns(card, money.currency === 'gbp')} rows={card.finishes} rowKey={(f) => f} />
           {card.cardmarket_url && (
             <a className="card-detail__cardmarket" href={card.cardmarket_url} target="_blank" rel="noopener noreferrer">
               View on Cardmarket

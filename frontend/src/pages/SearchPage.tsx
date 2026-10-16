@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { useCardSearch, useMe } from '../api/queries';
 import { CardTile } from '../components/CardTile';
+import { RateNote } from '../components/RateNote';
 import { SearchFilters } from '../components/SearchFilters';
 import { errorMessage } from '../lib/messages';
 import { loginUrl } from '../lib/nextPath';
@@ -63,6 +64,7 @@ export function SearchPage() {
         // Busy while the results of an older search stand in for the new one's.
         <div className="search-page__results" aria-busy={results.isPlaceholderData || undefined}>
           <h2 className="visually-hidden">Results</h2>
+          <RateNote />
           <Grid as="ul" minItemWidth="180px" className="card-grid">
             {results.data.map((card) => (
               <li key={card.id}>

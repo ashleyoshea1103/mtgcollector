@@ -36,9 +36,12 @@ export function CollectionEntryTile({ entry, actions, onView }: Props) {
         )}
       </Cluster>
       <p className="entry-tile__price">
-        <span className="entry-tile__unit">
-          <Price value={entry.unit_price_eur} /> each
-        </span>
+        {/* For one copy the price per copy is the value: shown once. */}
+        {entry.quantity > 1 && (
+          <span className="entry-tile__unit">
+            <Price value={entry.unit_price_eur} each />
+          </span>
+        )}
         <span className="entry-tile__value">
           <VisuallyHidden>Value </VisuallyHidden>
           <Price value={entry.value_eur} />

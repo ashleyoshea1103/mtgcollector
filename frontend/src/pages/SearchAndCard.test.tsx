@@ -1,9 +1,10 @@
 import { screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { cards, customGroups, entries, makeEntry } from '../fixtures';
 import { keys } from '../api/keys';
 import { renderApp, signedIn, signedOut, type Routes } from '../test/app';
 import type { Card, CardPage } from '../types';
+import { pounds, usd } from '../test/helpers';
 
 const { lightningBolt, ragavan, delver } = cards;
 // Another printing of Lightning Bolt: the same card from another set.
@@ -15,6 +16,47 @@ const searchApi: Routes = {
   'GET /api/cards/:id/printings': { body: page([otherBolt, lightningBolt]) },
 };
 const main = () => within(screen.getByRole('main'));
+
+describe('in pounds', () => {
+  afterEach(() => localStorage.clear());
+
+  it('notes the rate once above the search results, and nothing in euros', async () => {
+    const { user } = renderApp('/search?q=bolt', { ...signedOut, ...searchApi });
+    await main().findByRole('heading', { name: lightningBolt.name });
+    expect(main().queryByText(/ECB rate/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'GBP' }));
+    expect(await main().findAllByText("Cardmarket's euro prices in pounds, at the ECB rate of 9 Oct 2026 (€1 = £0.8712)")).toHaveLength(1);
+  });
+
+  it("notes the rate once in a card's prices, and nothing in euros", async () => {
+    const routes = { ...signedOut, 'GET /api/cards/:id': { body: delver }, 'GET /api/cards/:id/printings': { body: page([delver]) } };
+    const { user } = renderApp(`/cards/${delver.id}`, routes);
+    await main().findByRole('table');
+    expect(main().queryByText(/ECB rate/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'GBP' }));
+    expect(await main().findAllByText("Cardmarket's euro prices in pounds, at the ECB rate of 9 Oct 2026 (€1 = £0.8712)")).toHaveLength(1);
+  });
+
+  it('shows search results, and the printings to add, in pounds', async () => {
+    localStorage.setItem('mtgcollector-currency', 'gbp');
+    const { user } = renderApp('/search?q=bolt', { ...signedIn, ...searchApi, 'GET /api/groups': { body: { groups: [] } } });
+    const tile = (await main().findByRole('heading', { name: lightningBolt.name })).closest('article')!;
+    expect(tile.querySelector('.card-tile__price')).toHaveTextContent(pounds(lightningBolt.prices.eur));
+    await user.click(main().getByRole('button', { name: `Add ${lightningBolt.name}` }));
+    const dialog = screen.getByRole('dialog', { name: `Add ${lightningBolt.name}` });
+    const printing = await within(dialog).findByRole('button', { name: new RegExp(`${otherBolt.set.name}.*#7`) });
+    expect(printing).toHaveTextContent(pounds(otherBolt.prices.eur));
+  });
+
+  it("heads the card's price table in pounds, its dollars left alone", async () => {
+    localStorage.setItem('mtgcollector-currency', 'gbp');
+    renderApp(`/cards/${delver.id}`, { ...signedOut, 'GET /api/cards/:id': { body: delver }, 'GET /api/cards/:id/printings': { body: page([delver]) } });
+    const table = await main().findByRole('table');
+    expect(within(table).getByRole('columnheader', { name: 'GBP (from Cardmarket)' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'USD' })).toBeInTheDocument();
+    expect(table).toHaveTextContent(usd(delver.prices.usd));
+  });
+});
 
 describe('SearchPage', () => {
   it("opens the larger view from a result's image", async () => {

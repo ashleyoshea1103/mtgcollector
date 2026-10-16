@@ -53,7 +53,7 @@ export function AddToCollectionForm({ card, groups = [], onSubmit, submitting = 
     <form className="add-form" onSubmit={handleSubmit}>
       <p className="add-form__card">
         Adding <strong>{card.name}</strong> (<SetSymbol set={card.set} rarity={card.rarity} nameShown /> {card.set.name} #{card.collector_number}) at{' '}
-        <Price prices={card.prices} finish={finish} /> each
+        <Price prices={card.prices} finish={finish} each />
       </p>
 
       <Field label="Quantity" className="add-form__field">

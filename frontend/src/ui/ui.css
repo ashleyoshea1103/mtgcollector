@@ -551,6 +551,12 @@
   font-size: var(--text-sm);
   cursor: pointer;
 }
+/* A finger needs a bigger target: the group's border makes up the rest of 44px. */
+@media (pointer: coarse) {
+  .segmented-control__option {
+    min-height: calc(var(--size-touch) - 2px);
+  }
+}
 .segmented-control__option[data-hovered] {
   color: var(--color-text-strong);
 }

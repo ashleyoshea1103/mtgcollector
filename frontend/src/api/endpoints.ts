@@ -12,6 +12,7 @@ import type {
   CustomGroupList,
   EntryChange,
   EntryPage,
+  ExchangeRates,
   GroupBy,
   GroupChange,
   GroupMember,
@@ -73,6 +74,7 @@ export const searchCards = (s: CardSearch, page: number, signal?: AbortSignal) =
   });
 export const autocomplete = (q: string, signal?: AbortSignal) => request<CardNames>('GET', '/api/cards/autocomplete', { query: { q }, signal });
 export const card = (id: string, signal?: AbortSignal) => request<Card>('GET', `/api/cards/${segment(id)}`, { signal });
+export const rates = (signal?: AbortSignal) => request<ExchangeRates>('GET', '/api/rates', { signal });
 export const printings = (id: string, page: number, signal?: AbortSignal) =>
   request<CardPage>('GET', `/api/cards/${segment(id)}/printings`, { query: { page }, signal });
 

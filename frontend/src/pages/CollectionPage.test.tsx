@@ -2,7 +2,8 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { colorGroups, customGroups, entries, makeEntry, makeGroup, cards, stats } from '../fixtures';
 import { keys } from '../api/keys';
-import { ann, renderApp, signedIn, type FakeRequest, type Reply, type Routes } from '../test/app';
+import { ann, ratesApi, renderApp, signedIn, type FakeRequest, type Reply, type Routes } from '../test/app';
+import { pounds } from '../test/helpers';
 import { cardPath } from '../lib/paths';
 import { countOf } from '../lib/format';
 import type { CardSummary, CollectionEntry, GroupSummary } from '../types';
@@ -22,6 +23,69 @@ const collection: Routes = {
 const main = () => within(screen.getByRole('main'));
 const section = (label: RegExp) => screen.getByRole('button', { name: label }).closest('.group-bucket') as HTMLElement;
 const keysAsked = (requests: FakeRequest[]) => requests.map((r) => r.query.get('key'));
+
+describe('CollectionPage, in pounds', () => {
+  afterEach(() => localStorage.clear());
+
+  it('says where its values come from: euros, or pounds at the ECB rate', async () => {
+    const { user } = renderApp('/collection', collection);
+    expect(await main().findByText('Values from Cardmarket, in euros')).toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'GBP' }));
+    expect(await main().findByText("Cardmarket's euro prices in pounds, at the ECB rate of 9 Oct 2026 (€1 = £0.8712)")).toBeInTheDocument();
+    expect(main().queryByText('Values from Cardmarket, in euros')).not.toBeInTheDocument();
+  });
+
+  it("stays in euros, and says why, when the rate can't be had", async () => {
+    localStorage.setItem('mtgcollector-currency', 'gbp');
+    renderApp('/collection', { ...collection, 'GET /api/rates': { status: 500, body: { error: 'the database is unavailable' } } });
+    expect(await main().findByText("Pound prices aren't available yet, so these are in euros.")).toBeInTheDocument();
+    const summary = await main().findByRole('region', { name: 'Collection summary' });
+    expect(summary).not.toHaveTextContent('≈');
+    expect(summary).toHaveTextContent('€');
+  });
+
+  it("doesn't say the rate is missing while it's still coming", async () => {
+    localStorage.setItem('mtgcollector-currency', 'gbp');
+    let send!: () => void;
+    const sent = new Promise<void>((resolve) => (send = resolve));
+    renderApp('/collection', {
+      ...collection,
+      'GET /api/rates': async () => {
+        await sent;
+        return ratesApi['GET /api/rates'] as Reply;
+      },
+    });
+    await main().findByRole('region', { name: 'Collection summary' });
+    expect(main().queryByText("Pound prices aren't available yet, so these are in euros.")).not.toBeInTheDocument();
+    send();
+    expect(await main().findByText("Cardmarket's euro prices in pounds, at the ECB rate of 9 Oct 2026 (€1 = £0.8712)")).toBeInTheDocument();
+  });
+
+  it('treats a malformed rate as no rate', async () => {
+    localStorage.setItem('mtgcollector-currency', 'gbp');
+    for (const rate of [
+      { currency: 'GBP', per_eur: 0, date: '2026-10-09' },
+      { currency: 'GBP', per_eur: -0.87, date: '2026-10-09' },
+      { currency: 'GBP', per_eur: 0.8712, date: 'soon' },
+    ]) {
+      const { unmount } = renderApp('/collection', { ...collection, 'GET /api/rates': { body: { rates: [rate] } } });
+      expect(await main().findByText("Pound prices aren't available yet, so these are in euros.")).toBeInTheDocument();
+      expect(await main().findByRole('region', { name: 'Collection summary' })).not.toHaveTextContent('≈');
+      unmount();
+    }
+  });
+
+  it('shows every value in pounds when GBP is chosen, a missing price still as a dash', async () => {
+    localStorage.setItem('mtgcollector-currency', 'gbp');
+    renderApp('/collection', collection);
+    const summary = await main().findByRole('region', { name: 'Collection summary' });
+    expect(summary).toHaveTextContent(pounds(stats.value_eur));
+    for (const e of all) {
+      const tile = (await main().findByRole('heading', { name: e.card.name })).closest('article')!;
+      expect(tile.querySelector('.entry-tile__value')).toHaveTextContent(e.value_eur == null ? '—' : `Value ${pounds(e.value_eur)}`);
+    }
+  });
+});
 
 describe('CollectionPage, the larger card view', () => {
   it("opens from a card's image, links to the card's page, and gives focus back on closing", async () => {

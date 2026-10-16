@@ -27,6 +27,8 @@ type Services struct {
 	// The signed-in user's collection, and their custom groups.
 	Collection   Collection
 	CustomGroups CustomGroups
+	// The euro exchange rates, for showing prices in pounds.
+	Rates Rates
 	// Limits on how often clients may call the API; nil means DefaultLimits().
 	Limits *Limits
 }
@@ -43,6 +45,7 @@ func NewHandler(s Services) http.Handler {
 	mux.HandleFunc("GET /api/cards/autocomplete", autocomplete(s.Cards))
 	mux.HandleFunc("GET /api/cards/{id}", getCard(s.Cards))
 	mux.HandleFunc("GET /api/cards/{id}/printings", printings(s.Cards))
+	mux.HandleFunc("GET /api/rates", exchangeRates(s.Rates))
 	mux.Handle("POST /api/auth/signup", limit(l.AuthPerClient, signup(s.Auth)))
 	mux.Handle("POST /api/auth/login", limit(l.AuthPerClient, login(s.Auth, l.LoginFailures)))
 	mux.HandleFunc("POST /api/auth/logout", logout(s.Auth))
