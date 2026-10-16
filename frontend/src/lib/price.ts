@@ -1,6 +1,9 @@
 import type { CardSummary, Finish, Prices } from '../types';
 
+/** The currencies a card has prices in (Scryfall's, from Cardmarket and TCGplayer). */
 export type Currency = 'eur' | 'usd';
+/** The currencies a price can be shown in: pounds are euros converted (toPounds). */
+export type ShownCurrency = Currency | 'gbp';
 
 /**
  * The unit price of one copy in a finish, for cards that aren't owned yet
@@ -33,11 +36,17 @@ export function lineValue(unitPrice: number | null, quantity: number): number | 
   return unitPrice == null ? null : roundToCents(unitPrice * quantity);
 }
 
-const formatters: Record<Currency, Intl.NumberFormat> = {
+/** A euro amount in pounds at gbpPerEur pounds to the euro, to the penny (half up, as euros are rounded). */
+export function toPounds(eur: number, gbpPerEur: number): number {
+  return roundToCents(eur * gbpPerEur);
+}
+
+const formatters: Record<ShownCurrency, Intl.NumberFormat> = {
   eur: new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR' }),
   usd: new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }),
+  gbp: new Intl.NumberFormat(undefined, { style: 'currency', currency: 'GBP' }),
 };
 
-export function formatPrice(value: number, currency: Currency = 'eur'): string {
+export function formatPrice(value: number, currency: ShownCurrency = 'eur'): string {
   return formatters[currency].format(value);
 }

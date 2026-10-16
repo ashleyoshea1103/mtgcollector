@@ -2,6 +2,7 @@ import { Link, useSearchParams } from 'react-router';
 import { useStats } from '../api/queries';
 import { CollectionSummary } from '../components/CollectionSummary';
 import { ListingControls } from '../components/ListingControls';
+import { RateNote } from '../components/RateNote';
 import { readListing, writeListing } from '../lib/listingParams';
 import { errorMessage } from '../lib/messages';
 import { EmptyState, ErrorState, Loading, Stack } from '../ui';
@@ -20,7 +21,7 @@ export function CollectionPage() {
       <div className="page-head">
         <div className="page-head__titles">
           <h1>Your collection</h1>
-          <p className="page-head__subtitle">Values from Cardmarket, in euros</p>
+          <RateNote className="page-head__subtitle" euros="Values from Cardmarket, in euros" />
         </div>
         {/* On a phone it floats at the bottom of the screen, in reach of a thumb. */}
         <Link to="/search" className="button button--primary page-head__action collection-page__add">

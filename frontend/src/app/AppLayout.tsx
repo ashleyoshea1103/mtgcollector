@@ -3,6 +3,8 @@ import { Link, NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } fr
 import { useLogout, useMe } from '../api/queries';
 import { errorMessage } from '../lib/messages';
 import { Button, Cluster, toast } from '../ui';
+import { CurrencySwitch } from './CurrencySwitch';
+import { MoneyProvider } from './MoneyProvider';
 import { ThemeToggle } from './ThemeToggle';
 
 /** Every page's frame: the header with the app's sections and the account, then the page. */
@@ -39,7 +41,8 @@ export function AppLayout() {
   }
 
   return (
-    <>
+    // How prices are shown, for the header's switch and every page (dialogs included).
+    <MoneyProvider>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -82,6 +85,7 @@ export function AppLayout() {
               </Cluster>
             )
           )}
+          <CurrencySwitch />
           <ThemeToggle />
         </Cluster>
       </header>
@@ -89,6 +93,6 @@ export function AppLayout() {
         <Outlet />
       </main>
       <ScrollRestoration />
-    </>
+    </MoneyProvider>
   );
 }

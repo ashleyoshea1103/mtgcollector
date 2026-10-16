@@ -1,8 +1,9 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { cards, entries, serverPricedBolts } from '../fixtures';
-import { eur, getAllByTooltip, getByTooltip, queryByTooltip } from '../test/helpers';
+import { cards, entries, makeEntry, serverPricedBolts, unpricedCard } from '../fixtures';
+import { eur, getAllByTooltip, getByTooltip, inPounds, pounds, poundsSeen, queryByTooltip, visibleText } from '../test/helpers';
+import { MoneyContext } from '../lib/money';
 import { corsIconUrl } from '../lib/urls';
 import { CardTile } from './CardTile';
 import { CollectionEntryTile } from './CollectionEntryTile';
@@ -64,6 +65,48 @@ describe('CardTile', () => {
     expect(queryByTooltip(document.body, 'No price available')).not.toBeInTheDocument();
   });
 
+});
+
+describe('CollectionEntryTile, the unit price', () => {
+  const unit = () => screen.getByRole('article').querySelector('.entry-tile__unit')!;
+
+  it('says "each" after a euro price', () => {
+    render(<CollectionEntryTile entry={entries.bolts} />);
+    expect(visibleText(unit())).toBe(`${eur(entries.bolts.unit_price_eur)} each`);
+  });
+
+  it('shows a pound price without "each", though it is still read out', () => {
+    render(
+      <MoneyContext value={inPounds}>
+        <CollectionEntryTile entry={entries.bolts} />
+      </MoneyContext>,
+    );
+    expect(visibleText(unit())).toBe(poundsSeen(entries.bolts.unit_price_eur!));
+    expect(unit()).toHaveTextContent(`${pounds(entries.bolts.unit_price_eur)} each`);
+  });
+
+  it('is left out for a single copy, whose value is the same amount', () => {
+    const one = makeEntry(9, cards.lightningBolt, { quantity: 1 });
+    const { rerender } = render(<CollectionEntryTile entry={one} />);
+    const tile = screen.getByRole('article');
+    expect(tile.querySelector('.entry-tile__unit')).toBeNull();
+    expect(tile.querySelector('.entry-tile__value')).toHaveTextContent(`Value ${eur(one.value_eur)}`);
+    expect(tile).not.toHaveTextContent(/each/);
+
+    rerender(
+      <MoneyContext value={inPounds}>
+        <CollectionEntryTile entry={one} />
+      </MoneyContext>,
+    );
+    expect(screen.getByRole('article').querySelector('.entry-tile__unit')).toBeNull();
+    expect(screen.getByRole('article').querySelector('.entry-tile__value')).toHaveTextContent(`Value ${pounds(one.value_eur)}`);
+    expect(screen.getByRole('article')).not.toHaveTextContent(/each/);
+  });
+
+  it('shows an unpriced single copy as one dash', () => {
+    render(<CollectionEntryTile entry={makeEntry(10, unpricedCard, { quantity: 1 })} />);
+    expect(screen.getByRole('article').querySelectorAll('.price--none')).toHaveLength(1);
+  });
 });
 
 describe('CollectionEntryTile', () => {

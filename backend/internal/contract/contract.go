@@ -382,3 +382,20 @@ const MinPasswordLength = 15
 
 // The most characters a password may have.
 const MaxPasswordLength = 256
+
+// ExchangeRate is a currency's euro exchange rate on one day: the European Central Bank's
+// reference rate, PerEUR of the currency to one euro. The app shows Cardmarket's euro prices
+// in that currency with it.
+type ExchangeRate struct {
+	// An ISO 4217 code, e.g. "GBP".
+	Currency string  `json:"currency"`
+	PerEUR   float64 `json:"per_eur"`
+	// The ECB's day for the rate, YYYY-MM-DD.
+	Date string `json:"date"`
+}
+
+// ExchangeRates are the latest rates the server has: empty (never null) until it has fetched
+// one.
+type ExchangeRates struct {
+	Rates []ExchangeRate `json:"rates"`
+}

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useChangeGroup, useCustomGroup, useDeleteGroup } from '../api/queries';
 import { GroupForm } from '../components/GroupForm';
 import { ListingControls } from '../components/ListingControls';
+import { RateNote } from '../components/RateNote';
 import { TotalValue } from '../components/TotalValue';
 import { countOf } from '../lib/format';
 import { groupChange } from '../lib/groups';
@@ -53,6 +54,7 @@ function GroupView({ id }: { id: number }) {
         </Cluster>
         {g.description && <p className="group-page__description">{g.description}</p>}
       </header>
+      <RateNote />
       {/* The same page, so it stays where it's scrolled to. */}
       <ListingControls value={listing} onChange={(next) => setParams(writeListing(params, next), { replace: true, preventScrollReset: true })} />
       <Listing

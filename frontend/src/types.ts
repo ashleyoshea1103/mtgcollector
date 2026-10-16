@@ -429,3 +429,26 @@ export const MinPasswordLength = 15;
  * The most characters a password may have.
  */
 export const MaxPasswordLength = 256;
+/**
+ * ExchangeRate is a currency's euro exchange rate on one day: the European Central Bank's
+ * reference rate, PerEUR of the currency to one euro. The app shows Cardmarket's euro prices
+ * in that currency with it.
+ */
+export interface ExchangeRate {
+  /**
+   * An ISO 4217 code, e.g. "GBP".
+   */
+  currency: string;
+  per_eur: number /* float64 */;
+  /**
+   * The ECB's day for the rate, YYYY-MM-DD.
+   */
+  date: string;
+}
+/**
+ * ExchangeRates are the latest rates the server has: empty (never null) until it has fetched
+ * one.
+ */
+export interface ExchangeRates {
+  rates: ExchangeRate[];
+}

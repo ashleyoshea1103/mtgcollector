@@ -18,6 +18,8 @@ export const keys = {
   search: (s: CardSearch) => ['cards', 'search', s] as const,
   card: (id: string) => ['cards', 'card', id] as const,
   printings: (id: string) => ['cards', 'printings', id] as const,
+  // The euro exchange rates, for showing prices in pounds: public, like card data.
+  rates: ['rates'] as const,
   stats: ['collection', 'stats'] as const,
   copies: (cardId: string) => ['collection', 'copies', cardId] as const,
   groupList: ['groups', 'list'] as const,

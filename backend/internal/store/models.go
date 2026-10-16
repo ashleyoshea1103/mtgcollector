@@ -137,6 +137,13 @@ type EntryPrice struct {
 	Value         pgtype.Numeric
 }
 
+type ExchangeRate struct {
+	Currency  string
+	PerEur    pgtype.Numeric
+	RateDate  pgtype.Date
+	FetchedAt pgtype.Timestamptz
+}
+
 type GroupMember struct {
 	GroupID  int64
 	EntryID  int64

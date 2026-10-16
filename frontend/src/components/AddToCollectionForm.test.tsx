@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, customGroups } from '../fixtures';
 import { LANGUAGES } from '../lib/labels';
-import { eur, getByTooltip } from '../test/helpers';
+import { eur, getByTooltip, inPounds, pounds, poundsSeen, readText, visibleText } from '../test/helpers';
+import { MoneyContext } from '../lib/money';
 import { corsIconUrl } from '../lib/urls';
 import type { NewEntry } from '../types';
 import { AddToCollectionForm } from './AddToCollectionForm';
@@ -20,6 +21,23 @@ describe('AddToCollectionForm', () => {
     expect(line).toHaveTextContent(`Adding ${ragavan.name} ( ${ragavan.set.name} #${ragavan.collector_number})`);
     expect(getByTooltip(line as HTMLElement, ragavan.set.name)).toHaveClass('set-symbol');
     expect(line.querySelector('.set-symbol img')).toHaveAttribute('src', corsIconUrl(ragavan.set.icon_svg_uri!));
+  });
+
+  it('says "each" after a euro price, and not after a pound price, though it is still read out', () => {
+    const { container, rerender } = render(<AddToCollectionForm card={lightningBolt} onSubmit={vi.fn<(entry: NewEntry) => void>()} />);
+    // What follows the last " at ": the price, and whatever comes after it.
+    const atThePrice = (text: string) => text.slice(text.lastIndexOf(' at ') + 1);
+    const line = container.querySelector('.add-form__card')!;
+    expect(atThePrice(visibleText(line))).toBe(`at ${eur(lightningBolt.prices.eur)} each`);
+
+    rerender(
+      <MoneyContext value={inPounds}>
+        <AddToCollectionForm card={lightningBolt} onSubmit={vi.fn<(entry: NewEntry) => void>()} />
+      </MoneyContext>,
+    );
+    const inGbp = container.querySelector('.add-form__card')!;
+    expect(atThePrice(visibleText(inGbp))).toBe(`at ${poundsSeen(lightningBolt.prices.eur!)}`);
+    expect(atThePrice(readText(inGbp))).toBe(`at ${pounds(lightningBolt.prices.eur)} each`);
   });
 
   it('submits one near-mint English copy by default', async () => {
