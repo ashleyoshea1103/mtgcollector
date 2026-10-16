@@ -151,6 +151,74 @@ func TestTheDownloadsFolderIsLeftToTheGoCommand(t *testing.T) {
 	}
 }
 
+func TestAnEditHiddenByRewritingTheStateFileIsCaughtAgainstTheBaseline(t *testing.T) {
+	modcache, stateFile := t.TempDir(), filepath.Join(t.TempDir(), "state")
+	addFixtures(t, modcache)
+	checkOK(t, modcache, stateFile)
+	baseline := readFile(t, stateFile)
+
+	// What verified code could do: edit a module, then record its new fingerprint.
+	appendTo(t, filepath.Join(modcache, "example.com", "m@v1.0.0", "m.go"), "func init() { panic(1) }\n")
+	fingerprints, _, err := scan(modcache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, _, _ := loadState(stateFile)
+	st["example.com/m@v1.0.0"] = entry{fingerprint: fingerprints["example.com/m@v1.0.0"]}
+	if err := saveState(stateFile, st); err != nil {
+		t.Fatal(err)
+	}
+	if problems, err := check(modcache, stateFile, nil, new(bytes.Buffer)); len(problems) > 0 || err != nil {
+		t.Fatalf("against the rewritten file, check = %q, %v; the test expects it to be fooled", problems, err)
+	}
+
+	problems, err := check(modcache, stateFile, strings.NewReader(baseline), new(bytes.Buffer))
+	if err != nil || !slices.ContainsFunc(problems, func(p string) bool { return strings.HasPrefix(p, "example.com/m@v1.0.0: its files don't match") }) {
+		t.Errorf("against the baseline, check = %q, %v; want the edited module caught", problems, err)
+	}
+}
+
+func TestTheBaselineIgnoresChangesAnotherPushMadeToTheStateFile(t *testing.T) {
+	modcache, stateFile := t.TempDir(), filepath.Join(t.TempDir(), "state")
+	addModule(t, modcache, fixtures[0].root, fixtures[0].files)
+	checkOK(t, modcache, stateFile)
+	baseline := readFile(t, stateFile)
+
+	// Another push downloads a module, records it, and prunes (stamping the time it was used).
+	addModule(t, modcache, fixtures[1].root, fixtures[1].files)
+	checkOK(t, modcache, stateFile)
+	mustPrune(t, modcache, stateFile, nil, time.Unix(1_800_000_000, 0))
+
+	var out bytes.Buffer
+	if problems, err := check(modcache, stateFile, strings.NewReader(baseline), &out); len(problems) > 0 || err != nil {
+		t.Fatalf("check = %q, %v; want no problems", problems, err)
+	}
+	if !strings.Contains(out.String(), "hashing 1 changed module") {
+		t.Errorf("check said %q; want the module new since the baseline hashed", out.String())
+	}
+	if st, _, _ := loadState(stateFile); st[fixtures[0].root].lastUsed != 1_800_000_000 {
+		t.Errorf("last used = %d; want the other push's stamp kept", st[fixtures[0].root].lastUsed)
+	}
+}
+
+func TestAMalformedModuleNameInTheStateFileIsAProblemNotACrash(t *testing.T) {
+	modcache, stateFile := t.TempDir(), filepath.Join(t.TempDir(), "state")
+	writeFile(t, stateFile, stateHeader+"\nexample.com/m\tabc\t0\n")
+	wantProblem(t, modcache, stateFile, "example.com/m: not a module directory's name")
+}
+
+func TestAZiphashCutShortIsRecreatedFromTheZipAsTheGoCommandWould(t *testing.T) {
+	modcache, stateFile := t.TempDir(), filepath.Join(t.TempDir(), "state")
+	addFixtures(t, modcache)
+	mod, _ := parseRoot(fixtures[0].root)
+	writeFile(t, mod.download(modcache)+".ziphash", "h1:fCHMq")
+	checkOK(t, modcache, stateFile)
+
+	// ...so then the files must match the zip.
+	writeZip(t, mod.download(modcache)+".zip", "example.com/m@v1.0.0", map[string]string{"go.mod": "module example.com/m\n", "m.go": "package evil\n"})
+	wantProblem(t, modcache, filepath.Join(t.TempDir(), "state"), "example.com/m@v1.0.0: its files don't match")
+}
+
 func TestADeletedModuleIsCheckedByTheZipItWouldBeExtractedFrom(t *testing.T) {
 	modcache, stateFile := t.TempDir(), filepath.Join(t.TempDir(), "state")
 	addFixtures(t, modcache)
@@ -223,8 +291,8 @@ func TestPruneDeletesModulesNotUsedForTheKeepPeriod(t *testing.T) {
 			t.Errorf("%s kept = %v (dir: %v, zip: %v), want %v", root, kept, err, zipErr, want)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(modcache, "cache", "modcache-check-trash")); !os.IsNotExist(err) {
-		t.Errorf("the trash wasn't emptied (stat: %v)", err)
+	if trash, _ := os.ReadDir(filepath.Join(modcache, "cache", "modcache-check-trash")); len(trash) > 0 {
+		t.Errorf("the trash wasn't emptied: %v", trash)
 	}
 	if out := checkOK(t, modcache, stateFile); out != "" {
 		t.Errorf("check after pruning said %q; want nothing to hash", out)
@@ -275,11 +343,11 @@ func TestPruneBeforeAnyCheckDoesNothing(t *testing.T) {
 func TestAStateFileFromSomethingElseIsAnError(t *testing.T) {
 	modcache, stateFile := t.TempDir(), filepath.Join(t.TempDir(), "state")
 	writeFile(t, stateFile, "something else\n")
-	if _, err := check(modcache, stateFile, new(bytes.Buffer)); err == nil {
+	if _, err := check(modcache, stateFile, nil, new(bytes.Buffer)); err == nil {
 		t.Error("check accepted a state file it didn't write")
 	}
 	writeFile(t, stateFile, stateHeader+"\nexample.com/m@v1.0.0\tabc\n")
-	if _, err := check(modcache, stateFile, new(bytes.Buffer)); err == nil {
+	if _, err := check(modcache, stateFile, nil, new(bytes.Buffer)); err == nil {
 		t.Error("check accepted a malformed line")
 	}
 }
@@ -297,7 +365,10 @@ func TestTheCommandLine(t *testing.T) {
 		{[]string{"verify"}, "", 2, "usage"},
 		{[]string{"check", modcache}, "", 2, "usage"},
 		{[]string{"prune", "-keep", "soon", modcache, stateFile}, "", 2, "usage"},
+		{[]string{"check", "-baseline", stateFile, modcache, stateFile}, "", 2, "usage"},
+		{[]string{"check", "-baseline", "-", modcache, stateFile}, "not a state file\n", 2, "the baseline isn't a state file"},
 		{[]string{"check", modcache, stateFile}, "", 0, ""},
+		{[]string{"check", "-baseline", "-", modcache, stateFile}, stateHeader + "\n", 0, ""},
 		{[]string{"prune", "-keep", "1h", modcache, stateFile}, filepath.Join(modcache, "example.com", "m@v1.0.0") + "\r\n\n", 0, ""},
 	}
 	for _, c := range cases {
@@ -394,6 +465,15 @@ func writeFile(t *testing.T, file, body string) {
 	}
 }
 
+func readFile(t *testing.T, file string) string {
+	t.Helper()
+	data, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
 func appendTo(t *testing.T, file, text string) {
 	t.Helper()
 	if err := os.Chmod(file, 0o644); err != nil {
@@ -432,7 +512,7 @@ func writeZip(t *testing.T, file, prefix string, files map[string]string) {
 func checkOK(t *testing.T, modcache, stateFile string) string {
 	t.Helper()
 	var out bytes.Buffer
-	problems, err := check(modcache, stateFile, &out)
+	problems, err := check(modcache, stateFile, nil, &out)
 	if err != nil || len(problems) > 0 {
 		t.Fatalf("check = %q, %v; want no problems", problems, err)
 	}
@@ -441,7 +521,7 @@ func checkOK(t *testing.T, modcache, stateFile string) string {
 
 func wantProblem(t *testing.T, modcache, stateFile, want string) {
 	t.Helper()
-	problems, err := check(modcache, stateFile, new(bytes.Buffer))
+	problems, err := check(modcache, stateFile, nil, new(bytes.Buffer))
 	if err != nil {
 		t.Fatal(err)
 	}

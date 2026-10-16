@@ -14,12 +14,15 @@
 //
 // Usage:
 //
-//	modcache-check check <module cache> <state file>
+//	modcache-check check [-baseline -] <module cache> <state file>
 //	modcache-check prune [-keep 720h] <module cache> <state file> <directories-in-use
 //
 // check compares the cache with the fingerprints in the state file. On the first run, with no
 // fingerprints yet, it hashes every module. It exits 1, listing the problems, if a module's
 // files don't match its recorded hash, and records the new fingerprints only when all do.
+// With -baseline -, the fingerprints to compare with are read from standard input instead: the
+// hook keeps its own copy of the state file while it verifies, as the code being verified could
+// rewrite the file to hide an edit (and another push, running alongside, rewrites it anyway).
 //
 // prune deletes the modules nothing has used for -keep, so the cache doesn't keep every
 // version Dependabot has moved past. Standard input lists the module directories in use, one
@@ -57,7 +60,7 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
-const usage = `usage: modcache-check check <module cache> <state file>
+const usage = `usage: modcache-check check [-baseline -] <module cache> <state file>
        modcache-check prune [-keep 720h] <module cache> <state file> <directories-in-use`
 
 // run is the command line: exit status 0 when the cache checks out, 1 when it doesn't, and 2
@@ -69,10 +72,17 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	switch args[0] {
 	case "check":
-		if len(args) != 3 {
+		flags := flag.NewFlagSet("check", flag.ContinueOnError)
+		flags.SetOutput(stderr)
+		baselineFrom := flags.String("baseline", "", `"-" to read the fingerprints to compare with from standard input`)
+		if flags.Parse(args[1:]) != nil || flags.NArg() != 2 || (*baselineFrom != "" && *baselineFrom != "-") {
 			break
 		}
-		problems, err := check(args[1], args[2], stdout)
+		var baseline io.Reader
+		if *baselineFrom == "-" {
+			baseline = stdin
+		}
+		problems, err := check(flags.Arg(0), flags.Arg(1), baseline, stdout)
 		if err != nil {
 			fmt.Fprintln(stderr, "modcache-check:", err)
 			return 2
@@ -116,10 +126,28 @@ func readLines(r io.Reader) ([]string, error) {
 	return lines, s.Err()
 }
 
-// check compares the cache with the state file's fingerprints, hashes the modules that changed,
-// and returns what's wrong. It saves the new fingerprints only if nothing is.
-func check(modcache, stateFile string, out io.Writer) ([]string, error) {
-	old, existed, err := loadState(stateFile)
+// check compares the cache with the fingerprints in baseline (or, if that's nil, the state
+// file), hashes the modules that changed, and returns what's wrong. It saves the new
+// fingerprints to the state file only if nothing is.
+func check(modcache, stateFile string, baseline io.Reader, out io.Writer) ([]string, error) {
+	var old state
+	existed := true
+	var err error
+	if baseline != nil {
+		var data []byte
+		if data, err = io.ReadAll(baseline); err == nil {
+			old, err = parseState(data, "the baseline")
+		}
+		// Last-used times only decide what prune deletes, so the file's newer ones are kept.
+		if onDisk, _, err := loadState(stateFile); err == nil {
+			for root, e := range old {
+				e.lastUsed = max(e.lastUsed, onDisk[root].lastUsed)
+				old[root] = e
+			}
+		}
+	} else {
+		old, existed, err = loadState(stateFile)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -284,15 +312,22 @@ func verifyModule(modcache, root string, removed bool) result {
 	if extracting(modcache, root) {
 		removed = true // the go command doesn't use a partly extracted module: it extracts it again
 	}
+	prefix := mod.path + "@" + mod.version
 	if !removed {
-		want, err := readZiphash(download + ".ziphash")
+		want, err := recordedHash(download, prefix)
 		if err != nil {
 			return result{problem: fmt.Sprintf("%s: no recorded hash to check its files against (%v)", root, err)}
 		}
-		got, err := hashDir(filepath.Join(modcache, filepath.FromSlash(root)), mod.path+"@"+mod.version)
+		dir := filepath.Join(modcache, filepath.FromSlash(root))
+		got, err := hashDir(dir, prefix)
+		if errors.Is(err, fs.ErrNotExist) {
+			// Only a directory that's gone counts as deleted: a file that can't be opened
+			// by the name it's listed under is a problem like any other.
+			if _, statErr := os.Lstat(dir); errors.Is(statErr, fs.ErrNotExist) {
+				return result{problem: checkZip(root, download, prefix), unverified: true}
+			}
+		}
 		switch {
-		case errors.Is(err, fs.ErrNotExist):
-			removed = true // deleted since the scan
 		case err != nil:
 			return result{problem: fmt.Sprintf("%s: %v", root, err)}
 		case got != want:
@@ -301,15 +336,31 @@ func verifyModule(modcache, root string, removed bool) result {
 			return result{}
 		}
 	}
-	return result{problem: checkZip(root, download, mod.path+"@"+mod.version), unverified: true}
+	return result{problem: checkZip(root, download, prefix), unverified: true}
+}
+
+// recordedHash is the hash the go command recorded for a module. It recreates a ziphash file
+// that isn't a hash (cut short by an interrupted download, say) from the zip, so then the
+// zip's hash is the one it checks against go.sum.
+func recordedHash(download, prefix string) (string, error) {
+	h, err := readZiphash(download + ".ziphash")
+	if err != nil || validHash(h) {
+		return h, err
+	}
+	return hashZip(download+".zip", prefix)
+}
+
+// validHash is the go command's test of a ziphash file (modfetch.isValidSum).
+func validHash(h string) bool {
+	return len(h) == len("h1:")+base64.StdEncoding.EncodedLen(sha256.Size) && !strings.Contains(h, "\x00")
 }
 
 // checkZip checks that a module's zip, which the go command extracts without checking it,
 // matches the module's recorded hash, which the go command does check against go.sum. Without
-// the zip or the hash, the go command downloads the module again.
+// the zip or a valid hash, the go command downloads the module again or rehashes the zip.
 func checkZip(root, download, prefix string) string {
 	want, err := readZiphash(download + ".ziphash")
-	if errors.Is(err, fs.ErrNotExist) {
+	if errors.Is(err, fs.ErrNotExist) || (err == nil && !validHash(want)) {
 		return ""
 	} else if err != nil {
 		return fmt.Sprintf("%s: %v", root, err)
@@ -353,8 +404,14 @@ func extracting(modcache, root string) bool {
 	return err == nil
 }
 
+// parseRoot splits a module directory's name at the @ in its last element (see splitRoot).
 func parseRoot(root string) (module, error) {
-	at := strings.LastIndex(root, "@")
+	last := strings.LastIndex(root, "/") + 1
+	at := strings.Index(root[last:], "@")
+	if at < 0 {
+		return module{}, errors.New("not a module directory's name")
+	}
+	at += last
 	m := module{escapedPath: root[:at], escapedVersion: root[at+1:]}
 	var err1, err2 error
 	m.path, err1 = unescape(m.escapedPath)
@@ -508,50 +565,62 @@ func prune(modcache, stateFile string, inUse []string, keep time.Duration, now t
 				return err
 			}
 		}
-		if err := removeModule(modcache, root, filepath.Join(trash, strconv.Itoa(deleted))); err != nil {
+		moved, err := removeModule(modcache, root, filepath.Join(trash, strconv.Itoa(deleted)))
+		if err != nil {
 			fmt.Fprintf(warn, "modcache-check: couldn't delete %s, which hasn't been used since %s: %v\n",
 				root, time.Unix(e.lastUsed, 0).Format(time.DateOnly), err)
-			continue
 		}
-		delete(st, root)
-		deleted++
+		if moved {
+			delete(st, root)
+			deleted++
+		}
 	}
 	if err := saveState(stateFile, st); err != nil {
 		return err
 	}
-	// Earlier prunes' leftovers too: files a scanner held open may be deletable now.
-	if err := removeAll(trashDir); err != nil {
-		fmt.Fprintf(warn, "modcache-check: couldn't empty %s: %v\n", trashDir, err)
+	if trash != "" {
+		if err := removeAll(trash); err != nil {
+			fmt.Fprintf(warn, "modcache-check: couldn't empty %s: %v\n", trash, err)
+		}
+	}
+	// Earlier prunes' leftovers (files a virus scanner held open may be deletable now), but
+	// not a prune running alongside this one.
+	leftovers, _ := os.ReadDir(trashDir)
+	for _, d := range leftovers {
+		if info, err := d.Info(); err == nil && now.Sub(info.ModTime()) > time.Hour {
+			removeAll(filepath.Join(trashDir, d.Name()))
+		}
 	}
 	return nil
 }
 
 // removeModule moves a module's directory to trash in one step, so the go command never sees
-// it half deleted, then deletes its zip and recorded hash.
-func removeModule(modcache, root, trash string) error {
+// it half deleted, then deletes its zip and recorded hash. moved reports whether the directory
+// is gone from the cache, even if deleting the zip then failed.
+func removeModule(modcache, root, trash string) (moved bool, err error) {
 	mod, err := parseRoot(root)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if extracting(modcache, root) {
-		return errors.New("the go command is extracting it")
+		return false, errors.New("the go command is extracting it")
 	}
 	dir := filepath.Join(modcache, filepath.FromSlash(root))
 	// The go command makes module directories read-only, and on Linux moving a directory
 	// needs write permission on it.
 	if err := os.Chmod(dir, 0o777); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
+		return false, err
 	}
 	if err := os.Rename(dir, trash); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
+		return false, err
 	}
 	download := mod.download(modcache)
 	for _, ext := range []string{".zip", ".ziphash"} {
 		if err := os.Remove(download + ext); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return err
+			return true, err
 		}
 	}
-	return nil
+	return true, nil
 }
 
 // removeAll is os.RemoveAll for a tree with read-only directories, which the go command makes.
@@ -583,27 +652,34 @@ func loadState(file string) (st state, existed bool, err error) {
 	} else if err != nil {
 		return nil, false, err
 	}
+	st, err = parseState(data, file)
+	return st, err == nil, err
+}
+
+func parseState(data []byte, name string) (state, error) {
 	lines := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
 	if lines[0] != stateHeader {
-		return nil, false, fmt.Errorf("%s isn't a state file this version understands", file)
+		return nil, fmt.Errorf("%s isn't a state file this version understands", name)
 	}
-	st = state{}
+	st := state{}
 	for _, line := range lines[1:] {
 		f := strings.Split(line, "\t")
 		var lastUsed int64
+		var err error
 		if len(f) == 3 {
 			lastUsed, err = strconv.ParseInt(f[2], 10, 64)
 		}
 		if len(f) != 3 || err != nil {
-			return nil, false, fmt.Errorf("%s has a malformed line: %q", file, line)
+			return nil, fmt.Errorf("%s has a malformed line: %q", name, line)
 		}
 		st[f[0]] = entry{fingerprint: f[1], lastUsed: lastUsed}
 	}
-	return st, true, nil
+	return st, nil
 }
 
 // saveState replaces the state file in one step, so a crash or a second hook running at the
-// same time never leaves half of one.
+// same time never leaves half of one. On Windows the replacing fails while another process has
+// the file open, so it's tried for a few seconds.
 func saveState(file string, st state) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0o777); err != nil {
 		return err
@@ -622,5 +698,11 @@ func saveState(file string, st state) error {
 	if err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), file)
+	for range 50 {
+		if err = os.Rename(tmp.Name(), file); err == nil {
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return err
 }

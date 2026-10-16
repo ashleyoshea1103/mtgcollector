@@ -49,7 +49,15 @@ case $STUB in
   pass) ;;
   edit) chmod u+w "$m/m.go" && echo 'func init() {}' >>"$m/m.go" ;;
   download | bad-download) cp -R "$FIXTURES/$STUB/." "$GOMODCACHE/" ;;
-  fingerprints) echo >>"$(git rev-parse --path-format=absolute --git-common-dir)/pre-push-go/modcache-state" ;;
+  hide) # edits a module, then records the edit as its fingerprint, as verified code could
+    chmod u+w "$m/m.go" && echo 'func init() {}' >>"$m/m.go"
+    hash=$GOMODCACHE/cache/download/example.com/m/@v/v1.0.0.ziphash
+    mv "$hash" "$hash.real"
+    echo 'h1:/Xios9MKq0q76wpQFtiq8ynQqYJKsgEmpWeOi23SK8Y=' >"$hash" # the edited files' hash
+    git_dir=$(git rev-parse --path-format=absolute --git-common-dir)
+    "$git_dir/hooks/modcache-check$(go env GOEXE)" check "$(go env GOMODCACHE)" "$git_dir/pre-push-go/modcache-state"
+    mv -f "$hash.real" "$hash" ;;
+  garble) echo garbage >"$(git rev-parse --path-format=absolute --git-common-dir)/pre-push-go/modcache-state" ;;
   git-config) git config --local pre-push-test.planted yes ;;
   *) exit 1 ;;
 esac
@@ -123,8 +131,13 @@ expect_blocked bad-download "verify adds a module that doesn't match its recorde
 fresh_cache
 expect_pass pass 'the first push after a fresh cache'
 expect_blocked git-config 'verify changes git config' 'changed .git/config'
-expect_blocked fingerprints 'verify edits the fingerprints' 'modcache-state; check them'
-expect_blocked pass 'a push after the fingerprints were edited' "modcache-state has a malformed line"
+expect_blocked hide 'verify edits a module and rewrites its fingerprint to match' \
+  "example.com/m@v1.0.0: its files don't match"
+
+fresh_cache
+expect_pass pass 'the first push after a fresh cache'
+expect_pass garble 'verify garbles the fingerprints (the hook rewrites them from its own copy)'
+expect_pass pass 'a push after the fingerprints were garbled'
 
 rm -f .git/hooks/modcache-check*
 expect_blocked pass 'modcache-check is not installed' 'run ./scripts/install-hooks.sh'

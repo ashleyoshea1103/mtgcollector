@@ -42,12 +42,9 @@ fi
 export GOENV=off GOFLAGS='' GOTOOLCHAIN=local GOWORK=off \
   GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org GONOSUMDB='' GONOPROXY='' GOPRIVATE='' GOINSECURE='' \
   GOMODCACHE="$git_dir/pre-push-go/mod" GOCACHE="$git_dir/pre-push-go/build"
-# The fingerprints of the modules in that cache, kept by modcache-check (see below).
-modcache_state=$git_dir/pre-push-go/modcache-state
 
 # What verified code must not change: git config (this repository's, your global and the
-# system's), the installed hooks, the go env file, which every later `go` command reads, and
-# the module cache's fingerprints, which would hide an edited module.
+# system's), the installed hooks, and the go env file, which every later `go` command reads.
 git_state() {
   {
     cat "$git_dir/config"
@@ -55,8 +52,31 @@ git_state() {
     git config --system --list 2>/dev/null || true
     find "$git_dir/hooks" -type f -exec cksum {} + 2>/dev/null | sort
     if [[ -n $go_env_file && -e $go_env_file ]]; then cksum <"$go_env_file" 2>/dev/null || echo unreadable; fi
-    if [[ -e $modcache_state ]]; then cksum <"$modcache_state" 2>/dev/null || echo unreadable; fi
   } | cksum
+}
+
+# Verified code could edit a module in the hook's module cache, which later verifications
+# would compile in. modcache-check (backend/cmd/modcache-check, built into the hooks folder by
+# scripts/install-hooks.sh) keeps a fingerprint of each module there (every file's path, size,
+# modification time and mode) in modcache-state, and hashes the modules whose fingerprint
+# changed, comparing them with the hashes the go command recorded when it downloaded them.
+# It runs before the first verification, against the fingerprints saved by your last push,
+# and after each one, against the hook's own copy of the fingerprints from before it (code
+# being verified could rewrite the file to hide an edit, and a push running alongside
+# rewrites it anyway). check_modcache <what to say if a module was modified>
+modcache_state=$git_dir/pre-push-go/modcache-state
+check_modcache() {
+  local status=0
+  if [[ -n ${modcache_baseline-} ]]; then
+    printf '%s\n' "$modcache_baseline" | "$modcache_check" check -baseline - "$modcache" "$modcache_state" || status=$?
+  else
+    "$modcache_check" check "$modcache" "$modcache_state" || status=$?
+  fi
+  case $status in
+    0) modcache_baseline=$(<"$modcache_state") ;;
+    1) blocked "$1; delete $git_dir/pre-push-go and push again" ;;
+    *) blocked "couldn't check the hook's Go module cache (see above)" ;;
+  esac
 }
 
 # git passes one line per ref: <local ref> <local sha> <remote ref> <remote sha>
@@ -74,19 +94,13 @@ while read -r local_ref local_sha _remote_ref remote_sha; do
   echo "pre-push: will verify $local_ref at ${commit:0:7}"
 done
 
-# Verified code could edit a module in the hook's module cache, which later verifications
-# would compile in. modcache-check (backend/cmd/modcache-check, built into the hooks folder by
-# scripts/install-hooks.sh) keeps a fingerprint of each module there (every file's path, size,
-# modification time and mode), and hashes the ones whose fingerprint changed, comparing them
-# with the hashes the go command recorded when it downloaded them. It runs before the first
-# verification, to catch an edit since your last push, and after each one.
 if [[ -n ${commits[*]-} ]]; then
   command -v go >/dev/null || blocked 'go is not on PATH; install Go (see backend/go.mod for the version)'
-  modcache_check=$hooks_dir/modcache-check$(go env GOEXE)
+  # GOMODCACHE as the go command spells it, which is how go list reports module directories.
+  { read -r goexe && read -r modcache; } < <(go env GOEXE GOMODCACHE) || blocked "couldn't run go env"
+  modcache_check=$hooks_dir/modcache-check$goexe
   [[ -x $modcache_check ]] || blocked "$modcache_check is missing; run ./scripts/install-hooks.sh"
-  modcache=$(go env GOMODCACHE) # as the go command spells it, which is how go list reports module directories
-  "$modcache_check" check "$modcache" "$modcache_state" ||
-    blocked "the hook's Go module cache was modified since your last push; delete $git_dir/pre-push-go and push again"
+  check_modcache "the hook's Go module cache was modified since your last push"
 fi
 modules_in_use=$scratch/modules-in-use
 : >"$modules_in_use"
@@ -114,15 +128,14 @@ for commit in ${commits[@]+"${commits[@]}"}; do
   before=$(git_state)
   "$wt/scripts/verify.sh" || blocked "verify failed for ${commit:0:7}"
   [[ $(git_state) == "$before" ]] ||
-    blocked "verifying ${commit:0:7} changed .git/config, .git/hooks, the go env file or $modcache_state; check them (git config --list --local, go env), reinstall the hook and delete $git_dir/pre-push-go"
+    blocked "verifying ${commit:0:7} changed .git/config, .git/hooks or the go env file; check them (git config --list --local, go env) and reinstall the hook"
   # Which module versions the commit uses, for the prune below.
   for module in "$wt/backend" "$wt/backend/tools"; do
     if [[ -f $module/go.mod ]]; then
       go -C "$module" list -m -f '{{.Dir}}' all >>"$modules_in_use" || prune=''
     fi
   done
-  "$modcache_check" check "$modcache" "$modcache_state" ||
-    blocked "verifying ${commit:0:7} left the hook's Go module cache modified; delete $git_dir/pre-push-go and push again"
+  check_modcache "verifying ${commit:0:7} left the hook's Go module cache modified"
 
   git -C "$root" worktree remove --force "$wt" # free its node_modules before the next one
   current_wt=''
