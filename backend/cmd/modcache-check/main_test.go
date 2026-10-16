@@ -537,3 +537,32 @@ func mustPrune(t *testing.T, modcache, stateFile string, inUse []string, now tim
 		t.Fatalf("prune = %v, warnings %q", err, warn.String())
 	}
 }
+
+// Linux and macOS record when a file last changed, and NTFS gives it a new change journal
+// number, so an edit shows even with its size, modification time and mode put back.
+func TestAnEditThatKeepsTheSizeAndModificationTimeIsCaught(t *testing.T) {
+	modcache, stateFile := t.TempDir(), filepath.Join(t.TempDir(), "state")
+	addFixtures(t, modcache)
+	checkOK(t, modcache, stateFile)
+	file := filepath.Join(modcache, "example.com", "m@v1.0.0", "m.go")
+	info, err := os.Stat(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(file, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, []byte("package x\n"), 0o644); err != nil { // the size of "package m\n"
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(file, info.ModTime(), info.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(file, info.Mode()); err != nil {
+		t.Fatal(err)
+	}
+	if after, err := os.Stat(file); err != nil || after.Size() != info.Size() || !after.ModTime().Equal(info.ModTime()) || after.Mode() != info.Mode() {
+		t.Fatalf("the edit changed the file's size, time or mode (%v)", err)
+	}
+	wantProblem(t, modcache, stateFile, "example.com/m@v1.0.0: its files don't match")
+}

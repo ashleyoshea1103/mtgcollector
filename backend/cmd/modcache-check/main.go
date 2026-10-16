@@ -6,11 +6,11 @@
 // every module a build uses, which takes minutes on a cache this size.
 //
 // So this keeps a fingerprint of each extracted module directory: every file's path, size,
-// modification time and mode, plus its inode and change time on Linux and macOS. Only the
-// directories whose fingerprint changed are hashed and compared with the recorded hash, as
-// `go mod verify` would. Like the hook's other checks, it's a tripwire, not a sandbox: code
-// that edits a file without changing its size, and then restores its modification time, gets
-// past it on Windows, where nothing records when a file's metadata last changed.
+// modification time and mode, plus a stamp no program can set back (the inode and change time
+// on Linux and macOS, the NTFS change journal's sequence number on Windows), so an edit that
+// keeps a file's size and puts back its modification time still shows. Only the directories
+// whose fingerprint changed are hashed and compared with the recorded hash, as `go mod verify`
+// would. Like the hook's other checks, it's a tripwire, not a sandbox.
 //
 // Usage:
 //
@@ -200,7 +200,29 @@ func check(modcache, stateFile string, baseline io.Reader, out io.Writer) ([]str
 // to the cache, as in github.com/!burnt!sushi/toml@v1.6.0). A file outside any module's
 // directory is a problem: the go command never writes one.
 func scan(modcache string) (map[string]string, []string, error) {
-	hashes := map[string]hash.Hash{}
+	type file struct{ root, line string }
+	var files []file
+	// On Windows a stamp takes a few system calls, so they're read several at a time, while
+	// the walk goes on.
+	type job struct {
+		i    int
+		path string
+		info fs.FileInfo
+	}
+	jobs := make(chan job, 256)
+	stamps := map[int]string{}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for range 16 {
+		wg.Go(func() {
+			for j := range jobs {
+				stamp := sysStamp(j.path, j.info)
+				mu.Lock()
+				stamps[j.i] = stamp
+				mu.Unlock()
+			}
+		})
+	}
 	var problems []string
 	err := filepath.WalkDir(modcache, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -233,17 +255,25 @@ func scan(modcache string) (map[string]string, []string, error) {
 		} else if err != nil {
 			return err
 		}
-		h := hashes[root]
-		if h == nil {
-			h = sha256.New()
-			hashes[root] = h
-		}
-		// WalkDir goes in lexical order, so the same files always hash the same.
-		fmt.Fprintf(h, "%s\x00%d\x00%d\x00%d\x00%s\n", inner, info.Size(), info.ModTime().UnixNano(), info.Mode(), sysStamp(info))
+		line := fmt.Sprintf("%s\x00%d\x00%d\x00%d", inner, info.Size(), info.ModTime().UnixNano(), info.Mode())
+		files = append(files, file{root, line})
+		jobs <- job{len(files) - 1, path, info}
 		return nil
 	})
+	close(jobs)
+	wg.Wait()
 	if err != nil {
 		return nil, nil, err
+	}
+
+	hashes := map[string]hash.Hash{}
+	for i, f := range files { // in WalkDir's lexical order, so the same files always hash the same
+		h := hashes[f.root]
+		if h == nil {
+			h = sha256.New()
+			hashes[f.root] = h
+		}
+		fmt.Fprintf(h, "%s\x00%s\n", f.line, stamps[i])
 	}
 	fingerprints := make(map[string]string, len(hashes))
 	for root, h := range hashes {

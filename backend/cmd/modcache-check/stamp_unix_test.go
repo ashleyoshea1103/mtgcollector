@@ -8,30 +8,6 @@ import (
 	"testing"
 )
 
-func TestAnEditThatKeepsTheSizeAndModificationTimeIsCaughtByTheChangeTime(t *testing.T) {
-	modcache, stateFile := t.TempDir(), filepath.Join(t.TempDir(), "state")
-	addFixtures(t, modcache)
-	checkOK(t, modcache, stateFile)
-	file := filepath.Join(modcache, "example.com", "m@v1.0.0", "m.go")
-	info, err := os.Stat(file)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(file, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(file, []byte("package x\n"), 0o644); err != nil { // same size as "package m\n"
-		t.Fatal(err)
-	}
-	if err := os.Chtimes(file, info.ModTime(), info.ModTime()); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(file, info.Mode()); err != nil {
-		t.Fatal(err)
-	}
-	wantProblem(t, modcache, stateFile, "example.com/m@v1.0.0: its files don't match")
-}
-
 func TestALinkInAModuleIsCaught(t *testing.T) {
 	modcache, stateFile := t.TempDir(), filepath.Join(t.TempDir(), "state")
 	addFixtures(t, modcache)

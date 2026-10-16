@@ -57,9 +57,10 @@ git_state() {
 
 # Verified code could edit a module in the hook's module cache, which later verifications
 # would compile in. modcache-check (backend/cmd/modcache-check, built into the hooks folder by
-# scripts/install-hooks.sh) keeps a fingerprint of each module there (every file's path, size,
-# modification time and mode) in modcache-state, and hashes the modules whose fingerprint
-# changed, comparing them with the hashes the go command recorded when it downloaded them.
+# scripts/install-hooks.sh) keeps a fingerprint of each module there in modcache-state (every
+# file's path, size, modification time, mode and a stamp no program can set back), and hashes
+# the modules whose fingerprint changed, comparing them with the hashes the go command
+# recorded when it downloaded them.
 # It runs before the first verification, against the fingerprints saved by your last push,
 # and after each one, against the hook's own copy of the fingerprints from before it (code
 # being verified could rewrite the file to hide an edit, and a push running alongside
