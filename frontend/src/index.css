@@ -654,7 +654,7 @@ a.button:hover {
   width: auto;
 }
 /* The search takes the room between the selects and the view switch, up to a line's worth. On a
-   phone it shares the second row with the view switch, keeping the sticky bar short. */
+   phone it shares the second row with the view switch, keeping the sticky bar short (below). */
 .listing-controls__search {
   flex: 1 1 12rem;
   max-width: 22rem;
@@ -1072,7 +1072,9 @@ html:has(.listing-controls) {
   transition: opacity 0.15s ease;
 }
 /* The last results, shown while the next search runs. */
-.search-page__results[aria-busy='true'] {
+.search-page__results[aria-busy='true'],
+/* The last search's cards, standing in while the next search's load. */
+:is(.listing, .listing__section)[aria-busy='true'] {
   opacity: 0.6;
 }
 .search-page__more {
@@ -1410,6 +1412,10 @@ html:has(.listing-controls) {
   }
   .listing-controls .select {
     width: 100%;
+  }
+  /* Too wide to share the first row with the selects: it shares the second with View. */
+  .listing-controls .listing-controls__search {
+    flex-basis: 12rem;
   }
   /* Cards two to a row. */
   :is(.entry-grid, .card-grid).grid {

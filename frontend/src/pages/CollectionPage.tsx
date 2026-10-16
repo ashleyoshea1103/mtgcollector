@@ -43,7 +43,8 @@ export function CollectionPage() {
         params={listing}
         renderActions={(row) => <EntryActions entry={row.entry} />}
         empty={
-          listing.q ? (
+          // With no cards at all, how to add some, searching or not.
+          listing.q && stats.data?.card_count !== 0 ? (
             <EmptyState title={`No cards match “${listing.q}”`}>Check the spelling, or clear the search.</EmptyState>
           ) : (
             <EmptyState title="Your collection is empty" action={<Link to="/search">Search for cards to add</Link>}>

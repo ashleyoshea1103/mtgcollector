@@ -132,6 +132,18 @@ describe('useGroupMember', () => {
   });
 });
 
+describe('onlySearchChanged', () => {
+  it('is true only for the same listing, grouping and order with another search', () => {
+    expect(q.onlySearchChanged(keys.listingGroups(null, 'color', 'elf'), keys.listingGroups(null, 'color', 'goblin'))).toBe(true);
+    expect(q.onlySearchChanged(keys.listingEntries(null, 'none', 'all', 'name', ''), keys.listingEntries(null, 'none', 'all', 'name', 'elf'))).toBe(true);
+    // The same key again (e.g. after it was dropped) brings nothing of the old query back.
+    expect(q.onlySearchChanged(keys.listingGroups(null, 'color', 'elf'), keys.listingGroups(null, 'color', 'elf'))).toBe(false);
+    expect(q.onlySearchChanged(keys.listingGroups(null, 'color', 'elf'), keys.listingGroups(null, 'type', 'goblin'))).toBe(false);
+    expect(q.onlySearchChanged(keys.listingGroups(null, 'color', 'elf'), keys.listingGroups(binder.id, 'color', 'goblin'))).toBe(false);
+    expect(q.onlySearchChanged(keys.listingEntries(null, 'none', 'all', 'name', ''), keys.listingEntries(null, 'none', 'all', 'price', 'elf'))).toBe(false);
+  });
+});
+
 describe('a searched listing', () => {
   const groupsOf = (req: FakeRequest): Reply => ({ body: { group_by: req.query.get('group_by'), groups: [] } });
   // One entry for "goblin", none for anything else.

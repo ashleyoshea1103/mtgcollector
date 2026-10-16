@@ -304,4 +304,11 @@ describe('searching a group', () => {
     expect(main().getByText('Check the spelling, or clear the search.')).toBeInTheDocument();
     expect(main().queryByText(`No cards in ${binder.name} yet`)).not.toBeInTheDocument();
   });
+
+  it('says the group has no cards yet, not that nothing matches, when it has none at all', async () => {
+    const emptyBinder = { ...binder, card_count: 0, entry_count: 0, value_eur: 0, unpriced_count: 0 };
+    renderApp(`/groups/${binder.id}?q=elf`, { ...groupApi(emptyBinder), 'GET /api/groups/:id/groups': { body: { group_by: 'none', groups: [] } } });
+    expect(await main().findByText(`No cards in ${binder.name} yet`)).toBeInTheDocument();
+    expect(main().queryByText('Check the spelling, or clear the search.')).not.toBeInTheDocument();
+  });
 });

@@ -1,5 +1,5 @@
 import type { CollectionView } from '../components/GroupBucketSection';
-import type { GroupBy, SortBy } from '../types';
+import { MaxSearchLength, type GroupBy, type SortBy } from '../types';
 
 /** How a listing (the collection, or a group) is shown: kept in the URL, so it survives a reload and can be linked. */
 export interface ListingParams {
@@ -42,7 +42,8 @@ export function readListing(params: URLSearchParams): ListingParams {
     groupBy: oneOf(GROUP_BY_LABELS, params.get('group_by'), DEFAULT_LISTING.groupBy),
     sort: oneOf(SORT_LABELS, params.get('sort'), DEFAULT_LISTING.sort),
     view: oneOf(VIEW_LABELS, params.get('view'), DEFAULT_LISTING.view),
-    q: normaliseSearch(params.get('q') ?? ''),
+    // As much as the server takes, so a hand-edited link still lists something.
+    q: normaliseSearch([...(params.get('q') ?? '').replaceAll('\0', '')].slice(0, MaxSearchLength).join('')),
   };
 }
 

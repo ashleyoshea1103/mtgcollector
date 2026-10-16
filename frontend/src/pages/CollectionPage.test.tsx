@@ -1,5 +1,5 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { colorGroups, customGroups, entries, makeEntry, makeGroup, cards, stats } from '../fixtures';
 import { keys } from '../api/keys';
 import { ann, renderApp, signedIn, type FakeRequest, type Reply, type Routes } from '../test/app';
@@ -556,17 +556,56 @@ describe('searching the collection', () => {
     expect(main().queryByText('Your collection is empty')).not.toBeInTheDocument();
   });
 
+  it('says the collection is empty, not that nothing matches, when there are no cards at all', async () => {
+    renderApp('/collection?q=goblin', {
+      ...collection,
+      'GET /api/collection/stats': { body: { ...stats, card_count: 0, unique_cards: 0, value_eur: 0, unpriced_count: 0, by_color: {}, by_rarity: {} } },
+      'GET /api/collection/groups': { body: { group_by: 'none', groups: [{ ...allGroup.group, card_count: 0, entry_count: 0, value_eur: 0, unpriced_count: 0 }] } },
+    });
+    expect(await main().findByText('Your collection is empty')).toBeInTheDocument();
+    expect(main().queryByText('Check the spelling, or clear the search.')).not.toBeInTheDocument();
+  });
+
+  it("brings the results' start into view when a search from far down the page finds them", async () => {
+    const { user } = renderApp('/collection', searchable);
+    await main().findByRole('heading', { name: entries.bolts.card.name });
+    // Scrolled far down: the results' start is above the sticky toolbar's bottom (120px).
+    const start = status();
+    let startTop = -800;
+    const rect = (top: number) => ({ top, bottom: top, height: 0, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    vi.spyOn(start, 'getBoundingClientRect').mockImplementation(() => rect(startTop));
+    vi.spyOn(document.querySelector('.listing-controls')!, 'getBoundingClientRect').mockImplementation(() => ({ ...rect(0), bottom: 120, height: 120 }) as DOMRect);
+    const scrolled = vi.fn<(this: Element) => void>(function () {
+      if (this === start) startTop = 200;
+    });
+    Element.prototype.scrollIntoView = scrolled;
+    onTestFinished(() => {
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+      vi.restoreAllMocks();
+    });
+
+    await user.type(box(), 'creature');
+    await main().findByRole('heading', { name: creatures[0].card.name });
+    await waitFor(() => expect(scrolled.mock.contexts).toEqual([start]));
+    // Already in view: the next search leaves the page where it is.
+    await user.type(box(), ' elf');
+    await waitFor(() => expect(status()).toHaveTextContent(/match/));
+    await waitFor(() => expect(main().queryByRole('heading', { name: entries.foilRagavan.card.name })).not.toBeInTheDocument());
+    expect(scrolled).toHaveBeenCalledTimes(1);
+  });
+
   it('announces how many cards match', async () => {
     const { user } = renderApp('/collection?q=creature', searchable);
     const copies = creatures.reduce((n, e) => n + e.quantity, 0);
-    await waitFor(() => expect(status()).toHaveTextContent(`${countOf(copies, 'card')} match`));
+    await waitFor(() => expect(status().textContent).toBe(`${countOf(copies, 'card')} match`));
     expect(status()).toHaveAttribute('role', 'status');
     await user.clear(box());
     await user.type(box(), 'zzz');
-    await waitFor(() => expect(status()).toHaveTextContent('No cards match'));
-    // Not searching: nothing to announce.
+    await waitFor(() => expect(status().textContent).toBe('No cards match'));
+    // Not searching: once every card is back, nothing to announce.
     await user.click(main().getByRole('button', { name: 'Clear search' }));
-    await waitFor(() => expect(status()).toHaveTextContent(/^$/));
+    for (const e of all) await main().findByRole('heading', { name: e.card.name });
+    expect(status().textContent).toBe('');
   });
 
   it('sends the search with the cursor for more', async () => {
@@ -595,7 +634,7 @@ describe('searching the collection', () => {
 
   it("keeps the last search's cards up while the next search's load", async () => {
     let release = () => {};
-    const { user } = renderApp('/collection', {
+    const { api, user } = renderApp('/collection', {
       ...searchable,
       'GET /api/collection/groups': (req) =>
         req.query.get('q') === 'zzz'
@@ -606,6 +645,8 @@ describe('searching the collection', () => {
     await user.type(box(), 'zzz');
     await waitFor(() => expect(bolts.closest('.listing')).toHaveAttribute('aria-busy', 'true'));
     expect(bolts).toBeInTheDocument();
+    // The sections are the last search's, so they ask nothing of the next search yet.
+    expect(api.sent('GET /api/collection/entries').some((r) => r.query.get('q') === 'zzz')).toBe(false);
     act(() => release());
     expect(await main().findByText('No cards match “zzz”')).toBeInTheDocument();
   });
@@ -636,6 +677,42 @@ describe('searching the collection', () => {
     expect(main().queryByRole('heading', { name: entries.bolts.card.name })).not.toBeInTheDocument();
     expect(heading).toHaveTextContent(countOf(creatures.reduce((n, e) => n + e.quantity, 0), 'card'));
     expect(heading.closest('.listing__section')).not.toHaveAttribute('aria-busy');
+  });
+
+  it("gives a closed section the next search's heading, and keeps its heading with its cards when reopened", async () => {
+    // Ten sets, each with Lightning Bolt and Ragavan: "creature" leaves all ten (so only the
+    // first is open by default), each with just its Ragavan.
+    const sets = Array.from({ length: 10 }, (_, i) => makeGroup(`s${i}`, `Set ${i}`, [makeEntry(200 + 2 * i, cards.lightningBolt, { quantity: 3 }), makeEntry(201 + 2 * i, cards.ragavan)]));
+    const narrowed = (q: string | null) => sets.map((g) => makeGroup(g.group.key, g.group.label, g.entries.filter((e) => matches(e, q))));
+    const entriesOf = (req: FakeRequest): Reply => ({ body: { entries: narrowed(req.query.get('q')).find((g) => g.group.key === req.query.get('key'))!.entries, next_cursor: null } });
+    let release = () => {};
+    const { user } = renderApp('/collection?group_by=set', {
+      ...collection,
+      'GET /api/collection/groups': (req) => ({ body: { group_by: 'set', groups: narrowed(req.query.get('q')).map((g) => g.group) } }),
+      'GET /api/collection/entries': (req) =>
+        req.query.get('q') === 'creature' && req.query.get('key') === 's5' ? new Promise((resolve) => (release = () => resolve(entriesOf(req)))) : entriesOf(req),
+    });
+    const five = await screen.findByRole('button', { name: /^Set 5/ });
+    const set5 = () => within(five.closest('.listing__section') as HTMLElement);
+    const everyCopy = countOf(4, 'card');
+    // Opened (its cards fetched), then closed again.
+    await user.click(five);
+    await set5().findByRole('heading', { name: cards.lightningBolt.name });
+    await user.click(five);
+    expect(five).toHaveTextContent(everyCopy);
+
+    await user.type(box(), 'creature');
+    await waitFor(() => expect(five).toHaveTextContent(countOf(1, 'card')));
+    expect(five).toHaveAttribute('aria-expanded', 'false');
+
+    // Reopened while its creatures load: the last search's cards, with the heading they came with.
+    await user.click(five);
+    expect(set5().getByRole('heading', { name: cards.lightningBolt.name })).toBeInTheDocument();
+    expect(five).toHaveTextContent(everyCopy);
+    act(() => release());
+    await waitFor(() => expect(set5().queryByRole('heading', { name: cards.lightningBolt.name })).not.toBeInTheDocument());
+    expect(set5().getByRole('heading', { name: cards.ragavan.name })).toBeInTheDocument();
+    expect(five).toHaveTextContent(countOf(1, 'card'));
   });
 
   it('opens the sections a search leaves, as a fresh page would, when it narrows many groups to a few', async () => {

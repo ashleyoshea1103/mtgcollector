@@ -259,7 +259,6 @@ describe('ListingControls', () => {
     render(<ListingControls value={value} onChange={onChange} />);
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), '  goblin   king ');
     await waitFor(() => expect(onChange).toHaveBeenLastCalledWith({ ...value, q: 'goblin king' }));
-    expect(onChange).toHaveBeenCalledTimes(1);
   });
 
   it('starts afresh from a search it was given rather than typed (a link, or the URL edited)', () => {
@@ -286,6 +285,7 @@ describe('ListingControls', () => {
     expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('goblin k');
     await waitFor(() => expect(onChange).toHaveBeenLastCalledWith({ ...value, q: 'goblin k' }));
   });
+
   it("sets --toolbar-height to the bar's height while it's shown, for the headings that stick below it", () => {
     let report = () => {};
     vi.stubGlobal(

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LISTING, readListing, writeListing } from './listingParams';
+import { MaxSearchLength } from '../types';
 
 const q = (s: string) => new URLSearchParams(s);
 
@@ -17,6 +18,11 @@ describe('readListing', () => {
   it('reads a search as its words, one space apart', () => {
     expect(readListing(q('q=%20%20goblin%20%20king%20')).q).toBe('goblin king');
     expect(readListing(q('q=%20%20')).q).toBe('');
+  });
+
+  it("reads only as much of a search as the server takes, without characters it refuses (a hand-edited link's)", () => {
+    expect(readListing(q(`q=${'é'.repeat(MaxSearchLength + 20)}`)).q).toBe('é'.repeat(MaxSearchLength));
+    expect(readListing(q('q=gob%00lin')).q).toBe('goblin');
   });
 });
 

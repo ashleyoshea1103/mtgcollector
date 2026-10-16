@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { keys, type ListingId } from '../api/keys';
 import { useListingEntries, useListingGroups, type ListedEntry, type ListingGroups } from '../api/queries';
 import { GroupBucketSection } from '../components/GroupBucketSection';
@@ -40,15 +40,37 @@ export function Listing(props: Props) {
 
 function Groups(props: Props & { onViewCard: (card: CardSummary) => void }) {
   const groups = useListingGroups(props.listing, props.params.groupBy, props.params.q);
+  const start = useRef<HTMLParagraphElement>(null);
+  useResultsInView(start, groups.data && !groups.isPlaceholderData ? groups.data.q : undefined);
   return (
     <>
-      {/* First in every state, so the live region is there before what it says changes. */}
-      <p role="status" className="visually-hidden listing__status">
+      {/* First in every state, so the live region is there before what it says changes. It also
+          marks where the results start. */}
+      <p ref={start} role="status" className="visually-hidden listing__status">
         {groups.data && !groups.isPlaceholderData ? searchStatus(groups.data) : ''}
       </p>
       <GroupList {...props} groups={groups} />
     </>
   );
+}
+
+/**
+ * When a new search's results arrive while their start is scrolled up behind the sticky toolbar
+ * (searched from far down the page), brings the start into view: otherwise the page would open
+ * in the middle of the results, or past their end. Not on the first results, so a reload keeps
+ * its scroll position.
+ */
+function useResultsInView(start: RefObject<HTMLElement | null>, q: string | undefined) {
+  const last = useRef(q);
+  useLayoutEffect(() => {
+    if (q === undefined) return;
+    const before = last.current;
+    last.current = q;
+    if (before === undefined || before === q || !start.current) return;
+    const toolbar = document.querySelector('.listing-controls')?.getBoundingClientRect().bottom ?? 0;
+    // The html element's scroll-padding keeps it below the toolbar.
+    if (start.current.getBoundingClientRect().top < toolbar) start.current.scrollIntoView({ block: 'start' });
+  }, [start, q]);
 }
 
 /** What a search found, for a screen reader: nothing to say when not searching. */
@@ -131,11 +153,12 @@ function Section({ listing, group, params, q, defaultOpen, renderActions, onView
   // A card removed (with the Actions button that had focus) leaves focus on the section's heading.
   const keepFocus = useFocusFallback<HTMLDivElement>(firstToggle, rows);
   // While the last search's cards stand in for the next one's, the heading they came with stays
-  // too, so the count and value are always those of the cards shown.
-  const standIn = entries.isPlaceholderData;
-  const [shown, setShown] = useState(group);
-  if (!standIn && shown !== group) setShown(group);
-  const heading = standIn ? shown : group;
+  // too, so the count and value are always those of the cards shown. (A closed section shows no
+  // cards, so it has the current heading; its stand-in, if it had cards, waits for it to open.)
+  const standIn = open && entries.isPlaceholderData;
+  const [cardsHeading, setCardsHeading] = useState(group);
+  if (rows !== undefined && !entries.isPlaceholderData && cardsHeading !== group) setCardsHeading(group);
+  const heading = standIn ? cardsHeading : group;
 
   async function loadMore() {
     // Not cancelling a refresh under way (after a change), which would leave the old pages up.

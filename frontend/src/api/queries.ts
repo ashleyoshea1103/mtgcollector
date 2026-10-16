@@ -73,7 +73,8 @@ export function useGroupMember(groupId: number | null, entryId: number) {
  * the last search's results stay up while the next one's load, rather than blinking out at each
  * pause in typing. Another listing, grouping or order still shows as loading.
  */
-const onlySearchChanged = (a: QueryKey, b: QueryKey) => a.length === b.length && a.slice(0, -1).every((part, i) => part === b[i]);
+export const onlySearchChanged = (a: QueryKey, b: QueryKey) =>
+  a.length === b.length && a.at(-1) !== b.at(-1) && a.slice(0, -1).every((part, i) => part === b[i]);
 
 /** A listing's groups, and the search (q) they're for: during a new search, the last one's may be standing in. */
 export interface ListingGroups extends CollectionGroups {

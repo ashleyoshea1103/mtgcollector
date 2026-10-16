@@ -23,12 +23,12 @@ export function ListingControls({ value, onChange }: Props) {
     // The bar stays at the top of the screen while the cards scroll (src/index.css).
     <div ref={bar} className="listing-controls">
       <Cluster className="listing-controls__bar" gap={4}>
-      <Field label="Group by" className="listing-controls__group-by">
-        <Select options={GROUP_BY_OPTIONS} value={value.groupBy} onChange={(groupBy) => onChange({ ...value, groupBy })} />
-      </Field>
-      <Field label="Sort by" className="listing-controls__sort">
-        <Select options={SORT_OPTIONS} value={value.sort} onChange={(sort) => onChange({ ...value, sort })} />
-      </Field>
+        <Field label="Group by" className="listing-controls__group-by">
+          <Select options={GROUP_BY_OPTIONS} value={value.groupBy} onChange={(groupBy) => onChange({ ...value, groupBy })} />
+        </Field>
+        <Field label="Sort by" className="listing-controls__sort">
+          <Select options={SORT_OPTIONS} value={value.sort} onChange={(sort) => onChange({ ...value, sort })} />
+        </Field>
         <Field label="Search" className="listing-controls__search">
           <SearchInput
             key={search.key}
