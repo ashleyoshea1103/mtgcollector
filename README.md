@@ -1,1 +1,104 @@
 # mtgcollector
+
+A web app for keeping an inventory of a Magic: The Gathering collection. It finds cards with [Scryfall](https://scryfall.com/docs/api), shows Cardmarket (EUR) prices, and groups cards automatically (by set, color, type, rarity or mana value) or into your own binders, decks and boxes.
+
+## Stack
+- **frontend/**: React, Vite and TypeScript
+- **backend/**: Go and PostgreSQL. The API's JSON shapes are Go structs in `backend/internal/contract`, and `frontend/src/types.ts` is generated from them.
+
+## Development
+You need Node 24 (see `frontend/.nvmrc`), Go (see `backend/go.mod`) and PostgreSQL 18 running locally. Once per clone:
+```bash
+./scripts/install-hooks.sh   # the pre-push check
+./scripts/setup-dev-db.sh    # the local databases; asks for your PostgreSQL superuser password
+```
+Run the API. It applies database migrations when it starts, then imports Scryfall's card data in the background (about 80 MB, 10 seconds or so) and again once a day. Set `SCRYFALL_SYNC=off` to skip that, and `go run ./cmd/sync` to import on demand. It also fetches the European Central Bank's euro-to-pound rate, for showing prices in pounds, and checks for a new one every few hours; `RATES_SYNC=off` skips that.
+```bash
+cd backend
+go run ./cmd/server
+```
+Run the frontend in another terminal. It forwards `/api` to the API:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open http://localhost:5173 for the app, http://localhost:5173/dev/components for the component gallery, and http://localhost:5173/api/health to check that the API can reach its database.
+
+## The app
+- **Search** (`/search`): cards by name, set, type, rarity and colors, kept in the URL. Signed in, you can add a card: pick the printing, how many, the finish, condition and language, and optionally a group.
+- **A card** (`/cards/{id}`): one printing in full, with its prices, a Cardmarket link, the copies you own and its other printings.
+- **Your collection** (`/collection`): totals, then your cards grouped by set, color, type, rarity or mana value, sorted, in a grid or a list. Each card's Actions menu changes it, puts copies of it in a group, or removes it.
+- **Groups** (`/groups`, `/groups/{id}`): your binders, decks and boxes. A group's page lists its cards as the collection page does, with the group's copies.
+- **Log in, Sign up** (`/login`, `/signup`). The collection and group pages send visitors to log in, and back afterwards; so does a session that ends.
+
+Pages fetch with TanStack Query (the hooks are in `frontend/src/api/queries.ts`) and pass what they get to the components in `frontend/src/components`, which know nothing of the API. Logging out, or a session ending, drops everything cached.
+
+## API
+The API's own responses are JSON, shaped by the types in `backend/internal/contract` (and so `frontend/src/types.ts`); its errors are `{"error": "…"}` with a 4xx or 5xx status. (The router's redirect from an unclean path, such as `//`, is plain text.)
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/health` | Whether the API can reach its database. |
+| `GET /api/cards/search?q=&set=&type=&rarity=&colors=&extras=&page=` | A page of cards (`CardPage`), one printing each: English if there is one, released, from a regular set rather than a promo or special printing, then the newest; with `set`, that set's printing. `q` is words the name contains, in any order; one of them needs 3 letters or digits in a row, unless `set` (a code like `mh2`) is given. `type` is words the type line contains. `colors` is letters from `WUBRG` the card must all be, or `C` for colourless. Printings Scryfall no longer lists are left out, and so are tokens, emblems, substitute cards and other non-game cards unless `extras=true`. |
+| `GET /api/cards/autocomplete?q=` | Up to 20 card names containing `q` (`CardNames`), best matches first; nothing until 3 letters or digits in a row are typed. |
+| `GET /api/cards/{id}` | One printing in full (`Card`), by Scryfall id. |
+| `GET /api/rates` | The latest euro exchange rates (`ExchangeRates`): the European Central Bank's daily reference rate for GBP (`per_eur` pounds to the euro, on `date`), which the app shows prices in pounds with. Empty until the server has fetched one; public. |
+| `GET /api/cards/{id}/printings?page=` | A page of every printing of that card, newest first, including ones Scryfall no longer lists (`no_longer_listed`). |
+| `POST /api/auth/signup` | Creates an account from `Credentials` (`{email, password}`; a password of 15 to 256 characters) and signs it in: 201 with the `User`. 409 if the email already has an account. |
+| `POST /api/auth/login` | Signs in with `Credentials`: 200 with the `User`, or 401 whether the email or the password was wrong. |
+| `POST /api/auth/logout` | Ends this browser's session: 204. |
+| `GET /api/auth/me` | The signed-in `User`, or 401. |
+| `GET /api/collection/groups?group_by=&q=` | The signed-in user's groups (`CollectionGroups`) for one way of grouping (`none` if left out), with each group's totals. Groups with none of the user's cards are left out, except `none`'s one group, `all`. With a search (`q`), only the matching cards count. |
+| `GET /api/collection/entries?group_by=&key=&sort=&cursor=&q=` | A page of one group's entries (`EntryPage`), only those matching the search `q` if given, sorted by `name` (the default; Unicode order, so "Æther Vial" sorts with the aethers), `price` (most valuable copy first, unpriced last), `cmc` or `added` (newest first: when the entry was made, not when copies were last added to it). Pass `next_cursor` back as `cursor` for the next page. |
+| `GET /api/collection/stats` | Totals for the whole collection (`CollectionStats`). |
+| `GET /api/collection/cards/{card_id}` | Your copies of one printing (`CardCopies`): an entry for each finish, condition and language you own it in, non-foil first, then best condition first. None if you own no copies. |
+| `POST /api/collection/entries` | Adds copies (`NewEntry`): 201 with a new entry, or 200 with the entry of the same printing, finish, condition and language they were added to. |
+| `PATCH /api/collection/entries/{id}` | Changes an entry's quantity, finish, condition or language (`EntryChange`): 200 with the entry; 409 if it would then be the same as another of yours. |
+| `DELETE /api/collection/entries/{id}` | Removes an entry: 204. It leaves any groups it was in. |
+| `GET /api/groups` | The user's custom groups (`CustomGroupList`), by name, each with its totals and up to four preview images (its most valuable cards'). |
+| `POST /api/groups` | Makes a group (`NewGroup`: a name, unique per user whatever its case; a kind, `binder`, `deck`, `box` or `other`; a description): 201. 409 if you have a group of that name; 400 at 500 groups. |
+| `GET /api/groups/{id}` | One group (`CustomGroup`). |
+| `PATCH /api/groups/{id}` | Renames a group, or changes its kind or description (`GroupChange`). 409 if you have another group of the new name. |
+| `DELETE /api/groups/{id}` | Deletes a group: 204. Its cards stay in the collection. |
+| `GET /api/groups/{id}/groups?group_by=&q=` | The group's cards grouped (`CollectionGroups`), as the collection's are. |
+| `GET /api/groups/{id}/members?group_by=&key=&sort=&cursor=&q=` | A page of the group's members (`GroupMemberPage`), as the collection's entries are; `added` sorts by when they joined the group. |
+| `GET /api/groups/{id}/members/{entry_id}` | One member (`GroupMember`): how many of the entry's copies are in the group. 404 if it isn't in it. |
+| `PUT /api/groups/{id}/members/{entry_id}` | Puts copies of one of your entries in the group (`MemberQuantity`), or changes how many are there: 201 if the entry is new to the group, else 200. |
+| `DELETE /api/groups/{id}/members/{entry_id}` | Takes an entry out of the group: 204. It stays in the collection. |
+
+Pages hold 60 cards, up to page 50.
+
+**Searching a listing.** `q` on the collection's and a group's groups and entries lists only the cards with every word of it somewhere in their name or type line, each word in either, ignoring case and order. For example, `goblin` finds Goblin creatures, `bolt light` finds Lightning Bolt, and `llanowar druid` finds Llanowar Elves (Creature — Elf Druid). Curly apostrophes match straight ones, and a dash on its own is ignored. It is at most 150 characters (`MaxSearchLength`); a longer one, or one with a NUL or that isn't UTF-8, is a 400. A cursor is only for the search it was made with.
+
+**The collection.** Every collection endpoint needs a signed-in user, and only ever sees that user's cards (another user's entry is a 404). An entry holds 1 to 999 copies; its finish must be one the printing comes in. A collection holds at most 50,000 entries (`MaxEntries`); past that, only copies of entries already there can be added. Its EUR price is the regular price for non-foil, and the foil price, else the regular one, for foil and etched (the rules in `testdata/pricing-cases.json`, which the frontend and the server's tests both run); a card Scryfall no longer lists has no price. Totals add up the priced cards and count the others as `unpriced_count`. The `group_by` values and their groups' keys:
+
+| `group_by` | Groups (in order) |
+|---|---|
+| `none` | `all` |
+| `set` | the set codes, newest set first (sets released the same day by name; those with no date last) |
+| `color` | by colour identity: `W`, `U`, `B`, `R`, `G`, `M` (several), `C` (none) |
+| `type` | the front face's first of `creature`, `planeswalker`, `battle`, `instant`, `sorcery`, `artifact`, `enchantment`, `land`; else `other` |
+| `rarity` | `mythic`, `rare`, `uncommon`, `common`, `special`, `bonus` |
+| `cmc` | mana value, rounded down: `0` to `6`, then `7` for 7 or more |
+
+**Custom groups.** A group (binder, deck, box) holds some of your entries: of each, 1 to all of its copies. One entry can be in several groups (a deck can list cards that live in a binder). Lowering an entry's quantity lowers its copies in groups with it, and adding cards with a `group_id` puts them in that group as well, both or neither. A user has at most 500 groups (`MaxGroups`), holding at most 100,000 entries between them (`MaxMembers`). Changes to a group or an entry change only the fields given, so two at once don't undo each other. Another user's group, or a member of it, is a 404 (but a `group_id` that isn't one of yours, in an entry being added, is a 400, like any other bad field in a request). Names are trimmed and stored in one Unicode form (NFC), and must have a letter, digit or symbol; names and descriptions can't have invisible characters. Their lengths are in characters (code points: in JavaScript, `[...s].length`).
+
+**Signing in.** A session lasts about 30 days from its last use (its expiry moves forward at most once a day), and 90 days at most; the browser holds it in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, and the database only the token's SHA-256. Passwords are hashed with argon2id. Request bodies are JSON (`Content-Type: application/json`, at most 16 KB, no unknown fields). Requests that change anything are refused (403) when a browser says they come from another site, by their `Sec-Fetch-Site` or `Origin` header.
+
+**Limits.** Each client (IP address, or IPv6 /56) may make 20 API requests a second, in bursts of up to 60, and sign up or log in 10 times a minute. After 10 failed logins to one account, that client may try it once a minute; failures from other clients don't count, so no one can lock an account's owner out. Past a limit, the answer is 429 with `Retry-After`. The limits are kept in memory, per server.
+
+After changing the Go structs in `backend/internal/contract`, or the SQL in `backend/internal/db` (migrations or queries), run `go generate ./...` in `backend/`. It regenerates the frontend's types with tygo and the database code in `backend/internal/store` with sqlc. The tools are pinned in their own module, `backend/tools/go.mod`, so their dependencies don't mix with the app's.
+
+In development the session cookie is `Secure` too, which browsers allow on `http://localhost`. If yours doesn't keep it (signing in works but `/api/auth/me` still says 401), use a browser that does, such as Chrome or Firefox.
+
+## Running it for real
+Build the frontend (`npm run build` in `frontend/`) and point the server at it with `STATIC_DIR=frontend/dist`: it then serves the app as well as the API, with a Content-Security-Policy that allows no inline scripts and images only from Scryfall. Other settings, all environment variables (see `backend/cmd/server/main.go`):
+- `ALLOWED_HOSTS`: the names the site is reached by, like `cards.example.com`. Requests for any other `Host` are refused, so another site can't point its DNS at the server and use it as its own. The default allows only `localhost`, `127.0.0.1` and `::1`.
+- `DATABASE_URL`: a database on another machine needs `sslmode=verify-full`; the server won't start otherwise.
+- The session cookie is `Secure`, so the site must be served over HTTPS, by a reverse proxy in front of the server. Behind a proxy, every request comes from the proxy's address, so the per-client limits would be shared by everyone; taking the client's address from the proxy's header is still to do.
+
+## Workflow
+- `main` holds releases and `develop` is where work is integrated.
+- Each feature is built on a `feature/<name>` branch and merged into `develop` by pull request.
+- Every push and pull request must pass `./scripts/verify.sh`; see [CONTRIBUTING.md](CONTRIBUTING.md).

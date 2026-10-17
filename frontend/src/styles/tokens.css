@@ -1,0 +1,163 @@
+/*
+ * Design tokens: the one place colours, spacing, type, radii and shadows are set. The
+ * stylesheets use only these custom properties.
+ *
+ * Direction A, "dark, binder-style" (the design brief, 2026-10-11): a quiet near-black frame
+ * that lets the card art do the visual work. Colour carries meaning only: mana and rarity
+ * colours are never decoration, and the one accent (teal) marks what's selected or focused.
+ * The light theme (below) is the secondary one.
+ *
+ * This is Tailwind's @theme: each token is also a utility (bg-surface, text-text-muted,
+ * font-display, p-4…). Tailwind's own palette, fonts and spacing are cleared, so these are
+ * the only ones. All of them reach the page (static), used in a stylesheet or not: components
+ * also use them from code (e.g. the layout gaps). src/styles/tokens.test.ts checks every rarity and mana colour has a token,
+ * and that text colours are readable on the background in both themes.
+ */
+@theme static {
+  --color-*: initial;
+  --font-*: initial;
+  --spacing-*: initial;
+  --spacing: initial;
+
+  /* Colour: surfaces */
+  --color-bg: #111214;
+  --color-surface: #18191c;
+  --color-surface-raised: #1f2024;
+  --color-control: #1c1d20;
+  --color-overlay: rgb(0 0 0 / 62%);
+  --color-skeleton: #26282c;
+  /* Colour: lines, faintest to strongest */
+  --color-rule: #26282c;
+  --color-border: #2c2e33;
+  /* A control's outline sets it apart from the panel it's on (3:1, WCAG's non-text contrast). */
+  --color-border-control: #6b6e74;
+  /* Colour: text, strongest to faintest */
+  --color-text-strong: #f4f1ec;
+  --color-text: #e9e7e4;
+  --color-text-secondary: #c9c5bf;
+  --color-text-muted: #a3a09b;
+  /* Colour: actions and feedback */
+  --color-accent: #6cc4bf;
+  --color-accent-text: #0f1414;
+  --color-accent-soft: rgb(108 196 191 / 14%);
+  --color-focus: #6cc4bf;
+  --color-danger: #c2412f;
+  --color-danger-text: #ffffff;
+  --color-danger-fg: #f08c7c;
+  --color-success: #5fbf7f;
+  --color-warning: #e0a03a;
+
+  /* Colour: card rarities (set symbols, rarity badges), as text on the background */
+  --color-rarity-common: #cfcac3;
+  --color-rarity-uncommon: #a9b6c2;
+  --color-rarity-rare: #d8b15a;
+  --color-rarity-mythic: #e8743f;
+  --color-rarity-special: #c79bd8;
+  --color-rarity-bonus: #c79bd8;
+
+  /* Colour: mana (W U B R G C), for symbols and colour breakdowns; M is multicolour */
+  --color-mana-w: #f8f6d8;
+  --color-mana-u: #c1d7e9;
+  --color-mana-b: #bab1ab;
+  --color-mana-r: #e49977;
+  --color-mana-g: #a3c095;
+  --color-mana-c: #ccc2c0;
+  --color-mana-m: #e0c96b;
+
+  /* Spacing: a 4px-based scale (0, 4, 8, 12, 16, 24, 32, 48 px) */
+  --spacing-0: 0;
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.5rem;
+  --spacing-6: 2rem;
+  --spacing-7: 3rem;
+
+  /* Type: Instrument Sans for the interface, Spectral for names and titles (both bundled) */
+  --font-body: 'Instrument Sans Variable', system-ui, sans-serif;
+  --font-display: 'Spectral', Georgia, serif;
+  --font-mono: ui-monospace, monospace;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
+  --text-md: 0.9375rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --text-3xl: 2.5rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --leading-tight: 1.15;
+  --leading-snug: 1.25;
+  --leading-body: 1.45;
+  --tracking-caps: 0.08em;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-full: 9999px;
+
+  /* Shadow: deep, for a dark ground */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-md: 0 8px 20px rgb(0 0 0 / 45%);
+  --shadow-lg: 0 18px 40px rgb(0 0 0 / 55%);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Layering */
+  --z-sticky: 10;
+  --z-overlay: 100;
+  --z-toast: 200;
+  --z-tooltip: 300;
+
+  /* Sizes */
+  --size-touch: 44px;
+  --size-page: 80rem;
+  /* The sticky toolbar's height, so section headings stick just below it. */
+  --toolbar-height: 3.75rem;
+}
+
+/* The light theme: B's palette, with A's structure. The accent darkens to stay readable. */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --color-bg: #f4f4f1;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-control: #ffffff;
+  --color-overlay: rgb(20 24 40 / 45%);
+  --color-skeleton: #e4e4de;
+  --color-rule: #e4e4de;
+  --color-border: #dcdcd6;
+  --color-border-control: #86888c;
+  --color-text-strong: #111214;
+  --color-text: #1b1c1f;
+  --color-text-secondary: #3d4048;
+  --color-text-muted: #5b5e66;
+  --color-accent: #0f6b64;
+  --color-accent-text: #ffffff;
+  --color-accent-soft: rgb(15 107 100 / 10%);
+  --color-focus: #0f6b64;
+  --color-danger: #b3261e;
+  --color-danger-text: #ffffff;
+  --color-danger-fg: #a51d2d;
+  --color-success: #1f7a45;
+  --color-warning: #9a5b00;
+  --color-rarity-common: #1a1a1a;
+  --color-rarity-uncommon: #5f6670;
+  --color-rarity-rare: #7a6420;
+  --color-rarity-mythic: #b5401f;
+  --color-rarity-special: #652978;
+  --color-rarity-bonus: #652978;
+  --shadow-sm: 0 1px 2px rgb(20 24 40 / 12%);
+  --shadow-md: 0 6px 16px rgb(20 24 40 / 14%);
+  --shadow-lg: 0 16px 36px rgb(20 24 40 / 20%);
+}

@@ -1,0 +1,1470 @@
+/*
+ * The app's own components and pages, styled for direction A (dark, binder-style): a quiet
+ * frame that lets the card art do the visual work. Every value is a token from
+ * src/styles/tokens.css. Components keep their BEM class names (block__element--modifier);
+ * these rules are the only place they're styled.
+ */
+
+/* App frame */
+
+/* Hidden until focused: the first thing a keyboard user reaches. */
+.skip-link {
+  position: absolute;
+  left: var(--spacing-3);
+  top: -100vh;
+  padding: var(--spacing-2) var(--spacing-4);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  z-index: var(--z-toast);
+}
+.skip-link:focus {
+  top: var(--spacing-3);
+}
+
+.app-header {
+  border-bottom: 1px solid var(--color-rule);
+}
+.app-header__bar {
+  max-width: var(--size-page);
+  margin: 0 auto;
+  padding: var(--spacing-3) var(--spacing-6);
+  row-gap: var(--spacing-2);
+}
+.app-header__home {
+  color: var(--color-text-strong);
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+.app-header__nav {
+  flex: 1 1 auto;
+}
+.app-header__nav a {
+  display: inline-block;
+  padding: var(--spacing-1) 0;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+.app-header__nav a:hover {
+  color: var(--color-text-strong);
+}
+.app-header__nav a[aria-current='page'] {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
+}
+.app-header__account {
+  gap: var(--spacing-4);
+}
+.app-header__account a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+.app-header__account a:hover {
+  color: var(--color-text-strong);
+}
+.app-header__email {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.theme-toggle {
+  font-size: var(--text-sm);
+}
+.currency-switch .segmented-control__option {
+  padding: 0 var(--spacing-3);
+}
+/* Deleting is offered quietly beside the group's other actions; its confirmation is the loud one. */
+.group-page__actions .button--danger {
+  border-color: var(--color-border-control);
+  background: transparent;
+  color: var(--color-danger-fg);
+}
+
+/* Focused when a new page opens, for screen readers; not a control, so no focus ring. */
+.app-main {
+  max-width: var(--size-page);
+  margin: 0 auto;
+  padding: 0 var(--spacing-6) var(--spacing-7);
+}
+.app-main:focus {
+  outline: none;
+}
+@media (max-width: 40rem) {
+  .app-header__bar {
+    padding: var(--spacing-2) var(--spacing-4);
+  }
+  .app-main {
+    padding: 0 var(--spacing-4) var(--spacing-7);
+  }
+}
+
+/* A page's heading: its title (and a line under it) on the left, its main action on the right. */
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--spacing-4) var(--spacing-6);
+  padding-top: var(--spacing-6);
+}
+.page-head__titles {
+  display: grid;
+  gap: var(--spacing-1);
+}
+.page-head__subtitle {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+/* A link drawn as a button brightens under the pointer, as the buttons do (React Aria marks
+   theirs [data-hovered]; a link has no such mark). Its colours stay the button's. */
+a.button:hover {
+  filter: brightness(1.08);
+}
+:is(.search-page, .groups-page, .card-page, .auth-page, .not-found, .route-error) > h1,
+:is(.groups-page, .group-page__header) h1 {
+  padding-top: var(--spacing-6);
+}
+:is(.groups-page, .group-page__header) > .cluster h1 {
+  padding-top: 0;
+}
+.groups-page > .cluster:first-of-type,
+.group-page__header > .cluster:first-child {
+  padding-top: var(--spacing-6);
+  align-items: flex-end;
+}
+
+/* Cards */
+
+/* Card images keep the printed card's 63 × 88 mm proportions and its round corners. */
+.card-image {
+  display: block;
+  aspect-ratio: 63 / 88;
+  width: 100%;
+  border-radius: 4.75% / 3.5%;
+  background: var(--color-surface);
+}
+.card-image--small {
+  max-width: 146px;
+}
+.card-image--normal {
+  max-width: 244px;
+}
+.card-image--large {
+  max-width: 336px;
+}
+.card-image--missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-4);
+  border: 1px dashed var(--color-border-control);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* Set symbols sit in a line of text, at the text's height. */
+.set-symbol {
+  white-space: nowrap;
+  text-decoration: none;
+}
+/* The symbol is Scryfall's SVG as a mask over the text colour, which the rarity sets (below).
+   It's the text's height, at the symbol's own proportions once known (--set-icon-ratio, from
+   SetSymbol) and a typical 1.4 until then, so it holds its space before it loads. */
+.set-symbol__icon {
+  display: inline-block;
+  height: 1em;
+  aspect-ratio: var(--set-icon-ratio, 1.4);
+  margin-right: 0.2em;
+  vertical-align: -0.15em;
+  background-color: currentColor;
+  mask: var(--set-icon, none) center / contain no-repeat;
+}
+/* Only there to report the symbol's load or failure (see SetSymbol). */
+.set-symbol__probe {
+  display: none;
+}
+/* Forced colours (e.g. Windows High Contrast) would repaint the fill as the background,
+   hiding the symbol: draw it in the text colour around it instead, which is already forced
+   (CanvasText, ButtonText in a button, LinkText in a link). */
+@media (forced-colors: active) {
+  .set-symbol__icon {
+    forced-color-adjust: none;
+    background-color: currentColor;
+  }
+}
+
+/* Rarity colours, from the tokens. */
+.set-symbol--common,
+.rarity-badge--common {
+  color: var(--color-rarity-common);
+}
+.set-symbol--uncommon,
+.rarity-badge--uncommon {
+  color: var(--color-rarity-uncommon);
+}
+.set-symbol--rare,
+.rarity-badge--rare {
+  color: var(--color-rarity-rare);
+}
+.set-symbol--mythic,
+.rarity-badge--mythic {
+  color: var(--color-rarity-mythic);
+}
+.set-symbol--special,
+.rarity-badge--special {
+  color: var(--color-rarity-special);
+}
+.set-symbol--bonus,
+.rarity-badge--bonus {
+  color: var(--color-rarity-bonus);
+}
+.rarity-badge {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+}
+.rarity-badge abbr {
+  text-decoration: none;
+}
+
+.no-longer-listed {
+  padding: 0.0625rem var(--spacing-2);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.price {
+  font-variant-numeric: tabular-nums;
+}
+/* Where pounds come from (or why prices are in euros): once on a page that shows prices. */
+.rate-note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.price--none {
+  color: var(--color-text-muted);
+}
+.total-value__unpriced {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-normal);
+}
+
+/* A card as a tile: its image, then its name, printing and price. Pointing at it (or
+   focusing inside it) tilts it slightly toward you, like a card picked up from a binder. */
+.card-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  transition: transform 0.18s var(--ease-out);
+}
+.card-tile__media {
+  position: relative;
+  border-radius: 4.75% / 3.5%;
+  box-shadow: var(--shadow-md);
+  transition: box-shadow 0.18s var(--ease-out);
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .card-tile:hover,
+  .card-tile:focus-within {
+    transform: perspective(900px) rotateX(3deg) rotateY(-4deg) translateY(-4px);
+  }
+  .card-tile:hover .card-tile__media,
+  .card-tile:focus-within .card-tile__media {
+    box-shadow: var(--shadow-lg);
+  }
+}
+/* Foil copies catch the light: a sheen that sweeps across the image. */
+:is(.card-tile--foil, .card-tile--etched) .card-tile__media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    115deg,
+    transparent 28%,
+    rgb(255 255 255 / 34%) 42%,
+    rgb(150 225 255 / 28%) 48%,
+    rgb(255 170 240 / 24%) 54%,
+    transparent 68%
+  );
+  background-size: 260% 260%;
+  animation: foil-sheen 3.6s ease-in-out infinite;
+}
+@keyframes foil-sheen {
+  0% {
+    background-position: 110% 0;
+  }
+  100% {
+    background-position: -110% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.card-tile--foil, .card-tile--etched) .card-tile__media::after {
+    animation: none;
+    background-position: 50% 0;
+  }
+}
+.card-tile__overlay {
+  position: absolute;
+  top: var(--spacing-2);
+  left: var(--spacing-2);
+  /* Only shows things (a count): a press on it is a press on the image. */
+  pointer-events: none;
+}
+.card-tile__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0 0.125rem;
+}
+.card-tile__body p {
+  margin: 0;
+}
+.card-tile__name {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  line-height: var(--leading-snug);
+}
+/* Runs as a line of text, so a long set name wraps with its symbol and number, not apart. */
+.card-tile__printing {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+.card-tile__price {
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
+}
+.card-tile__actions {
+  gap: var(--spacing-2);
+}
+.card-tile__actions a {
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+/* A tile whose image opens the larger view: the image is a button, drawn as just the image. */
+.button.card-tile__view {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  cursor: zoom-in;
+}
+.button.card-tile__view:is([data-hovered], [data-pressed]) {
+  background: none;
+  transform: none;
+}
+
+/* An owned copy's tile: a count on the image, its copy as chips, its value. */
+.entry-tile__quantity {
+  padding: 0.125rem 0.5625rem;
+  background: rgb(10 10 12 / 86%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 16%);
+  color: #ffffff;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+.entry-tile__copy {
+  gap: 0.375rem;
+}
+.entry-tile__copy > :is(abbr, span) {
+  padding: 0.125rem var(--spacing-2);
+  border-radius: 6px;
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+.entry-tile__copy > .entry-tile__finish {
+  background: linear-gradient(100deg, #3a3550, #24414a);
+  color: #e7e0ff;
+}
+.entry-tile__price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--spacing-2);
+  margin-top: 0.125rem;
+}
+.entry-tile__unit {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+/* At the right, alone too (one copy shows no price per copy). */
+.entry-tile__value {
+  margin-left: auto;
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
+}
+/* The Actions button sits on the image's corner, shown while the tile is pointed at or
+   focused (always where the main pointer is a finger, which can't point without pressing). */
+.entry-tile .card-tile__actions {
+  position: absolute;
+  top: var(--spacing-2);
+  right: var(--spacing-2);
+}
+.entry-tile .card-tile__actions .button {
+  width: var(--size-touch);
+  min-height: var(--size-touch);
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: rgb(10 10 12 / 86%);
+  color: #ffffff;
+}
+@media (hover: hover) and (pointer: fine) {
+  .entry-tile .card-tile__actions {
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+  /* Also while its menu is open: the menu takes the focus out of the tile. */
+  .entry-tile:hover .card-tile__actions,
+  .entry-tile:focus-within .card-tile__actions,
+  .entry-tile .card-tile__actions:has([aria-expanded='true']) {
+    opacity: 1;
+  }
+}
+
+/* An owned copy as a table row (the list view). */
+.entry-table {
+  font-size: var(--text-sm);
+}
+.entry-table .entry-row__name {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+}
+.entry-table :is(.entry-row__quantity, .entry-row__price, .entry-row__value) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.entry-table td.entry-row__quantity,
+.entry-table td.entry-row__value {
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
+}
+.entry-table td:is(.entry-row__type, .entry-row__set, .entry-row__condition, .entry-row__finish, .entry-row__language, .entry-row__price) {
+  color: var(--color-text-secondary);
+}
+.entry-table .entry-row__actions {
+  text-align: right;
+}
+.entry-table .entry-row__actions .button {
+  width: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--color-border-control);
+}
+@media (pointer: coarse) {
+  .entry-table .entry-row__actions .button {
+    width: var(--size-touch);
+    min-height: var(--size-touch);
+  }
+}
+
+/* The collection */
+
+.collection-page__add {
+  flex: none;
+}
+/* On a phone, adding cards floats at the bottom of the screen, in reach of a thumb. */
+@media (max-width: 40rem) {
+  .collection-page__add {
+    position: fixed;
+    right: var(--spacing-4);
+    bottom: var(--spacing-5);
+    min-height: 3.25rem;
+    padding: 0 var(--spacing-5);
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-lg);
+    z-index: var(--z-sticky);
+  }
+  /* Room below the last cards, and below anything focused, so the button never covers them. */
+  .app-main:has(.collection-page__add) {
+    padding-bottom: 6rem;
+  }
+  html:has(.collection-page__add) {
+    scroll-padding-bottom: 5.5rem;
+  }
+}
+
+/* Totals, then thin bars of how the cards divide by color and rarity. */
+.collection-summary {
+  display: grid;
+  grid-template-columns: auto repeat(2, minmax(14rem, 1fr));
+  align-items: end;
+  gap: var(--spacing-4) var(--spacing-6);
+}
+@media (max-width: 64rem) {
+  .collection-summary {
+    grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  }
+}
+.collection-summary__totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3) var(--spacing-6);
+  margin: 0;
+}
+.collection-summary__total {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.125rem;
+}
+.collection-summary__total dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.collection-summary__total dd {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 1.875rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-tight);
+  font-variant-numeric: tabular-nums;
+}
+.collection-summary__breakdown {
+  display: grid;
+  gap: var(--spacing-2);
+}
+.collection-summary__breakdown h3 {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.breakdown-bar {
+  display: flex;
+  gap: 2px;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--color-rule);
+}
+.breakdown-bar__part {
+  flex-basis: 0;
+}
+.breakdown-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem var(--spacing-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.breakdown-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.breakdown-item__swatch {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--radius-full);
+}
+/* Rarities are diamonds, like the rarity marks on the cards. */
+.collection-summary__breakdown--rarity .breakdown-item__swatch {
+  border-radius: 1px;
+  transform: rotate(45deg) scale(0.85);
+}
+.breakdown-item__count {
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.swatch--w {
+  background: var(--color-mana-w);
+}
+/* White mana is near the light theme's background: outlined there, so it still shows. */
+:root[data-theme='light'] .swatch--w {
+  box-shadow: inset 0 0 0 1px var(--color-border-control);
+}
+.swatch--u {
+  background: var(--color-mana-u);
+}
+.swatch--b {
+  background: var(--color-mana-b);
+}
+.swatch--r {
+  background: var(--color-mana-r);
+}
+.swatch--g {
+  background: var(--color-mana-g);
+}
+.swatch--c {
+  background: var(--color-mana-c);
+}
+.swatch--m {
+  background: var(--color-mana-m);
+}
+.swatch--common {
+  background: var(--color-rarity-common);
+}
+.swatch--uncommon {
+  background: var(--color-rarity-uncommon);
+}
+.swatch--rare {
+  background: var(--color-rarity-rare);
+}
+.swatch--mythic {
+  background: var(--color-rarity-mythic);
+}
+.swatch--special {
+  background: var(--color-rarity-special);
+}
+.swatch--bonus {
+  background: var(--color-rarity-bonus);
+}
+
+/* How the cards are shown: stays at the top while the cards scroll under it. Its height is
+   --toolbar-height (kept up to date by ListingControls), which the section headings below
+   stick under. */
+.listing-controls {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  min-height: var(--toolbar-height);
+  padding: var(--spacing-3) 0;
+  border-top: 1px solid var(--color-rule);
+  border-bottom: 1px solid var(--color-rule);
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+}
+.listing-controls .field {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+.listing-controls .select {
+  width: auto;
+}
+/* The search takes the room between the selects and the view switch, up to a line's worth. On a
+   phone it shares the second row with the view switch, keeping the sticky bar short (below). */
+.listing-controls__search {
+  flex: 1 1 12rem;
+  max-width: 22rem;
+}
+.listing-controls__search .search-input {
+  flex: 1;
+  min-width: 0;
+}
+.listing-controls__view {
+  margin-left: auto;
+}
+
+/* Keyboard focus scrolled into view lands below the toolbar and a section heading, not
+   under them. */
+html:has(.listing-controls) {
+  scroll-padding-top: calc(var(--toolbar-height) + 4.5rem);
+}
+
+/* A group of the listing: its heading stays in view below the controls while its cards scroll. */
+.listing {
+  display: grid;
+}
+.group-bucket__header {
+  position: sticky;
+  top: var(--toolbar-height);
+  z-index: calc(var(--z-sticky) - 1);
+  margin: 0;
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+}
+.group-bucket__toggle {
+  padding: var(--spacing-4) 0 var(--spacing-3);
+  color: var(--color-text-strong);
+}
+.group-bucket__label {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+}
+.group-bucket__count {
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-normal);
+  font-variant-numeric: tabular-nums;
+}
+.group-bucket__value {
+  margin-left: auto;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.group-bucket__body {
+  padding: var(--spacing-2) 0 var(--spacing-6);
+}
+.group-bucket__body .entry-grid {
+  row-gap: var(--spacing-6);
+}
+.group-bucket__more {
+  margin-top: var(--spacing-5);
+}
+
+/* Groups */
+
+.custom-group-card {
+  display: grid;
+  gap: var(--spacing-2);
+  height: 100%;
+  padding: var(--spacing-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+/* Its best cards, fanned like the top of a deck box. */
+.custom-group-card__previews {
+  display: flex;
+  justify-content: center;
+  height: 9.5rem;
+  margin-bottom: var(--spacing-2);
+  padding-top: var(--spacing-3);
+}
+.custom-group-card__previews img {
+  width: 5.5rem;
+  height: auto;
+  aspect-ratio: 63 / 88;
+  margin: 0 -1.25rem;
+  border-radius: 4.75% / 3.5%;
+  box-shadow: var(--shadow-md);
+  transform-origin: 50% 120%;
+}
+.custom-group-card__previews img:nth-child(1):not(:only-child) {
+  transform: rotate(-9deg);
+}
+.custom-group-card__previews img:nth-child(2) {
+  transform: rotate(-3deg);
+}
+.custom-group-card__previews img:nth-child(3) {
+  transform: rotate(3deg);
+}
+.custom-group-card__previews img:nth-child(4) {
+  transform: rotate(9deg);
+}
+.custom-group-card__empty {
+  width: 100%;
+  padding: var(--spacing-4);
+}
+.custom-group-card__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+.custom-group-card__meta {
+  gap: var(--spacing-1) var(--spacing-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.custom-group-card__kind {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+.custom-group-card__description {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.custom-group-card__actions {
+  margin-top: auto;
+  padding-top: var(--spacing-2);
+}
+.custom-group-card__actions a {
+  font-weight: var(--font-weight-semibold);
+}
+.group-grid,
+.card-grid,
+.printing-links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card-grid {
+  row-gap: var(--spacing-6);
+}
+
+.group-page__header {
+  display: grid;
+  gap: var(--spacing-2);
+}
+.group-page__meta {
+  gap: var(--spacing-1) var(--spacing-4);
+  color: var(--color-text-muted);
+}
+.group-page__description {
+  margin: 0;
+  max-width: 48rem;
+  color: var(--color-text-secondary);
+}
+
+/* A card in full */
+
+/* Top-aligned, not stretched: a stretched image would take the height of a taller info
+   column and lose the card's proportions. */
+.card-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--spacing-6);
+  padding-top: var(--spacing-6);
+}
+/* The images get a set width: room for each face at full size (--faces, from CardDetail), or
+   the whole row on narrow screens. Shared out between the faces, each image then has its
+   size before it loads; sized by its content instead, an unloaded image would be 0 wide. */
+.card-detail__images {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-3);
+  width: min(100%, calc(var(--faces, 1) * 336px + (var(--faces, 1) - 1) * var(--spacing-3)));
+}
+.card-detail__images > .card-image {
+  flex: 1 1 0;
+  min-width: 0;
+  box-shadow: var(--shadow-lg);
+}
+.card-detail__info {
+  display: grid;
+  flex: 1 1 22rem;
+  gap: var(--spacing-5);
+  min-width: 0;
+}
+.card-detail__header {
+  display: grid;
+  gap: var(--spacing-2);
+}
+.card-detail__name {
+  margin: 0;
+  font-family: var(--font-display);
+}
+.card-detail__printing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-1) var(--spacing-3);
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+.card-detail__face {
+  display: grid;
+  gap: var(--spacing-1);
+  padding: var(--spacing-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.card-detail__face-name {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+.card-detail__type {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.card-detail__oracle {
+  margin-top: var(--spacing-2);
+  white-space: pre-line;
+}
+.card-detail__prices,
+.card-detail__owned {
+  display: grid;
+  gap: var(--spacing-2);
+}
+.card-detail__prices > h2,
+.card-detail__owned > h2,
+.card-detail__prices > h3,
+.card-detail__owned > h3 {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.card-detail__cardmarket {
+  justify-self: start;
+  font-weight: var(--font-weight-semibold);
+}
+.card-detail__owned ul {
+  display: grid;
+  gap: var(--spacing-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card-page__printings {
+  display: grid;
+  gap: var(--spacing-3);
+}
+/* In columns on a wide screen: a card can have a hundred printings. */
+.printing-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(24rem, 100%), 1fr));
+  column-gap: var(--spacing-6);
+}
+.printing-links li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) 0;
+  border-top: 1px solid var(--color-rule);
+  color: var(--color-text-muted);
+}
+.printing-links a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+.printing-links a:hover {
+  color: var(--color-text-strong);
+  text-decoration: underline;
+}
+.printing-links [aria-current='page'] {
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Card symbols are Scryfall's images, sized to the text around them (a mana cost or a line
+   of rules text), with their space held before they load. */
+.mana-symbol {
+  text-decoration: none;
+}
+.mana-symbol__icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  max-width: none;
+  margin: 0 0.05em;
+  vertical-align: -0.125em;
+}
+/* A symbol Scryfall has no image for is shown as text, in braces, coloured from the tokens. */
+.mana-symbol--text {
+  padding: 0 0.15em;
+  border-radius: var(--radius-sm);
+  color: #1a1a1a;
+}
+.mana-symbol--text::before {
+  content: '{';
+}
+.mana-symbol--text::after {
+  content: '}';
+}
+.mana-symbol--text.mana-symbol--w {
+  background: var(--color-mana-w);
+}
+.mana-symbol--text.mana-symbol--u {
+  background: var(--color-mana-u);
+}
+.mana-symbol--text.mana-symbol--b {
+  background: var(--color-mana-b);
+}
+.mana-symbol--text.mana-symbol--r {
+  background: var(--color-mana-r);
+}
+.mana-symbol--text.mana-symbol--g {
+  background: var(--color-mana-g);
+}
+.mana-symbol--text.mana-symbol--c {
+  background: var(--color-mana-c);
+}
+
+/* Search */
+
+.search-filters {
+  display: grid;
+  gap: var(--spacing-4);
+  padding: var(--spacing-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.search-filters > .field .search-input input {
+  min-height: 3rem;
+  font-size: var(--text-lg);
+}
+.search-filters__more > .field {
+  flex: 1 1 12rem;
+}
+.search-filters__colors {
+  display: grid;
+  gap: var(--spacing-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.search-filters__colors legend {
+  margin-bottom: var(--spacing-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+}
+/* Colours are pills you switch on and off; the checkbox in each is still what's operated
+   (and read), only drawn as the pill. */
+.search-filters__color {
+  min-height: 2.5rem;
+  padding: 0 var(--spacing-3) 0 var(--spacing-2);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-full);
+  background: var(--color-control);
+  font-size: var(--text-sm);
+}
+.search-filters__color .checkbox__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+@media (pointer: coarse) {
+  .search-filters__color {
+    min-height: var(--size-touch);
+  }
+}
+.search-filters__color:has(:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-text-strong);
+}
+.search-filters__color:has(:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+/* Forced colours (e.g. Windows High Contrast) repaint the pill's colours the same whether it's
+   on or off, so there the checkbox itself shows it. */
+@media (forced-colors: active) {
+  .search-filters__color .checkbox__input {
+    position: static;
+    opacity: 1;
+  }
+}
+.search-filters__color .checkbox__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.search-filters__color .mana-symbol__icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.search-page__login,
+.search-page__hint {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+.search-page__results {
+  display: grid;
+  gap: var(--spacing-5);
+  transition: opacity 0.15s ease;
+}
+/* The last results, shown while the next search runs. */
+.search-page__results[aria-busy='true'],
+/* The last search's cards, standing in while the next search's load. */
+:is(.listing, .listing__section)[aria-busy='true'] {
+  opacity: 0.6;
+}
+.search-page__more {
+  justify-self: center;
+}
+
+/* A card shown larger, over the page */
+
+.dialog-modal:has(.card-viewer) {
+  position: relative;
+  width: min(33rem, 100%);
+}
+.card-viewer {
+  gap: var(--spacing-3);
+}
+.card-viewer .dialog__title {
+  padding-right: var(--size-touch);
+  font-size: var(--text-lg);
+}
+.button.card-viewer__close {
+  position: absolute;
+  top: var(--spacing-3);
+  right: var(--spacing-3);
+  width: var(--size-touch);
+  min-height: var(--size-touch);
+  padding: 0;
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+}
+.button.card-viewer__close[data-hovered] {
+  background: var(--color-rule);
+  color: var(--color-text-strong);
+}
+.card-viewer__printing {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+/* As big as the screen's height allows (less the dialog's title, which can take two lines,
+   and its buttons), in the card's proportions; but never smaller than a tile, so on a short
+   screen the dialog scrolls instead. */
+.card-viewer__card {
+  width: 100%;
+  max-width: max(min(30rem, calc((100vh - 16rem) * 63 / 88)), min(100%, 15rem));
+  max-width: max(min(30rem, calc((100dvh - 16rem) * 63 / 88)), min(100%, 15rem));
+  aspect-ratio: 63 / 88;
+  margin-inline: auto;
+  perspective: 1800px;
+}
+/* A double-faced card's faces, back to back: turning it over turns them round together. */
+.card-viewer__faces {
+  position: relative;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.55s var(--ease-out);
+}
+.card-viewer__faces--turned {
+  transform: rotateY(180deg);
+}
+.card-viewer__face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+.card-viewer__face--back {
+  transform: rotateY(180deg);
+}
+.card-viewer__face .card-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+}
+/* The large image, over the stand-in: see-through until it has loaded. */
+.card-viewer__face > .card-image {
+  background: none;
+}
+.card-viewer__stand-in .card-image {
+  box-shadow: var(--shadow-lg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-viewer__faces {
+    transition: none;
+  }
+}
+.card-viewer__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-3);
+}
+.card-viewer__side {
+  margin-right: auto;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.card-viewer__footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--size-touch);
+  font-weight: var(--font-weight-medium);
+}
+/* A short, wide screen (a phone on its side): the card as tall as the dialog allows, with its
+   name and buttons beside it. */
+@media (max-height: 30rem) and (min-width: 36rem) {
+  .dialog-modal:has(.card-viewer) {
+    width: min(46rem, 100%);
+  }
+  .card-viewer {
+    grid-template-columns: auto minmax(0, 1fr);
+    /* The name and printing at the top, the buttons at the foot: the card's height goes between. */
+    grid-template-rows: auto auto 1fr;
+    column-gap: var(--spacing-5);
+  }
+  .card-viewer > * {
+    grid-column: 2;
+  }
+  .card-viewer > .card-viewer__card {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    width: calc((100vh - 5.5rem) * 63 / 88);
+    width: calc((100dvh - 5.5rem) * 63 / 88);
+    max-width: none;
+  }
+  .card-viewer__footer {
+    align-self: end;
+    justify-content: flex-start;
+  }
+}
+
+/* Adding a card */
+
+.dialog-modal:has(.add-card-dialog) {
+  width: min(44rem, 100%);
+}
+.add-card-dialog__printings {
+  display: grid;
+  gap: var(--spacing-2);
+}
+.add-card-dialog__printings h3 {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.printing-list {
+  display: grid;
+  gap: var(--spacing-1);
+  max-height: 16rem;
+  overflow-y: auto;
+  padding-right: var(--spacing-1);
+}
+.printing-option {
+  justify-content: flex-start;
+  gap: var(--spacing-3);
+  width: 100%;
+  min-height: 2.75rem;
+  border-color: transparent;
+  background: transparent;
+  font-weight: var(--font-weight-normal);
+  text-align: left;
+}
+.printing-option__set {
+  flex: 1;
+  color: var(--color-text);
+}
+.printing-option__number,
+.printing-option__date {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.add-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--spacing-3) var(--spacing-4);
+}
+.add-form__card {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+.add-form__card strong {
+  color: var(--color-text-strong);
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+}
+.add-form__submit {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+/* Buttons keep their own width in the dialog's column. */
+.add-card-dialog__cancel,
+.add-card-dialog__printings > .button {
+  align-self: flex-start;
+  justify-self: start;
+}
+
+/* Forms in pages and dialogs */
+
+.auth-page {
+  max-width: 26rem;
+  margin: 0 auto;
+}
+.auth-form,
+.group-form,
+.entry-change-form,
+.member-form {
+  display: grid;
+  gap: var(--spacing-4);
+}
+.auth-form .button[type='submit'] {
+  justify-self: stretch;
+}
+.group-form__actions,
+.entry-change-form__actions,
+.member-form__actions {
+  justify-content: flex-end;
+  padding-top: var(--spacing-2);
+}
+
+/* Not found, and a page that failed */
+
+.not-found,
+.route-error {
+  max-width: 36rem;
+}
+.not-found p,
+.route-error p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+/* Gallery page (development only) */
+.gallery {
+  max-width: var(--size-page);
+  margin: 0 auto;
+  padding: var(--spacing-6);
+}
+.gallery__section {
+  margin-block: var(--spacing-6);
+  padding-top: var(--spacing-4);
+  border-top: 1px solid var(--color-border);
+}
+.gallery__section > h2 {
+  margin-bottom: var(--spacing-3);
+}
+.gallery__toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3);
+}
+.gallery__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-4);
+  align-items: flex-start;
+}
+.gallery__row .card-image {
+  width: auto;
+}
+.gallery__note {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+.gallery__output {
+  padding: var(--spacing-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.gallery__swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+.gallery__swatch-colour {
+  display: inline-block;
+  width: var(--spacing-5);
+  height: var(--spacing-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.gallery__space {
+  display: inline-block;
+  height: var(--spacing-3);
+  background: var(--color-accent);
+  vertical-align: middle;
+}
+.gallery__box {
+  padding: var(--spacing-2);
+  border: 1px dashed var(--color-border);
+}
+.gallery__form {
+  max-width: 24rem;
+}
+
+/* On a phone */
+
+@media (max-width: 40rem) {
+  /* The header in two short rows: the email goes (it's on the account's own pages), and the
+     theme switch shrinks to its icon, keeping its name for screen readers. */
+  .app-header__email {
+    display: none;
+  }
+  .theme-toggle {
+    width: var(--size-touch);
+    padding: 0;
+  }
+  .currency-switch .segmented-control__option {
+    padding: 0 var(--spacing-2);
+  }
+  .theme-toggle__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  /* The controls side by side, labels above, so the toolbar stays one short row. */
+  .listing-controls__bar {
+    align-items: flex-end;
+    gap: var(--spacing-2);
+  }
+  .listing-controls .field {
+    display: grid;
+    flex: 1 1 7rem;
+    gap: 0.125rem;
+  }
+  .listing-controls .field__label {
+    font-size: var(--text-xs);
+  }
+  .listing-controls .select {
+    width: 100%;
+  }
+  /* Too wide to share the first row with the selects: it shares the second with View. */
+  .listing-controls .listing-controls__search {
+    flex-basis: 12rem;
+  }
+  /* Cards two to a row. */
+  :is(.entry-grid, .card-grid).grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--spacing-3);
+  }
+  .card-tile__name {
+    font-size: var(--text-md);
+  }
+  .collection-summary__total dd {
+    font-size: var(--text-xl);
+  }
+}
+
+.card-page__printings > .button {
+  justify-self: start;
+}
+
+/* A short screen (a phone on its side, or the page zoomed in far) keeps its height for the
+   cards: the toolbar and section headings scroll away, and adding cards sits in the page. */
+@media (max-height: 32rem) {
+  .listing-controls,
+  .group-bucket__header {
+    position: static;
+  }
+  html:has(.listing-controls) {
+    scroll-padding-top: 0;
+  }
+  .collection-page__add {
+    position: static;
+    box-shadow: none;
+  }
+  .app-main:has(.collection-page__add) {
+    padding-bottom: var(--spacing-7);
+  }
+  html:has(.collection-page__add) {
+    scroll-padding-bottom: 0;
+  }
+}

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Before anything is fetched: requests (card art, set and mana symbols, some drawn from
+         CSS) don't tell other sites which page made them. -->
+    <meta name="referrer" content="no-referrer" />
+    <!-- The theme chosen in this browser, set before the page is first drawn. -->
+    <script src="/theme-init.js"></script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mtgcollector</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

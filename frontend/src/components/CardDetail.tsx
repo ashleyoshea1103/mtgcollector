@@ -1,0 +1,97 @@
+import type { CSSProperties } from 'react';
+import { CONDITIONS, FINISHES, labelFor, LANGUAGES } from '../lib/labels';
+import { useMoney } from '../lib/money';
+import type { Card, CardFace, CollectionEntry, Finish } from '../types';
+import { DataTable, type Column } from '../ui';
+import { CardImage } from './CardImage';
+import { ManaCost } from './ManaCost';
+import { NoLongerListed } from './NoLongerListed';
+import { OracleText } from './OracleText';
+import { Price } from './Price';
+import { RateNote } from './RateNote';
+import { RarityBadge } from './RarityBadge';
+import { SetSymbol } from './SetSymbol';
+
+interface Props {
+  card: Card;
+  /** The user's copies of this printing, if any. */
+  entries?: CollectionEntry[];
+  /** The card name's heading level: 1 when it's the page's title, else 2. Its sections' headings are one level below. */
+  headingLevel?: 1 | 2;
+}
+
+const priceColumns = (card: Card, inPounds: boolean): Column<Finish>[] => [
+  { key: 'finish', header: 'Finish', hideHeader: true, rowHeader: true, cell: (f) => labelFor(FINISHES, f) },
+  // Cardmarket's euro prices, which show in pounds when they're in effect.
+  { key: 'eur', header: inPounds ? 'GBP (from Cardmarket)' : 'EUR (Cardmarket)', cell: (f) => <Price prices={card.prices} finish={f} /> },
+  { key: 'usd', header: 'USD', cell: (f) => <Price prices={card.prices} finish={f} currency="usd" /> },
+];
+
+/** Everything about one printing: images, rules text, prices and owned copies. */
+export function CardDetail({ card, entries = [], headingLevel = 2 }: Props) {
+  const money = useMoney();
+  const Title = headingLevel === 1 ? 'h1' : 'h2';
+  const Sub = headingLevel === 1 ? 'h2' : 'h3';
+  // Transform/modal cards have an image per face; split and adventure cards share one.
+  const faceImages = card.faces?.filter((f) => f.images).length ?? 0;
+  const faces: CardFace[] = card.faces ?? [
+    { name: card.name, mana_cost: card.mana_cost, type_line: card.type_line, oracle_text: card.oracle_text ?? undefined, images: null },
+  ];
+
+  return (
+    <article className="card-detail">
+      <div className="card-detail__images" style={{ '--faces': faceImages > 1 ? card.faces!.length : 1 } as CSSProperties}>
+        {faceImages > 1 ? (
+          card.faces!.map((_, i) => <CardImage key={i} card={card} face={i} size="large" />)
+        ) : (
+          <CardImage card={card} size="large" />
+        )}
+      </div>
+
+      <div className="card-detail__info">
+        <header className="card-detail__header">
+          <Title className="card-detail__name">{card.name}</Title>
+          <p className="card-detail__printing">
+            <SetSymbol set={card.set} rarity={card.rarity} nameShown /> {card.set.name} #{card.collector_number} <RarityBadge rarity={card.rarity} />{' '}
+            <time dateTime={card.released_at}>{card.released_at}</time> <NoLongerListed card={card} />
+          </p>
+        </header>
+
+        {faces.map((face, i) => (
+          <section key={i} className="card-detail__face">
+            <Sub className="card-detail__face-name">
+              {face.name} <ManaCost cost={face.mana_cost} />
+            </Sub>
+            <p className="card-detail__type">{face.type_line}</p>
+            {face.oracle_text && <OracleText className="card-detail__oracle" text={face.oracle_text} />}
+          </section>
+        ))}
+
+        <section className="card-detail__prices">
+          <Sub>Prices</Sub>
+          <RateNote />
+          <DataTable className="card-detail__price-table" columns={priceColumns(card, money.currency === 'gbp')} rows={card.finishes} rowKey={(f) => f} />
+          {card.cardmarket_url && (
+            <a className="card-detail__cardmarket" href={card.cardmarket_url} target="_blank" rel="noopener noreferrer">
+              View on Cardmarket
+            </a>
+          )}
+        </section>
+
+        {entries.length > 0 && (
+          <section className="card-detail__owned">
+            <Sub>In your collection</Sub>
+            <ul>
+              {entries.map((e) => (
+                <li key={e.id}>
+                  {e.quantity}× {labelFor(FINISHES, e.finish)}, {labelFor(CONDITIONS, e.condition)}, {labelFor(LANGUAGES, e.language)}{' '}
+                  <Price value={e.value_eur} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+    </article>
+  );
+}
