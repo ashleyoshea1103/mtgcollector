@@ -35,6 +35,7 @@ package main
 import (
 	"archive/zip"
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -484,7 +485,10 @@ func unescape(escaped string) (string, error) {
 // hashDir is golang.org/x/mod/sumdb/dirhash.HashDir with the Hash1 algorithm, which is what
 // the go command records, except that anything but a regular file is an error: the go command
 // only ever extracts regular files, and a link could point at a file that changes later.
+// In a Go toolchain's module (golang.org/toolchain), it leaves out each go.mod that's a copy
+// of the _go.mod beside it, which the go command makes after extracting one (toolchain.Exec).
 func hashDir(dir, prefix string) (string, error) {
+	toolchain := strings.HasPrefix(prefix, "golang.org/toolchain@")
 	var files []string
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -503,6 +507,9 @@ func hashDir(dir, prefix string) (string, error) {
 		if !d.Type().IsRegular() {
 			return fmt.Errorf("%s is not a regular file", filepath.ToSlash(rel))
 		}
+		if toolchain && d.Name() == "go.mod" && sameContents(path, filepath.Join(filepath.Dir(path), "_go.mod")) {
+			return nil
+		}
 		files = append(files, prefix+"/"+filepath.ToSlash(rel))
 		return nil
 	})
@@ -512,6 +519,12 @@ func hashDir(dir, prefix string) (string, error) {
 	return hash1(files, func(name string) (io.ReadCloser, error) {
 		return os.Open(filepath.Join(dir, filepath.FromSlash(strings.TrimPrefix(name, prefix+"/"))))
 	})
+}
+
+func sameContents(a, b string) bool {
+	da, errA := os.ReadFile(a)
+	db, errB := os.ReadFile(b)
+	return errA == nil && errB == nil && bytes.Equal(da, db)
 }
 
 // hashZip is golang.org/x/mod/sumdb/dirhash.HashZip with the Hash1 algorithm. Every file in

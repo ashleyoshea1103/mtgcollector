@@ -544,6 +544,9 @@ func TestAnEditThatKeepsTheSizeAndModificationTimeIsCaught(t *testing.T) {
 	modcache, stateFile := t.TempDir(), filepath.Join(t.TempDir(), "state")
 	addFixtures(t, modcache)
 	checkOK(t, modcache, stateFile)
+	// Before Linux 6.13, change times only move on with the clock tick (up to 10 ms), so an edit
+	// right after the chmod above could keep it.
+	time.Sleep(50 * time.Millisecond)
 	file := filepath.Join(modcache, "example.com", "m@v1.0.0", "m.go")
 	info, err := os.Stat(file)
 	if err != nil {
@@ -565,4 +568,19 @@ func TestAnEditThatKeepsTheSizeAndModificationTimeIsCaught(t *testing.T) {
 		t.Fatalf("the edit changed the file's size, time or mode (%v)", err)
 	}
 	wantProblem(t, modcache, stateFile, "example.com/m@v1.0.0: its files don't match")
+}
+
+func TestAToolchainModuleIsHashedWithoutTheGoModCopiesTheGoCommandMakes(t *testing.T) {
+	modcache, stateFile := t.TempDir(), filepath.Join(t.TempDir(), "state")
+	root := "golang.org/toolchain@v0.0.1-go1.27.2.windows-amd64"
+	addModule(t, modcache, root, map[string]string{"src/_go.mod": "module std\n", "src/x.go": "package x\n"})
+	dir := filepath.Join(modcache, filepath.FromSlash(root), "src")
+	if err := os.Chmod(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(dir, "go.mod"), "module std\n") // what toolchain.Exec does
+	checkOK(t, modcache, stateFile)
+
+	writeFile(t, filepath.Join(dir, "go.mod"), "module std\nreplace x => ../evil\n")
+	wantProblem(t, modcache, stateFile, root+": its files don't match")
 }
