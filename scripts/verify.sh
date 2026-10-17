@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 # Every check a change must pass before it can be pushed or merged:
 #   0. setup            – lockfile sources (before installing), clean install, tidy go.mod, test file names
-#   1. compile          – generated API types up to date; Go format, vet, staticcheck and build;
+#   1. compile          – generated API types up to date; Go format, vet, staticcheck, govulncheck (CI) and build;
 #                         frontend lint (warnings fail), type check, production build, no dev-only code shipped
-#   2. unit tests       – pure logic (Go and frontend)
-#   3. behaviour checks – the API against a real Postgres; components rendered and driven as a user would
+#   2. unit tests       – pure logic (Go, with the race detector where cgo works, and frontend)
+#   3. behaviour checks – the API against a real Postgres; components rendered and driven as a user would;
+#                         the pre-push hook's guard on its Go module cache
 #
 # Run by the pre-push hook (.githooks/pre-push, on a clean checkout of the pushed
 # commit) and by CI (.github/workflows/verify.yml). Stops at the first failure.
 #
 # Usage: ./scripts/verify.sh
 #   CI=true or VERIFY_CLEAN_INSTALL=1   install dependencies from the lockfile first (npm ci)
+#   CI=true or VERIFY_VULNCHECK=1       run govulncheck (it needs the network)
+#   CI=true or VERIFY_HOOK_TEST=1       test the pre-push hook (also run when it differs from the installed one)
 #   TEST_DATABASE_URL                   database for the backend behaviour tests (default: the local
 #                                       mtgcollector_test database from scripts/setup-dev-db.sh)
 set -euo pipefail
@@ -47,6 +50,14 @@ stage 'setup'
 [[ -f frontend/package.json ]] || fail 'frontend/package.json is missing'
 [[ -f backend/go.mod ]] || fail 'backend/go.mod is missing'
 command -v go >/dev/null || fail 'go is not on PATH; install Go (see backend/go.mod for the version)'
+# The race detector needs cgo, so a C compiler. CI has one and must use it; elsewhere the
+# backend tests use it when Go finds one (on Windows that usually means installing gcc).
+race=''
+if [[ $(go env CGO_ENABLED) == 1 ]]; then
+  race=-race
+elif [[ -n "${CI:-}" ]]; then
+  fail 'cgo is off (no C compiler?), so the backend tests would run without the race detector'
+fi
 
 # Before anything is installed from it.
 run 'frontend: lockfile sources' node scripts/check-lockfile.mjs frontend/package-lock.json
@@ -61,6 +72,9 @@ fi
 run 'backend: go.mod and go.sum are tidy' go -C backend mod tidy -diff
 run 'backend: tools/go.mod and go.sum are tidy' go -C backend/tools mod tidy -diff
 
+# CI always tests the pre-push hook. Locally the test (about 20 seconds on Windows) runs when
+# the hook differs from the installed one, which is when you're changing it.
+hook_test=${CI:-}${VERIFY_HOOK_TEST:-}
 if [[ -z "${CI:-}" ]]; then
   # --git-path follows core.hooksPath, so this is the hook git will actually run.
   installed_hook=$(git rev-parse --git-path hooks/pre-push)
@@ -70,8 +84,11 @@ if [[ -z "${CI:-}" ]]; then
   elif ! grep -qs 'installed by scripts/install-hooks.sh' "$installed_hook"; then
     printf '%swarning: the pre-push hook is not installed; run ./scripts/install-hooks.sh%s\n' "$yellow" "$reset"
   elif ! cmp -s .githooks/pre-push <(grep -v 'installed by scripts/install-hooks.sh' "$installed_hook") ||
-    ! cmp -s scripts/check-lockfile.mjs "$(dirname "$installed_hook")/check-lockfile.mjs"; then
-    printf '%swarning: .githooks/pre-push or scripts/check-lockfile.mjs differs from the installed copy; review the change, then run ./scripts/install-hooks.sh%s\n' "$yellow" "$reset"
+    ! cmp -s scripts/check-lockfile.mjs "$(dirname "$installed_hook")/check-lockfile.mjs" ||
+    ! cmp -s <(for f in backend/cmd/modcache-check/*.go; do [[ $f == *_test.go ]] || cat "$f"; done) \
+      "$(dirname "$installed_hook")/modcache-check.src"; then
+    printf '%swarning: .githooks/pre-push, scripts/check-lockfile.mjs or backend/cmd/modcache-check differs from the installed copy; review the change, then run ./scripts/install-hooks.sh%s\n' "$yellow" "$reset"
+    hook_test=yes
   fi
 fi
 
@@ -130,6 +147,12 @@ for generated_go in backend/internal/store/*.sql.go; do
   [[ -f $query_file ]] || fail "$generated_go was generated from $query_file, which no longer exists; delete it"
 done
 run 'backend: staticcheck' go -C backend tool -modfile=tools/go.mod staticcheck -tags=integration ./...
+if [[ -n "${CI:-}" || -n "${VERIFY_VULNCHECK:-}" ]]; then
+  # Known vulnerabilities (vuln.go.dev) in the dependencies and standard library functions the
+  # backend actually calls. Only in CI by default: it needs the network, and a newly published
+  # vulnerability should block merging, not every local push.
+  run 'backend: govulncheck' go -C backend tool -modfile=tools/go.mod govulncheck ./...
+fi
 run 'backend: go build' go -C backend build ./...
 run 'frontend: lint' npm run --prefix frontend --silent lint
 run 'frontend: type check + build' npm run --prefix frontend --silent build
@@ -141,7 +164,7 @@ fi
 
 # --- 2. unit tests ----------------------------------------------------------
 stage '2/3 unit tests'
-run 'backend: unit tests' go -C backend test -count=1 ./...
+run "backend: unit tests${race:+ (race detector on)}" go -C backend test $race -count=1 ./...
 run 'frontend: unit tests' npm run --prefix frontend --silent test:unit
 
 # --- 3. behaviour checks ----------------------------------------------------
@@ -149,7 +172,10 @@ stage '3/3 behaviour checks'
 # The integration tag adds the tests that use the database (each gets a schema of its own).
 # Without a database they fail, never skip. -count=1 because a cached pass would skip the
 # database, whose state isn't part of Go's test cache key.
-run 'backend: API behaviour tests (Postgres)' go -C backend test -count=1 -tags=integration ./...
+run "backend: API behaviour tests (Postgres)${race:+ (race detector on)}" go -C backend test $race -count=1 -tags=integration ./...
 run 'frontend: behaviour tests' npm run --prefix frontend --silent test:behaviour
+if [[ -n $hook_test ]]; then
+  run 'pre-push hook: guards its Go module cache' scripts/test-pre-push.sh
+fi
 
 printf '\n%sverify passed%s\n' "$green" "$reset"
