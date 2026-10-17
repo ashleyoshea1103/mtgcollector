@@ -14,25 +14,25 @@ type Collection interface {
 	Add(ctx context.Context, userID int64, e contract.NewEntry) (contract.CollectionEntry, bool, error)
 	Change(ctx context.Context, userID, id int64, c contract.EntryChange) (contract.CollectionEntry, error)
 	Delete(ctx context.Context, userID, id int64) error
-	Groups(ctx context.Context, userID int64, by contract.GroupBy) (contract.CollectionGroups, error)
+	Groups(ctx context.Context, userID int64, by contract.GroupBy, q string) (contract.CollectionGroups, error)
 	Entries(ctx context.Context, userID int64, q collection.EntryQuery) (contract.EntryPage, error)
 	Stats(ctx context.Context, userID int64) (contract.CollectionStats, error)
 	Copies(ctx context.Context, userID int64, cardID string) (contract.CardCopies, error)
 }
 
-// GET /api/collection/groups?group_by=: the signed-in user's groups.
+// GET /api/collection/groups?group_by=&q=: the signed-in user's groups, of the cards matching q.
 func collectionGroups(c Collection) func(http.ResponseWriter, *http.Request, contract.User) {
 	return func(w http.ResponseWriter, r *http.Request, user contract.User) {
 		by := contract.GroupBy(r.URL.Query().Get("group_by"))
 		if by == "" {
 			by = contract.GroupByNone
 		}
-		res, err := c.Groups(r.Context(), user.ID, by)
+		res, err := c.Groups(r.Context(), user.ID, by, r.URL.Query().Get("q"))
 		result(w, r, http.StatusOK, res, err)
 	}
 }
 
-// GET /api/collection/entries?group_by=&key=&sort=&cursor=: a page of one group's entries.
+// GET /api/collection/entries?group_by=&key=&sort=&cursor=&q=: a page of one group's entries matching q.
 func collectionEntries(c Collection) func(http.ResponseWriter, *http.Request, contract.User) {
 	return func(w http.ResponseWriter, r *http.Request, user contract.User) {
 		res, err := c.Entries(r.Context(), user.ID, entryQuery(r))
@@ -99,11 +99,12 @@ func deleteEntry(c Collection) func(http.ResponseWriter, *http.Request, contract
 	}
 }
 
-// entryQuery reads which entries to list from ?group_by=&key=&sort=&cursor=.
+// entryQuery reads which entries to list from ?group_by=&key=&sort=&cursor=&q=.
 func entryQuery(r *http.Request) collection.EntryQuery {
 	q := r.URL.Query()
 	return collection.EntryQuery{
 		GroupBy: contract.GroupBy(q.Get("group_by")), Key: q.Get("key"), Sort: contract.SortBy(q.Get("sort")), Cursor: q.Get("cursor"),
+		Search: q.Get("q"),
 	}
 }
 

@@ -17,7 +17,7 @@ type CustomGroups interface {
 	CreateGroup(ctx context.Context, userID int64, g contract.NewGroup) (contract.CustomGroup, error)
 	ChangeGroup(ctx context.Context, userID, id int64, c contract.GroupChange) (contract.CustomGroup, error)
 	DeleteGroup(ctx context.Context, userID, id int64) error
-	GroupGroups(ctx context.Context, userID, groupID int64, by contract.GroupBy) (contract.CollectionGroups, error)
+	GroupGroups(ctx context.Context, userID, groupID int64, by contract.GroupBy, q string) (contract.CollectionGroups, error)
 	Members(ctx context.Context, userID, groupID int64, q collection.EntryQuery) (contract.GroupMemberPage, error)
 	Member(ctx context.Context, userID, groupID, entryID int64) (contract.GroupMember, error)
 	SetMember(ctx context.Context, userID, groupID, entryID int64, quantity int) (contract.GroupMember, bool, error)
@@ -83,19 +83,20 @@ func deleteGroup(g CustomGroups) func(http.ResponseWriter, *http.Request, contra
 	}
 }
 
-// GET /api/groups/{id}/groups?group_by=: the group's members grouped, as the collection's are.
+// GET /api/groups/{id}/groups?group_by=&q=: the group's members grouped, as the collection's are.
 func groupGroups(g CustomGroups) func(http.ResponseWriter, *http.Request, contract.User) {
 	return func(w http.ResponseWriter, r *http.Request, user contract.User) {
 		id, ok := pathID(w, r, "id", collection.ErrGroupNotFound)
 		if !ok {
 			return
 		}
-		res, err := g.GroupGroups(r.Context(), user.ID, id, contract.GroupBy(r.URL.Query().Get("group_by")))
+		q := r.URL.Query()
+		res, err := g.GroupGroups(r.Context(), user.ID, id, contract.GroupBy(q.Get("group_by")), q.Get("q"))
 		result(w, r, http.StatusOK, res, err)
 	}
 }
 
-// GET /api/groups/{id}/members?group_by=&key=&sort=&cursor=: a page of the group's members.
+// GET /api/groups/{id}/members?group_by=&key=&sort=&cursor=&q=: a page of the group's members.
 func groupMembers(g CustomGroups) func(http.ResponseWriter, *http.Request, contract.User) {
 	return func(w http.ResponseWriter, r *http.Request, user contract.User) {
 		id, ok := pathID(w, r, "id", collection.ErrGroupNotFound)

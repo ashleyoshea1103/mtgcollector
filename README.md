@@ -49,8 +49,8 @@ The API's own responses are JSON, shaped by the types in `backend/internal/contr
 | `POST /api/auth/login` | Signs in with `Credentials`: 200 with the `User`, or 401 whether the email or the password was wrong. |
 | `POST /api/auth/logout` | Ends this browser's session: 204. |
 | `GET /api/auth/me` | The signed-in `User`, or 401. |
-| `GET /api/collection/groups?group_by=` | The signed-in user's groups (`CollectionGroups`) for one way of grouping (`none` if left out), with each group's totals. Groups with none of the user's cards are left out, except `none`'s one group, `all`. |
-| `GET /api/collection/entries?group_by=&key=&sort=&cursor=` | A page of one group's entries (`EntryPage`), sorted by `name` (the default; Unicode order, so "Æther Vial" sorts with the aethers), `price` (most valuable copy first, unpriced last), `cmc` or `added` (newest first: when the entry was made, not when copies were last added to it). Pass `next_cursor` back as `cursor` for the next page. |
+| `GET /api/collection/groups?group_by=&q=` | The signed-in user's groups (`CollectionGroups`) for one way of grouping (`none` if left out), with each group's totals. Groups with none of the user's cards are left out, except `none`'s one group, `all`. With a search (`q`), only the matching cards count. |
+| `GET /api/collection/entries?group_by=&key=&sort=&cursor=&q=` | A page of one group's entries (`EntryPage`), only those matching the search `q` if given, sorted by `name` (the default; Unicode order, so "Æther Vial" sorts with the aethers), `price` (most valuable copy first, unpriced last), `cmc` or `added` (newest first: when the entry was made, not when copies were last added to it). Pass `next_cursor` back as `cursor` for the next page. |
 | `GET /api/collection/stats` | Totals for the whole collection (`CollectionStats`). |
 | `GET /api/collection/cards/{card_id}` | Your copies of one printing (`CardCopies`): an entry for each finish, condition and language you own it in, non-foil first, then best condition first. None if you own no copies. |
 | `POST /api/collection/entries` | Adds copies (`NewEntry`): 201 with a new entry, or 200 with the entry of the same printing, finish, condition and language they were added to. |
@@ -61,13 +61,15 @@ The API's own responses are JSON, shaped by the types in `backend/internal/contr
 | `GET /api/groups/{id}` | One group (`CustomGroup`). |
 | `PATCH /api/groups/{id}` | Renames a group, or changes its kind or description (`GroupChange`). 409 if you have another group of the new name. |
 | `DELETE /api/groups/{id}` | Deletes a group: 204. Its cards stay in the collection. |
-| `GET /api/groups/{id}/groups?group_by=` | The group's cards grouped (`CollectionGroups`), as the collection's are. |
-| `GET /api/groups/{id}/members?group_by=&key=&sort=&cursor=` | A page of the group's members (`GroupMemberPage`), as the collection's entries are; `added` sorts by when they joined the group. |
+| `GET /api/groups/{id}/groups?group_by=&q=` | The group's cards grouped (`CollectionGroups`), as the collection's are. |
+| `GET /api/groups/{id}/members?group_by=&key=&sort=&cursor=&q=` | A page of the group's members (`GroupMemberPage`), as the collection's entries are; `added` sorts by when they joined the group. |
 | `GET /api/groups/{id}/members/{entry_id}` | One member (`GroupMember`): how many of the entry's copies are in the group. 404 if it isn't in it. |
 | `PUT /api/groups/{id}/members/{entry_id}` | Puts copies of one of your entries in the group (`MemberQuantity`), or changes how many are there: 201 if the entry is new to the group, else 200. |
 | `DELETE /api/groups/{id}/members/{entry_id}` | Takes an entry out of the group: 204. It stays in the collection. |
 
 Pages hold 60 cards, up to page 50.
+
+**Searching a listing.** `q` on the collection's and a group's groups and entries lists only the cards with every word of it somewhere in their name or type line, each word in either, ignoring case and order. For example, `goblin` finds Goblin creatures, `bolt light` finds Lightning Bolt, and `llanowar druid` finds Llanowar Elves (Creature — Elf Druid). Curly apostrophes match straight ones, and a dash on its own is ignored. It is at most 150 characters (`MaxSearchLength`); a longer one, or one with a NUL or that isn't UTF-8, is a 400. A cursor is only for the search it was made with.
 
 **The collection.** Every collection endpoint needs a signed-in user, and only ever sees that user's cards (another user's entry is a 404). An entry holds 1 to 999 copies; its finish must be one the printing comes in. A collection holds at most 50,000 entries (`MaxEntries`); past that, only copies of entries already there can be added. Its EUR price is the regular price for non-foil, and the foil price, else the regular one, for foil and etched (the rules in `testdata/pricing-cases.json`, which the frontend and the server's tests both run); a card Scryfall no longer lists has no price. Totals add up the priced cards and count the others as `unpriced_count`. The `group_by` values and their groups' keys:
 

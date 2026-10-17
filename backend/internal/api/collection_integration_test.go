@@ -105,6 +105,48 @@ func TestTwoUsersCollectionsAgainstARealDatabase(t *testing.T) {
 	}
 }
 
+// A search through the real handlers and database: it narrows the collection's and a group's
+// listings, and one the database couldn't run is a 400, never a 500.
+func TestSearchingAgainstARealDatabase(t *testing.T) {
+	srv, newBrowser := liveServer(t)
+	ann := newBrowser("ann@example.com")
+	var added contract.CollectionEntry
+	ann.do(t, srv.URL, "POST", "/api/collection/entries",
+		`{"card_id":"`+bolt+`","quantity":2,"finish":"nonfoil","condition":"NM","language":"en","group_id":null}`, 201, &added)
+	var group contract.CustomGroup
+	ann.do(t, srv.URL, "POST", "/api/groups", `{"name":"Burn","kind":"deck","description":""}`, 201, &group)
+	ann.do(t, srv.URL, "PUT", "/api/groups/"+jsonID(group.ID)+"/members/"+jsonID(added.ID), `{"quantity":1}`, 201, nil)
+	groupPath := "/api/groups/" + jsonID(group.ID)
+
+	for _, path := range []string{"/api/collection", groupPath} {
+		var groups contract.CollectionGroups
+		ann.do(t, srv.URL, "GET", path+"/groups?group_by=color&q=bolt+instant", "", 200, &groups)
+		if len(groups.Groups) != 1 || groups.Groups[0].Key != "R" {
+			t.Errorf("%s groups for bolt = %+v", path, groups.Groups)
+		}
+		ann.do(t, srv.URL, "GET", path+"/groups?group_by=color&q=goblin", "", 200, &groups)
+		if len(groups.Groups) != 0 {
+			t.Errorf("%s groups for goblin = %+v", path, groups.Groups)
+		}
+	}
+	var page contract.EntryPage
+	ann.do(t, srv.URL, "GET", "/api/collection/entries?q=LIGHTNING", "", 200, &page)
+	if len(page.Entries) != 1 {
+		t.Errorf("entries for LIGHTNING = %+v", page.Entries)
+	}
+	var members contract.GroupMemberPage
+	ann.do(t, srv.URL, "GET", groupPath+"/members?q=goblin", "", 200, &members)
+	if len(members.Members) != 0 {
+		t.Errorf("members for goblin = %+v", members.Members)
+	}
+
+	for name, q := range map[string]string{"too long": strings.Repeat("a", contract.MaxSearchLength+1), "a NUL": "bolt%00", "not UTF-8": "bolt%FF"} {
+		for _, path := range []string{"/api/collection/groups", "/api/collection/entries", groupPath + "/groups", groupPath + "/members"} {
+			t.Run(name+" "+path, func(t *testing.T) { ann.do(t, srv.URL, "GET", path+"?q="+q, "", 400, nil) })
+		}
+	}
+}
+
 func jsonID(id int64) string { b, _ := json.Marshal(id); return string(b) }
 
 // browser is a client with its own cookies: one signed-in user.

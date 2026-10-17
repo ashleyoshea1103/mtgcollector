@@ -173,11 +173,11 @@ func (s *Service) DeleteGroup(ctx context.Context, userID, id int64) error {
 }
 
 // GroupGroups groups a custom group's members, as Groups does the collection's entries.
-func (s *Service) GroupGroups(ctx context.Context, userID, groupID int64, by contract.GroupBy) (contract.CollectionGroups, error) {
+func (s *Service) GroupGroups(ctx context.Context, userID, groupID int64, by contract.GroupBy, q string) (contract.CollectionGroups, error) {
 	if err := s.ownGroup(ctx, userID, groupID); err != nil {
 		return contract.CollectionGroups{}, err
 	}
-	return s.groupsOf(ctx, userID, groupID, by)
+	return s.groupsOf(ctx, userID, groupID, by, q)
 }
 
 // Members returns a page of a custom group's members, as Entries does the collection's

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -23,6 +24,7 @@ type fakeGroups struct {
 	newGroup         contract.NewGroup
 	change           contract.GroupChange
 	groupBy          contract.GroupBy
+	search           string
 	query            collection.EntryQuery
 }
 
@@ -59,9 +61,9 @@ func (f *fakeGroups) DeleteGroup(_ context.Context, userID, id int64) error {
 	return f.err
 }
 
-func (f *fakeGroups) GroupGroups(_ context.Context, userID, groupID int64, by contract.GroupBy) (contract.CollectionGroups, error) {
+func (f *fakeGroups) GroupGroups(_ context.Context, userID, groupID int64, by contract.GroupBy, q string) (contract.CollectionGroups, error) {
 	f.call("groups", userID)
-	f.groupID, f.groupBy = groupID, by
+	f.groupID, f.groupBy, f.search = groupID, by, q
 	return contract.CollectionGroups{GroupBy: by, Groups: []contract.GroupSummary{}}, f.err
 }
 
@@ -143,12 +145,12 @@ func TestGroupRoutesPassTheirParametersOn(t *testing.T) {
 	if g.change.Kind == nil || *g.change.Kind != "deck" || g.change.Name != nil || g.change.Description != nil {
 		t.Errorf("change = %+v", g.change)
 	}
-	send(t, groupsHandler(g), http.MethodGet, "/api/groups/4/groups?group_by=color", "", signedIn...)
-	if g.groupBy != "color" {
-		t.Errorf("group_by = %q", g.groupBy)
+	send(t, groupsHandler(g), http.MethodGet, "/api/groups/4/groups?group_by=color&q=goblin", "", signedIn...)
+	if g.groupBy != "color" || g.search != "goblin" {
+		t.Errorf("group_by = %q, search %q", g.groupBy, g.search)
 	}
-	send(t, groupsHandler(g), http.MethodGet, "/api/groups/4/members?group_by=set&key=mh2&sort=added&cursor=abc", "", signedIn...)
-	if want := (collection.EntryQuery{GroupBy: "set", Key: "mh2", Sort: "added", Cursor: "abc"}); g.query != want {
+	send(t, groupsHandler(g), http.MethodGet, "/api/groups/4/members?group_by=set&key=mh2&sort=added&cursor=abc&q=goblin", "", signedIn...)
+	if want := (collection.EntryQuery{GroupBy: "set", Key: "mh2", Sort: "added", Cursor: "abc", Search: "goblin"}); !reflect.DeepEqual(g.query, want) {
 		t.Errorf("query = %+v", g.query)
 	}
 	send(t, groupsHandler(g), http.MethodPut, "/api/groups/4/members/7", `{"quantity":3}`, signedIn...)

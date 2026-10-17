@@ -316,3 +316,37 @@ describe('GroupPage, more', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /^All cards/ })).toHaveFocus());
   });
 });
+
+describe('searching a group', () => {
+  const matching = (q: string | null) => members.filter((m) => (q ?? '').split(' ').filter(Boolean).every((w) => `${m.entry.card.name} ${m.entry.card.type_line}`.toLowerCase().includes(w)));
+  const searchable: Routes = {
+    ...groupApi(),
+    'GET /api/groups/:id/groups': (req) => ({
+      body: { group_by: 'none', groups: [makeGroup('all', 'All cards', matching(req.query.get('q')).map((m) => ({ ...m.entry, quantity: m.quantity, value_eur: m.value_eur }))).group] },
+    }),
+    'GET /api/groups/:id/members': (req) => ({ body: { members: matching(req.query.get('q')), next_cursor: null } }),
+  };
+
+  it("narrows the group's cards to the matches, and says when none match", async () => {
+    const { api, user, location } = renderApp(`/groups/${binder.id}`, searchable);
+    await main().findByRole('heading', { name: entries.bolts.card.name });
+    await user.type(main().getByRole('searchbox', { name: 'Search' }), 'elf');
+    await waitFor(() => expect(main().queryByRole('heading', { name: entries.bolts.card.name })).not.toBeInTheDocument());
+    expect(await main().findByRole('heading', { name: entries.unpricedElves.card.name })).toBeInTheDocument();
+    expect(location().search).toBe('?q=elf');
+    expect(api.sent('GET /api/groups/:id/groups').at(-1)!.query.get('q')).toBe('elf');
+    expect(api.sent('GET /api/groups/:id/members').at(-1)!.query.get('q')).toBe('elf');
+
+    await user.type(main().getByRole('searchbox', { name: 'Search' }), 'zzz');
+    expect(await main().findByText(`No cards in ${binder.name} match “elfzzz”`)).toBeInTheDocument();
+    expect(main().getByText('Check the spelling, or clear the search.')).toBeInTheDocument();
+    expect(main().queryByText(`No cards in ${binder.name} yet`)).not.toBeInTheDocument();
+  });
+
+  it('says the group has no cards yet, not that nothing matches, when it has none at all', async () => {
+    const emptyBinder = { ...binder, card_count: 0, entry_count: 0, value_eur: 0, unpriced_count: 0 };
+    renderApp(`/groups/${binder.id}?q=elf`, { ...groupApi(emptyBinder), 'GET /api/groups/:id/groups': { body: { group_by: 'none', groups: [] } } });
+    expect(await main().findByText(`No cards in ${binder.name} yet`)).toBeInTheDocument();
+    expect(main().queryByText('Check the spelling, or clear the search.')).not.toBeInTheDocument();
+  });
+});

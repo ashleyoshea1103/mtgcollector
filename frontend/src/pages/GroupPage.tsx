@@ -62,10 +62,15 @@ function GroupView({ id }: { id: number }) {
         params={listing}
         renderActions={(row) => <MemberActions groupId={id} groupName={g.name} row={row} />}
         empty={
-          <EmptyState title={`No cards in ${g.name} yet`}>
-            Put cards in it from <Link to="/collection">your collection</Link> (each card's Actions menu), or choose it when adding cards from{' '}
-            <Link to="/search">the search</Link>.
-          </EmptyState>
+          // With no cards at all, how to add some, searching or not.
+          listing.q && g.card_count !== 0 ? (
+            <EmptyState title={`No cards in ${g.name} match “${listing.q}”`}>Check the spelling, or clear the search.</EmptyState>
+          ) : (
+            <EmptyState title={`No cards in ${g.name} yet`}>
+              Put cards in it from <Link to="/collection">your collection</Link> (each card's Actions menu), or choose it when adding cards from{' '}
+              <Link to="/search">the search</Link>.
+            </EmptyState>
+          )
         }
       />
     </Stack>

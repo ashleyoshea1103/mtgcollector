@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -22,6 +23,7 @@ type fakeCollection struct {
 	entry   contract.NewEntry
 	change  contract.EntryChange
 	groupBy contract.GroupBy
+	search  string
 	query   collection.EntryQuery
 	cardID  string
 }
@@ -48,9 +50,9 @@ func (f *fakeCollection) Delete(_ context.Context, userID, id int64) error {
 	return f.err
 }
 
-func (f *fakeCollection) Groups(_ context.Context, userID int64, by contract.GroupBy) (contract.CollectionGroups, error) {
+func (f *fakeCollection) Groups(_ context.Context, userID int64, by contract.GroupBy, q string) (contract.CollectionGroups, error) {
 	f.call("groups", userID)
-	f.groupBy = by
+	f.groupBy, f.search = by, q
 	return contract.CollectionGroups{GroupBy: by, Groups: []contract.GroupSummary{}}, f.err
 }
 
@@ -115,11 +117,15 @@ func TestListingsPassTheirParametersOn(t *testing.T) {
 		t.Errorf("group_by = %q", c.groupBy)
 	}
 	send(t, collectionHandler(c), http.MethodGet, "/api/collection/groups", "", signedIn...)
-	if c.groupBy != contract.GroupByNone {
-		t.Errorf("no group_by = %q, want none", c.groupBy)
+	if c.groupBy != contract.GroupByNone || c.search != "" {
+		t.Errorf("no group_by = %q, search %q; want none, no search", c.groupBy, c.search)
 	}
-	send(t, collectionHandler(c), http.MethodGet, "/api/collection/entries?group_by=set&key=mh2&sort=price&cursor=abc", "", signedIn...)
-	if want := (collection.EntryQuery{GroupBy: "set", Key: "mh2", Sort: "price", Cursor: "abc"}); c.query != want {
+	send(t, collectionHandler(c), http.MethodGet, "/api/collection/groups?q=goblin+king", "", signedIn...)
+	if c.search != "goblin king" {
+		t.Errorf("search = %q", c.search)
+	}
+	send(t, collectionHandler(c), http.MethodGet, "/api/collection/entries?group_by=set&key=mh2&sort=price&cursor=abc&q=R%26D", "", signedIn...)
+	if want := (collection.EntryQuery{GroupBy: "set", Key: "mh2", Sort: "price", Cursor: "abc", Search: "R&D"}); !reflect.DeepEqual(c.query, want) {
 		t.Errorf("query = %+v, want %+v", c.query, want)
 	}
 	send(t, collectionHandler(c), http.MethodGet, "/api/collection/cards/0b8fe8b3-0000-4000-8000-000000000001", "", signedIn...)

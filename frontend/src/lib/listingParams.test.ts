@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LISTING, readListing, writeListing } from './listingParams';
+import { MaxSearchLength } from '../types';
 
 const q = (s: string) => new URLSearchParams(s);
 
 describe('readListing', () => {
-  it('reads the grouping, order and view', () => {
-    expect(readListing(q('group_by=color&sort=price&view=list'))).toEqual({ groupBy: 'color', sort: 'price', view: 'list' });
+  it('reads the grouping, order, view and search', () => {
+    expect(readListing(q('group_by=color&sort=price&view=list&q=goblin'))).toEqual({ groupBy: 'color', sort: 'price', view: 'list', q: 'goblin' });
   });
 
   it('uses the defaults for missing or unknown values', () => {
@@ -13,15 +14,30 @@ describe('readListing', () => {
     expect(readListing(q('group_by=owner&sort=__proto__&view=table'))).toEqual(DEFAULT_LISTING);
     expect(readListing(q('group_by=toString'))).toEqual(DEFAULT_LISTING);
   });
+
+  it('reads a search as its words, one space apart', () => {
+    expect(readListing(q('q=%20%20goblin%20%20king%20')).q).toBe('goblin king');
+    expect(readListing(q('q=%20%20')).q).toBe('');
+  });
+
+  it("reads only as much of a search as the server takes, without characters it refuses (a hand-edited link's)", () => {
+    expect(readListing(q(`q=${'é'.repeat(MaxSearchLength + 20)}`)).q).toBe('é'.repeat(MaxSearchLength));
+    expect(readListing(q('q=gob%00lin')).q).toBe('goblin');
+  });
 });
 
 describe('writeListing', () => {
   it('sets what differs from the defaults and keeps other parameters', () => {
-    expect(writeListing(q('x=1'), { groupBy: 'set', sort: 'added', view: 'list' }).toString()).toBe('x=1&group_by=set&sort=added&view=list');
+    expect(writeListing(q('x=1'), { groupBy: 'set', sort: 'added', view: 'list', q: 'elf' }).toString()).toBe('x=1&group_by=set&sort=added&view=list&q=elf');
   });
 
   it('leaves the defaults out', () => {
-    expect(writeListing(q('group_by=set&sort=cmc&view=list'), DEFAULT_LISTING).toString()).toBe('');
+    expect(writeListing(q('group_by=set&sort=cmc&view=list&q=elf'), DEFAULT_LISTING).toString()).toBe('');
+  });
+
+  it('writes a search as its words, one space apart, and none when there are none', () => {
+    expect(writeListing(q(''), { ...DEFAULT_LISTING, q: '  goblin \t king ' }).toString()).toBe('q=goblin+king');
+    expect(writeListing(q('q=elf'), { ...DEFAULT_LISTING, q: '   ' }).toString()).toBe('');
   });
 
   it("doesn't change the params it's given", () => {
@@ -31,7 +47,7 @@ describe('writeListing', () => {
   });
 
   it('round-trips', () => {
-    const listing = { groupBy: 'cmc', sort: 'cmc', view: 'grid' } as const;
+    const listing = { groupBy: 'cmc', sort: 'cmc', view: 'grid', q: "R&D's +1 #2" } as const;
     expect(readListing(writeListing(q(''), listing))).toEqual(listing);
   });
 });

@@ -1,8 +1,8 @@
 // The TanStack Query hooks the pages fetch and change data with. Pages pass what they return
 // to the presentational components, which know nothing of the API.
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { uniqueItems } from '../lib/pages';
-import { MaxSearchPage, type CardPage, type CollectionEntry, type Credentials, type CustomGroupList, type EntryChange, type GroupBy, type GroupChange, type GroupMember, type NewEntry, type NewGroup, type SortBy } from '../types';
+import { MaxSearchPage, type CardPage, type CollectionEntry, type CollectionGroups, type Credentials, type CustomGroupList, type EntryChange, type GroupBy, type GroupChange, type GroupMember, type NewEntry, type NewGroup, type SortBy } from '../types';
 import * as api from './endpoints';
 import { keys, type ListingId } from './keys';
 import { forgetCachedUser, switchUser } from './queryClient';
@@ -73,11 +73,29 @@ export function useGroupMember(groupId: number | null, entryId: number) {
   });
 }
 
-/** The groups of a listing (the collection, or a custom group), for one way of grouping. */
-export function useListingGroups(id: ListingId, groupBy: GroupBy) {
+/**
+ * Whether two listing keys differ only in their search (the last part, keys.listing*): then
+ * the last search's results stay up while the next one's load, rather than blinking out at each
+ * pause in typing. Another listing, grouping or order still shows as loading.
+ */
+export const onlySearchChanged = (a: QueryKey, b: QueryKey) =>
+  a.length === b.length && a.at(-1) !== b.at(-1) && a.slice(0, -1).every((part, i) => part === b[i]);
+
+/** A listing's groups, and the search (q) they're for: during a new search, the last one's may be standing in. */
+export interface ListingGroups extends CollectionGroups {
+  q: string;
+}
+
+/** The groups of a listing (the collection, or a custom group), for one way of grouping, of the cards matching q. */
+export function useListingGroups(id: ListingId, groupBy: GroupBy, q: string) {
+  const queryKey = keys.listingGroups(id, groupBy, q);
   return useQuery({
-    queryKey: keys.listingGroups(id, groupBy),
-    queryFn: ({ signal }) => (id === null ? api.collectionGroups(groupBy, signal) : api.groupGroups(id, groupBy, signal)),
+    queryKey,
+    queryFn: async ({ signal }): Promise<ListingGroups> => ({
+      ...(await (id === null ? api.collectionGroups(groupBy, q, signal) : api.groupGroups(id, groupBy, q, signal))),
+      q,
+    }),
+    placeholderData: (previous, previousQuery) => (previousQuery && onlySearchChanged(previousQuery.queryKey, queryKey) ? previous : undefined),
   });
 }
 
@@ -101,12 +119,17 @@ const asListed = (member: GroupMember): ListedEntry => ({
   member,
 });
 
-/** One group's entries a page at a time, fetched while enabled (its section is open). */
-export function useListingEntries(id: ListingId, groupBy: GroupBy, key: string, sort: SortBy, enabled: boolean) {
+/**
+ * One group's entries matching q, a page at a time, fetched while enabled (its section is open).
+ * While only the search changed, the last search's entries stand in (isPlaceholderData): the
+ * section then shows them with the heading they came with.
+ */
+export function useListingEntries(id: ListingId, groupBy: GroupBy, key: string, sort: SortBy, q: string, enabled: boolean) {
+  const queryKey = keys.listingEntries(id, groupBy, key, sort, q);
   return useInfiniteQuery({
-    queryKey: keys.listingEntries(id, groupBy, key, sort),
+    queryKey,
     queryFn: async ({ pageParam, signal }): Promise<ListedPage> => {
-      const page = { groupBy, key, sort, cursor: pageParam };
+      const page = { groupBy, key, sort, cursor: pageParam, q };
       if (id === null) {
         const res = await api.collectionEntries(page, signal);
         return { rows: res.entries.map((entry) => ({ entry, member: null })), next_cursor: res.next_cursor };
@@ -117,6 +140,7 @@ export function useListingEntries(id: ListingId, groupBy: GroupBy, key: string, 
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.next_cursor,
     select: (data) => uniqueItems(data.pages.map((p) => p.rows), (r) => r.entry.id),
+    placeholderData: (previous, previousQuery) => (previousQuery && onlySearchChanged(previousQuery.queryKey, queryKey) ? previous : undefined),
     enabled,
   });
 }

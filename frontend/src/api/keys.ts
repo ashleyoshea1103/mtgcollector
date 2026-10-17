@@ -26,6 +26,7 @@ export const keys = {
   group: (id: number) => ['groups', id, 'detail'] as const,
   member: (groupId: number, entryId: number) => ['groups', groupId, 'member', entryId] as const,
   listing,
-  listingGroups: (id: ListingId, groupBy: GroupBy) => [...listing(id), 'groups', groupBy] as const,
-  listingEntries: (id: ListingId, groupBy: GroupBy, key: string, sort: SortBy) => [...listing(id), 'entries', groupBy, key, sort] as const,
+  // The search (q) comes last, so a listing whose search alone changed can be told apart.
+  listingGroups: (id: ListingId, groupBy: GroupBy, q: string) => [...listing(id), 'groups', groupBy, q] as const,
+  listingEntries: (id: ListingId, groupBy: GroupBy, key: string, sort: SortBy, q: string) => [...listing(id), 'entries', groupBy, key, sort, q] as const,
 };

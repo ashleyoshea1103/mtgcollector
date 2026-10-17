@@ -407,6 +407,8 @@
   font-family: var(--font-display);
   font-size: var(--text-xl);
   font-weight: var(--font-weight-semibold);
+  /* It may quote what was typed: a long word mustn't widen the page. */
+  overflow-wrap: anywhere;
 }
 .empty-state__body {
   max-width: 32rem;
