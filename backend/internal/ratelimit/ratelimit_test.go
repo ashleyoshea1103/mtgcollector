@@ -2,6 +2,8 @@ package ratelimit
 
 import (
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -136,6 +138,37 @@ func TestARefundGivesTheRequestBack(t *testing.T) {
 	}
 	if ok, _, refund := k.Take("a"); ok || refund != nil {
 		t.Error("a refused request came with a refund")
+	}
+}
+
+// The server's handlers share one Keyed across their goroutines. CI runs this under the race
+// detector, which also checks that the buckets, the eviction and the sweep are locked.
+func TestConcurrentRequestsShareTheBuckets(t *testing.T) {
+	var ticks atomic.Int64
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return start.Add(time.Duration(ticks.Add(1)) * time.Second) } // a sweep every 60 calls
+
+	shared := &Keyed{Rate: 0, Burst: 50, Now: clock} // never refills: exactly 50 requests get through
+	churned := &Keyed{Rate: 1, Burst: 1, MaxKeys: 10, Now: clock}
+	var got atomic.Int64
+	var wg sync.WaitGroup
+	for i := range 200 {
+		wg.Go(func() {
+			if allowed(shared, "a") {
+				got.Add(1)
+			}
+			if ok, _, refund := churned.Take(fmt.Sprint("client-", i%30)); ok && i%2 == 0 {
+				refund()
+			}
+			churned.Len()
+		})
+	}
+	wg.Wait()
+	if got.Load() != 50 {
+		t.Errorf("%d of 200 concurrent requests got through a bucket of 50", got.Load())
+	}
+	if n := churned.Len(); n > 10 {
+		t.Errorf("tracking %d keys, more than MaxKeys (10)", n)
 	}
 }
 
