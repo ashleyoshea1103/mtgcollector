@@ -38,7 +38,7 @@ describe('CardTile', () => {
     expect(screen.queryByText(eur(lightningBolt.prices.eur))).not.toBeInTheDocument();
   });
 
-  it('marks its finish, so foil and etched copies shimmer', () => {
+  it('marks its finish', () => {
     const { rerender } = render(<CardTile card={lightningBolt} finish="foil" />);
     expect(screen.getByRole('article')).toHaveClass('card-tile--foil');
     rerender(<CardTile card={lightningBolt} finish="etched" />);

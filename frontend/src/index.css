@@ -284,15 +284,15 @@ a.button:hover {
     box-shadow: var(--shadow-lg);
   }
 }
-/* Foil copies catch the light: a sheen sweeps across the image, then rests off it before the
-   next pass. Each pass starts and ends with the band wholly off the card, so the loop never
+/* Foil copies catch the light: a sheen sweeps across the image in about 2.2 s, then rests off it
+   for about 1.4 s. Each pass starts and ends with the band just off the card, so the loop never
    jumps (motion.test.ts works this out from the values here). The band is a layer three cards
    wide, slid with a transform; its own layer clips it to the card's corners without clipping
    the image button's focus ring. */
 .card-tile__sheen {
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  overflow: clip; /* Not hidden: it needn't scroll. */
   border-radius: inherit;
   pointer-events: none;
 }
@@ -309,17 +309,16 @@ a.button:hover {
     rgb(255 170 240 / 24%) 57%,
     transparent 73.5%
   );
-  transform: translateX(-60%);
-  animation: foil-sheen 3.6s infinite;
+  transform: translateX(-57%);
+  animation: foil-sheen 3.6s ease-in-out infinite;
 }
 @keyframes foil-sheen {
   0% {
-    transform: translateX(-60%);
-    animation-timing-function: ease-in-out;
+    transform: translateX(-57%);
   }
   60%,
   100% {
-    transform: translateX(60%);
+    transform: translateX(57%);
   }
 }
 @media (prefers-reduced-motion: reduce) {
