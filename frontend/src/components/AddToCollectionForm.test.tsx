@@ -1,0 +1,217 @@
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { cards, customGroups } from '../fixtures';
+import { LANGUAGES } from '../lib/labels';
+import { eur, getByTooltip, inPounds, pounds, poundsSeen, readText, visibleText } from '../test/helpers';
+import { MoneyContext } from '../lib/money';
+import { corsIconUrl } from '../lib/urls';
+import type { NewEntry } from '../types';
+import { AddToCollectionForm } from './AddToCollectionForm';
+
+const { lightningBolt, fireIce, ragavan, propaganda } = cards;
+const select = (name: string) => screen.getByRole('combobox', { name });
+const submit = () => userEvent.click(screen.getByRole('button', { name: 'Add to collection' }));
+
+describe('AddToCollectionForm', () => {
+  it('says exactly which printing is being added', () => {
+    const { container } = render(<AddToCollectionForm card={ragavan} onSubmit={vi.fn<(entry: NewEntry) => void>()} />);
+    const line = container.querySelector('.add-form__card')!;
+    // The set symbol (an image) sits before the name, after the "(".
+    expect(line).toHaveTextContent(`Adding ${ragavan.name} ( ${ragavan.set.name} #${ragavan.collector_number})`);
+    expect(getByTooltip(line as HTMLElement, ragavan.set.name)).toHaveClass('set-symbol');
+    expect(line.querySelector('.set-symbol img')).toHaveAttribute('src', corsIconUrl(ragavan.set.icon_svg_uri!));
+  });
+
+  it('says "each" after a euro price, and not after a pound price, though it is still read out', () => {
+    const { container, rerender } = render(<AddToCollectionForm card={lightningBolt} onSubmit={vi.fn<(entry: NewEntry) => void>()} />);
+    // What follows the last " at ": the price, and whatever comes after it.
+    const atThePrice = (text: string) => text.slice(text.lastIndexOf(' at ') + 1);
+    const line = container.querySelector('.add-form__card')!;
+    expect(atThePrice(visibleText(line))).toBe(`at ${eur(lightningBolt.prices.eur)} each`);
+
+    rerender(
+      <MoneyContext value={inPounds}>
+        <AddToCollectionForm card={lightningBolt} onSubmit={vi.fn<(entry: NewEntry) => void>()} />
+      </MoneyContext>,
+    );
+    const inGbp = container.querySelector('.add-form__card')!;
+    expect(atThePrice(visibleText(inGbp))).toBe(`at ${poundsSeen(lightningBolt.prices.eur!)}`);
+    expect(atThePrice(readText(inGbp))).toBe(`at ${pounds(lightningBolt.prices.eur)} each`);
+  });
+
+  it('submits one near-mint English copy by default', async () => {
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
+    render(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} />);
+    await submit();
+    expect(onSubmit).toHaveBeenCalledWith({
+      card_id: lightningBolt.id,
+      quantity: 1,
+      finish: 'nonfoil',
+      condition: 'NM',
+      language: 'en',
+      group_id: null,
+    });
+  });
+
+  it('submits what the user picked', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
+    render(<AddToCollectionForm card={fireIce} groups={customGroups} onSubmit={onSubmit} />);
+
+    const quantity = screen.getByRole('spinbutton', { name: 'Quantity' });
+    await user.clear(quantity);
+    await user.type(quantity, '3');
+    await user.selectOptions(select('Finish'), 'etched');
+    await user.selectOptions(select('Condition'), 'LP');
+    await user.selectOptions(select('Language'), 'ph');
+    await user.selectOptions(select('Add to group'), 'Izzet Tempo');
+    await user.click(screen.getByRole('button', { name: 'Add to collection' }));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      card_id: fireIce.id,
+      quantity: 3,
+      finish: 'etched',
+      condition: 'LP',
+      language: 'ph',
+      group_id: customGroups.find((g) => g.name === 'Izzet Tempo')!.id,
+    });
+  });
+
+  it('lists every condition and language with its full name', () => {
+    render(<AddToCollectionForm card={lightningBolt} onSubmit={() => {}} />);
+    const optionText = (name: string) => within(select(name)).getAllByRole('option').map((o) => o.textContent);
+    expect(optionText('Condition')).toEqual([
+      'MT: Mint',
+      'NM: Near Mint',
+      'EX: Excellent',
+      'GD: Good',
+      'LP: Light Played',
+      'PL: Played',
+      'PO: Poor',
+    ]);
+    expect(optionText('Language')).toEqual(Object.values(LANGUAGES));
+  });
+
+  it('only offers the finishes the printing exists in', () => {
+    render(<AddToCollectionForm card={lightningBolt} onSubmit={() => {}} />);
+    const options = within(select('Finish')).getAllByRole('option');
+    expect(options.map((o) => o.getAttribute('value'))).toEqual(lightningBolt.finishes);
+    expect(options.map((o) => o.textContent)).toEqual(['Non-foil', 'Foil']);
+  });
+
+  it('defaults a foil-only printing to foil', async () => {
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
+    render(<AddToCollectionForm card={propaganda} onSubmit={onSubmit} />);
+    expect(select('Finish')).toHaveValue('foil');
+    expect(screen.getByText(/Adding/)).toHaveTextContent(eur(propaganda.prices.eur_foil));
+    await submit();
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ finish: 'foil' }));
+  });
+
+  it('falls back to a valid finish when the card changes to one without the chosen finish', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
+    const { rerender } = render(<AddToCollectionForm card={fireIce} onSubmit={onSubmit} />);
+    await user.selectOptions(select('Finish'), 'etched');
+
+    rerender(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} />);
+    expect(select('Finish')).toHaveValue('nonfoil');
+    expect(screen.getByText(/Adding/)).toHaveTextContent(eur(lightningBolt.prices.eur));
+    await submit();
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ card_id: lightningBolt.id, finish: 'nonfoil' }));
+  });
+
+  it("defaults the language to the printing's language", async () => {
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
+    render(<AddToCollectionForm card={{ ...lightningBolt, lang: 'ja' }} onSubmit={onSubmit} />);
+    expect(select('Language')).toHaveValue('ja');
+    await submit();
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ language: 'ja' }));
+  });
+
+  it('forgets the quantity, finish and language chosen for a previous card, but keeps condition and group', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
+    const { rerender } = render(<AddToCollectionForm card={lightningBolt} groups={customGroups} onSubmit={onSubmit} />);
+    const quantity = () => screen.getByRole('spinbutton', { name: 'Quantity' });
+    await user.clear(quantity());
+    await user.type(quantity(), '4');
+    await user.selectOptions(select('Finish'), 'foil');
+    await user.selectOptions(select('Language'), 'de');
+    await user.selectOptions(select('Condition'), 'LP');
+    await user.selectOptions(select('Add to group'), 'Trade binder');
+
+    rerender(<AddToCollectionForm card={ragavan} groups={customGroups} onSubmit={onSubmit} />);
+    expect(quantity()).toHaveValue(1);
+    expect(select('Finish')).toHaveValue('nonfoil');
+    expect(select('Language')).toHaveValue('en');
+    expect(select('Condition')).toHaveValue('LP');
+    expect(select('Add to group')).toHaveValue(String(customGroups.find((g) => g.name === 'Trade binder')!.id));
+  });
+
+  it('shows a finish it has no label for by its code', () => {
+    render(<AddToCollectionForm card={{ ...lightningBolt, finishes: ['nonfoil', 'glossy' as never] }} onSubmit={() => {}} />);
+    expect(within(select('Finish')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Non-foil', 'glossy']);
+  });
+
+  it('drops a chosen group that no longer exists, and "None" clears the group', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
+    const { rerender } = render(<AddToCollectionForm card={lightningBolt} groups={customGroups} onSubmit={onSubmit} />);
+    await user.selectOptions(select('Add to group'), 'Trade binder');
+    await user.selectOptions(select('Add to group'), 'None');
+    await submit();
+    expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ group_id: null }));
+
+    await user.selectOptions(select('Add to group'), 'Trade binder');
+    rerender(<AddToCollectionForm card={lightningBolt} groups={customGroups.filter((g) => g.name !== 'Trade binder')} onSubmit={onSubmit} />);
+    await submit();
+    expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ group_id: null }));
+  });
+
+  it('shows the unit price for the chosen finish', async () => {
+    const user = userEvent.setup();
+    render(<AddToCollectionForm card={ragavan} onSubmit={() => {}} />);
+    expect(screen.getByText(/Adding/)).toHaveTextContent(eur(ragavan.prices.eur));
+    await user.selectOptions(select('Finish'), 'foil');
+    expect(screen.getByText(/Adding/)).toHaveTextContent(eur(ragavan.prices.eur_foil));
+  });
+
+  it('submits an emptied quantity as one', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
+    render(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} />);
+    await user.clear(screen.getByRole('spinbutton', { name: 'Quantity' }));
+    await submit();
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ quantity: 1 }));
+  });
+
+  it.each(['2.5', '0', '1000'])('lets the browser block an invalid quantity of %s', async (typed) => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
+    render(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} />);
+    const quantity = screen.getByRole('spinbutton', { name: 'Quantity' });
+    await user.clear(quantity);
+    await user.type(quantity, typed);
+    await submit();
+    expect(quantity).toBeInvalid();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('hides the group picker when the user has no groups', () => {
+    render(<AddToCollectionForm card={lightningBolt} onSubmit={() => {}} />);
+    expect(screen.queryByRole('combobox', { name: 'Add to group' })).not.toBeInTheDocument();
+  });
+
+  it("won't submit twice: the button is busy while submitting", async () => {
+    const onSubmit = vi.fn<(entry: NewEntry) => void>();
+    render(<AddToCollectionForm card={lightningBolt} onSubmit={onSubmit} submitting />);
+    const button = screen.getByRole('button', { name: 'Adding…' });
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(button);
+    // Browsers submit a form from Enter in its only text field even with no usable submit button.
+    fireEvent.submit(button.closest('form')!);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
