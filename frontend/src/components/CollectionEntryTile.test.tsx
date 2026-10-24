@@ -47,6 +47,18 @@ describe('CardTile', () => {
     expect(screen.getByRole('article')).toHaveClass('card-tile--nonfoil');
   });
 
+  it('draws a sheen over a foil or etched image: under its overlay, outside its button, unheard', () => {
+    const sheen = () => screen.getByRole('article').querySelector('.card-tile__media > .card-tile__sheen');
+    const { rerender } = render(<CardTile card={lightningBolt} finish="foil" overlay="4×" onView={() => {}} />);
+    expect(sheen()).toHaveAttribute('aria-hidden', 'true');
+    expect(sheen()!.nextElementSibling).toHaveClass('card-tile__overlay');
+    expect(screen.getByRole('button', { name: `View ${lightningBolt.name} larger` })).not.toContainElement(sheen() as HTMLElement);
+    rerender(<CardTile card={lightningBolt} finish="etched" />);
+    expect(sheen()).toBeInTheDocument();
+    rerender(<CardTile card={lightningBolt} />);
+    expect(sheen()).toBeNull();
+  });
+
   it('shows the name, printing, non-foil price and actions', () => {
     render(<CardTile card={lightningBolt} actions={<button type="button">Add</button>} />);
     const tile = screen.getByRole('article');
