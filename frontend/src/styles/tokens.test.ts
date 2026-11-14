@@ -54,6 +54,9 @@ describe('design tokens', () => {
     ['--color-danger-text', '--color-danger', 4.5],
     ['--color-danger-fg', '--color-bg', 4.5],
     ['--color-danger-fg', '--color-surface-raised', 4.5],
+    // The foil chip's text, across its whole gradient.
+    ['--color-foil-text', '--color-foil-from', 4.5],
+    ['--color-foil-text', '--color-foil-to', 4.5],
     // Non-text marks need 3:1: a focus ring, and the outline that shows where a control is.
     ['--color-focus', '--color-bg', 3],
     ['--color-focus', '--color-surface-raised', 3],
@@ -65,6 +68,26 @@ describe('design tokens', () => {
     it.each(pairs)('%s is readable on %s', (fg, bg, ratio) => {
       expect(contrast(value(fg, theme), value(bg, theme))).toBeGreaterThanOrEqual(ratio);
     });
+  });
+
+  // A symbol drawn as text is the same dark text on every mana colour. The light theme may
+  // override the mana colours, so check against its value where it has one.
+  describe.each(['dark', 'light'] as const)('the %s theme', (theme) => {
+    const valueOrDark = (name: string) => (theme === 'light' && lightBlock.includes(`${name}:`) ? value(name, 'light') : value(name));
+    it.each(Object.keys(COLORS))('mana text is readable on the %s mana colour', (color) => {
+      expect(contrast(valueOrDark('--color-mana-text'), valueOrDark(`--color-mana-${color.toLowerCase()}`))).toBeGreaterThanOrEqual(4.5);
+    });
+  });
+
+  // The quantity badge and a tile's Actions button sit on card art, which can be any colour, so
+  // they're one value in both themes. Their translucent backing must keep the text readable even
+  // over white art (the worst case for light text).
+  it('keeps text on card art readable over any art', () => {
+    expect(lightBlock).not.toMatch(/--color-on-image/);
+    const [, r, g, b, alpha] = tokens.match(/--color-on-image:\s*rgb\((\d+) (\d+) (\d+) \/ (\d+)%\);/)!.map(Number);
+    const overWhite = [r, g, b].map((c) => Math.round((c * alpha + 255 * (100 - alpha)) / 100));
+    const backing = `#${overWhite.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+    expect(contrast(value('--color-on-image-text'), backing)).toBeGreaterThanOrEqual(4.5);
   });
 
   it('gives the light theme its own value for every colour it needs', () => {
