@@ -1,0 +1,26 @@
+{
+  "description": "Pricing rules shared by the frontend (frontend/src/lib/price.ts) and the Go backend. Both test suites run every case here, so the client and server can't price a card differently. Prices are Scryfall's; EUR comes from Cardmarket.",
+  "price_cases": [
+    { "name": "non-foil uses the regular price", "prices": { "eur": 1.55, "eur_foil": 5.56, "usd": 1.87, "usd_foil": 8.03, "usd_etched": 6.5 }, "finish": "nonfoil", "currency": "eur", "expected": 1.55 },
+    { "name": "foil uses the foil price", "prices": { "eur": 1.55, "eur_foil": 5.56, "usd": 1.87, "usd_foil": 8.03, "usd_etched": 6.5 }, "finish": "foil", "currency": "eur", "expected": 5.56 },
+    { "name": "etched uses the EUR foil price (Scryfall has no EUR etched price)", "prices": { "eur": 1.55, "eur_foil": 5.56, "usd": 1.87, "usd_foil": 8.03, "usd_etched": 6.5 }, "finish": "etched", "currency": "eur", "expected": 5.56 },
+    { "name": "etched uses the USD etched price", "prices": { "eur": 1.55, "eur_foil": 5.56, "usd": 1.87, "usd_foil": 8.03, "usd_etched": 6.5 }, "finish": "etched", "currency": "usd", "expected": 6.5 },
+    { "name": "USD etched falls back to USD foil", "prices": { "eur": 1.55, "eur_foil": 5.56, "usd": 1.87, "usd_foil": 8.03, "usd_etched": null }, "finish": "etched", "currency": "usd", "expected": 8.03 },
+    { "name": "foil falls back to the regular price", "prices": { "eur": 0.2, "eur_foil": null, "usd": 0.25, "usd_foil": null, "usd_etched": null }, "finish": "foil", "currency": "eur", "expected": 0.2 },
+    { "name": "etched falls back through foil to regular", "prices": { "eur": 0.2, "eur_foil": null, "usd": 0.25, "usd_foil": null, "usd_etched": null }, "finish": "etched", "currency": "usd", "expected": 0.25 },
+    { "name": "non-foil never falls back to foil", "prices": { "eur": null, "eur_foil": 40.2, "usd": null, "usd_foil": 41.7, "usd_etched": null }, "finish": "nonfoil", "currency": "eur", "expected": null },
+    { "name": "etched-only printing without EUR prices is unpriced in EUR", "prices": { "eur": null, "eur_foil": null, "usd": null, "usd_foil": null, "usd_etched": 3.1 }, "finish": "etched", "currency": "eur", "expected": null },
+    { "name": "no prices at all", "prices": { "eur": null, "eur_foil": null, "usd": null, "usd_foil": null, "usd_etched": null }, "finish": "foil", "currency": "eur", "expected": null }
+  ],
+  "default_finish_cases": [
+    { "name": "non-foil when the printing has it", "finishes": ["foil", "nonfoil"], "expected": "nonfoil" },
+    { "name": "foil-only printing", "finishes": ["foil"], "expected": "foil" },
+    { "name": "etched-only printing", "finishes": ["etched"], "expected": "etched" },
+    { "name": "no finishes listed", "finishes": [], "expected": "nonfoil" }
+  ],
+  "value_cases": [
+    { "name": "line value is quantity times unit price, rounded to cents", "unit_price": 1.005, "quantity": 1, "expected": 1.01 },
+    { "name": "line value for several copies", "unit_price": 0.21, "quantity": 3, "expected": 0.63 },
+    { "name": "no unit price means no value", "unit_price": null, "quantity": 4, "expected": null }
+  ]
+}

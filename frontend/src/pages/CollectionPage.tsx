@@ -1,0 +1,59 @@
+import { Link, useSearchParams } from 'react-router';
+import { useStats } from '../api/queries';
+import { CollectionSummary } from '../components/CollectionSummary';
+import { ListingControls } from '../components/ListingControls';
+import { RateNote } from '../components/RateNote';
+import { readListing, writeListing } from '../lib/listingParams';
+import { errorMessage } from '../lib/messages';
+import { EmptyState, ErrorState, Loading, Stack } from '../ui';
+import { EntryActions } from './EntryActions';
+import { Listing } from './Listing';
+
+/** The signed-in user's whole collection: totals, then the cards grouped and sorted as chosen. */
+export function CollectionPage() {
+  const [params, setParams] = useSearchParams();
+  const listing = readListing(params);
+  const stats = useStats();
+
+  return (
+    <Stack as="section" className="collection-page" gap={5}>
+      <title>Your collection · mtgcollector</title>
+      <div className="page-head">
+        <div className="page-head__titles">
+          <h1>Your collection</h1>
+          <RateNote className="page-head__subtitle" euros="Values from Cardmarket, in euros" />
+        </div>
+        {/* On a phone it floats at the bottom of the screen, in reach of a thumb. */}
+        <Link to="/search" className="button button--primary page-head__action collection-page__add">
+          Add cards
+        </Link>
+      </div>
+      {stats.data === undefined ? (
+        stats.isError ? (
+          <ErrorState message={errorMessage(stats.error)} onRetry={() => void stats.refetch()} />
+        ) : (
+          <Loading label="Loading totals…" live={false} />
+        )
+      ) : (
+        <CollectionSummary stats={stats.data} />
+      )}
+      {/* The same page, so it stays where it's scrolled to. */}
+      <ListingControls value={listing} onChange={(next) => setParams(writeListing(params, next), { replace: true, preventScrollReset: true })} />
+      <Listing
+        listing={null}
+        params={listing}
+        renderActions={(row) => <EntryActions entry={row.entry} />}
+        empty={
+          // With no cards at all, how to add some, searching or not.
+          listing.q && stats.data?.card_count !== 0 ? (
+            <EmptyState title={`No cards match “${listing.q}”`}>Check the spelling, or clear the search.</EmptyState>
+          ) : (
+            <EmptyState title="Your collection is empty" action={<Link to="/search">Search for cards to add</Link>}>
+              Find a card, pick the printing you have, and add it.
+            </EmptyState>
+          )
+        }
+      />
+    </Stack>
+  );
+}
