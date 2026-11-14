@@ -46,6 +46,15 @@
   --color-danger-fg: #f08c7c;
   --color-success: #5fbf7f;
   --color-warning: #e0a03a;
+  /* Colour: the foil chip on an owned copy's tile (a gradient, with its text) */
+  --color-foil-from: #3a3550;
+  --color-foil-to: #24414a;
+  --color-foil-text: #e7e0ff;
+  /* Colour: marks that sit on card art (the quantity badge, a tile's Actions button). Art can be
+     any colour in either theme, so these are the same in both: a near-opaque dark backing. */
+  --color-on-image: rgb(10 10 12 / 86%);
+  --color-on-image-text: #ffffff;
+  --color-on-image-ring: rgb(255 255 255 / 16%);
 
   /* Colour: card rarities (set symbols, rarity badges), as text on the background */
   --color-rarity-common: #cfcac3;
@@ -72,6 +81,7 @@
   --color-mana-symbol-r: #e49977;
   --color-mana-symbol-g: #a3c095;
   --color-mana-symbol-c: #ccc2c0;
+  --color-mana-text: #1a1a1a;
 
   /* Spacing: a 4px-based scale (0, 4, 8, 12, 16, 24, 32, 48 px) */
   --spacing-0: 0;
@@ -159,6 +169,9 @@
   --color-danger-fg: #a51d2d;
   --color-success: #1f7a45;
   --color-warning: #9a5b00;
+  --color-foil-from: #e6def8;
+  --color-foil-to: #d4ecef;
+  --color-foil-text: #3b2d6e;
   --color-rarity-common: #1a1a1a;
   --color-rarity-uncommon: #5f6670;
   --color-rarity-rare: #7a6420;
