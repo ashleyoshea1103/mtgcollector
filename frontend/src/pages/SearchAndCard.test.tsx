@@ -74,6 +74,23 @@ describe('SearchPage', () => {
     expect(api.sent('GET /api/cards/search')).toHaveLength(0);
   });
 
+  it('offers example searches before one is typed, which fill in the search', async () => {
+    const { api, user, location } = renderApp('/search', { ...signedOut, ...searchApi });
+    expect(await main().findByRole('link', { name: 'Modern Horizons 2 (mh2)' })).toHaveAttribute('href', '/search?set=mh2');
+    expect(main().getByRole('link', { name: 'red dragons in Core Set 2019' })).toHaveAttribute('href', '/search?set=m19&type=dragon&colors=R');
+    await user.click(main().getByRole('link', { name: 'Lightning Bolt' }));
+    await waitFor(() => expect(location().search).toBe('?q=lightning+bolt'));
+    expect(main().getByRole('searchbox', { name: 'Card name' })).toHaveValue('lightning bolt');
+    expect(api.sent('GET /api/cards/search').map((r) => r.query.toString())).toEqual(['q=lightning+bolt&page=1']);
+    expect(main().queryByRole('link', { name: 'Lightning Bolt' })).not.toBeInTheDocument();
+  });
+
+  it('offers no example searches while a set code needs correcting', async () => {
+    renderApp('/search?set=mh-2', { ...signedOut, ...searchApi });
+    expect(await main().findByText('Correct the set code to search.')).toBeInTheDocument();
+    expect(main().queryByRole('link', { name: 'Lightning Bolt' })).not.toBeInTheDocument();
+  });
+
   it('searches as you type, keeping the search in the URL', async () => {
     const { api, user, location } = renderApp('/search', { ...signedOut, ...searchApi });
     const box = await main().findByRole('searchbox', { name: 'Card name' });
