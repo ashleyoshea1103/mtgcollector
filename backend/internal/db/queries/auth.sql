@@ -40,3 +40,8 @@ DELETE FROM sessions WHERE token_hash = @token_hash;
 
 -- name: DeleteExpiredSessions :execrows
 DELETE FROM sessions WHERE expires_at <= @now;
+
+-- name: DeleteUserByEmail :execrows
+-- Removes an account and, through the foreign keys, everything that's its own: sessions,
+-- collection entries, custom groups and their members. Only the development seed uses it.
+DELETE FROM users WHERE email = @email;

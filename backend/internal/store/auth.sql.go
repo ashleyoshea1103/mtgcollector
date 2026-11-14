@@ -97,6 +97,20 @@ func (q *Queries) DeleteSession(ctx context.Context, tokenHash []byte) error {
 	return err
 }
 
+const deleteUserByEmail = `-- name: DeleteUserByEmail :execrows
+DELETE FROM users WHERE email = $1
+`
+
+// Removes an account and, through the foreign keys, everything that's its own: sessions,
+// collection entries, custom groups and their members. Only the development seed uses it.
+func (q *Queries) DeleteUserByEmail(ctx context.Context, email string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUserByEmail, email)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const sessionUser = `-- name: SessionUser :one
 SELECT u.id, u.email, s.created_at, s.expires_at
   FROM sessions s
