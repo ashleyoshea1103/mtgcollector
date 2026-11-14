@@ -7,11 +7,19 @@ import { SearchFilters } from '../components/SearchFilters';
 import { errorMessage } from '../lib/messages';
 import { loginUrl } from '../lib/nextPath';
 import { cardPath } from '../lib/paths';
-import { canSearch, isSetCode, readSearch, writeSearch } from '../lib/search';
+import { canSearch, EMPTY_SEARCH, isSetCode, readSearch, writeSearch } from '../lib/search';
 import { MinSearchWord, type CardSummary } from '../types';
 import { Button, EmptyState, ErrorState, Grid, Loading, Stack, VisuallyHidden } from '../ui';
 import { AddCardDialog } from './AddCardDialog';
 import { useCardViewer } from './useCardViewer';
+
+// Searches to try before typing one, each named by what it finds. The type-and-colour one names
+// a set too, since the API needs a name or a set to search by.
+const EXAMPLES = [
+  { label: 'Lightning Bolt', search: { ...EMPTY_SEARCH, q: 'lightning bolt' } },
+  { label: 'Modern Horizons 2 (mh2)', search: { ...EMPTY_SEARCH, set: 'mh2' } },
+  { label: 'red dragons in Core Set 2019', search: { ...EMPTY_SEARCH, set: 'm19', type: 'dragon', colors: 'R' } },
+];
 
 /** Searching every card by name and filters; signed-in users can add what they find. The search is kept in the URL. */
 export function SearchPage() {
@@ -49,9 +57,24 @@ export function SearchPage() {
         </p>
       )}
       {!ready ? (
-        <p className="search-page__hint">
-          {search.set !== '' && !isSetCode(search.set) ? 'Correct the set code to search.' : `Type at least ${MinSearchWord} letters of a card's name, or a set code.`}
-        </p>
+        search.set !== '' && !isSetCode(search.set) ? (
+          <p className="search-page__hint">Correct the set code to search.</p>
+        ) : (
+          <div className="search-page__hint">
+            <p>Type at least {MinSearchWord} letters of a card's name, or a set code.</p>
+            <p>
+              Or try{' '}
+              {EXAMPLES.map(({ label, search: example }, i) => (
+                <span key={label}>
+                  {i > 0 && (i === EXAMPLES.length - 1 ? ' or ' : ', ')}
+                  {/* A link rather than a write, so it's a new search the form starts afresh from. */}
+                  <Link to={`/search?${writeSearch(example)}`}>{label}</Link>
+                </span>
+              ))}
+              .
+            </p>
+          </div>
+        )
       ) : results.data === undefined ? (
         results.isError ? (
           <ErrorState message={errorMessage(results.error)} onRetry={() => void results.refetch()} />

@@ -64,7 +64,8 @@
   --color-rarity-special: #c79bd8;
   --color-rarity-bonus: #c79bd8;
 
-  /* Colour: mana (W U B R G C), for symbols and colour breakdowns; M is multicolour */
+  /* Colour: mana (W U B R G C) as marks on the page: the collection summary's bars and
+     swatches. M is multicolour. The light theme deepens them (below). */
   --color-mana-w: #f8f6d8;
   --color-mana-u: #c1d7e9;
   --color-mana-b: #bab1ab;
@@ -72,7 +73,14 @@
   --color-mana-g: #a3c095;
   --color-mana-c: #ccc2c0;
   --color-mana-m: #e0c96b;
-  /* Text on a mana colour (a symbol drawn as text) */
+  /* Mana symbols drawn as text (when Scryfall has no image): pale pills with dark text, as
+     the symbols are printed on cards, so the same in both themes. */
+  --color-mana-symbol-w: #f8f6d8;
+  --color-mana-symbol-u: #c1d7e9;
+  --color-mana-symbol-b: #bab1ab;
+  --color-mana-symbol-r: #e49977;
+  --color-mana-symbol-g: #a3c095;
+  --color-mana-symbol-c: #ccc2c0;
   --color-mana-text: #1a1a1a;
 
   /* Spacing: a 4px-based scale (0, 4, 8, 12, 16, 24, 32, 48 px) */
@@ -103,7 +111,6 @@
   --leading-tight: 1.15;
   --leading-snug: 1.25;
   --leading-body: 1.45;
-  --tracking-caps: 0.08em;
 
   /* Radius */
   --radius-sm: 4px;
@@ -171,6 +178,14 @@
   --color-rarity-mythic: #b5401f;
   --color-rarity-special: #652978;
   --color-rarity-bonus: #652978;
+  /* Mana, deeper so the summary's bars and swatches stand out from the page (3:1). White
+     stays pale, as white must, and is outlined where it's drawn (see .swatch--w). */
+  --color-mana-u: #4a7fb5;
+  --color-mana-b: #6b625d;
+  --color-mana-r: #c4573a;
+  --color-mana-g: #4f8a52;
+  --color-mana-c: #807774;
+  --color-mana-m: #9a7b22;
   --shadow-sm: 0 1px 2px rgb(20 24 40 / 12%);
   --shadow-md: 0 6px 16px rgb(20 24 40 / 14%);
   --shadow-lg: 0 16px 36px rgb(20 24 40 / 20%);

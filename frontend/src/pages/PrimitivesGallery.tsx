@@ -73,7 +73,8 @@ export function PrimitivesGallery() {
         <h3>Rarity</h3>
         <Cluster gap={4}>{Object.keys(RARITIES).map((r) => swatch(`--color-rarity-${r}`))}</Cluster>
         <h3>Mana</h3>
-        <Cluster gap={4}>{[...Object.keys(COLORS).map((c) => `--color-mana-${c.toLowerCase()}`), '--color-mana-text'].map(swatch)}</Cluster>
+        <Cluster gap={4}>{Object.keys(COLORS).map((c) => swatch(`--color-mana-${c.toLowerCase()}`))}</Cluster>
+        <Cluster gap={4}>{[...['w', 'u', 'b', 'r', 'g', 'c'].map((c) => `--color-mana-symbol-${c}`), '--color-mana-text'].map(swatch)}</Cluster>
         <h3>Foil chip</h3>
         <Cluster gap={4}>{['--color-foil-from', '--color-foil-to', '--color-foil-text'].map(swatch)}</Cluster>
         <h3>On card art</h3>

@@ -70,13 +70,29 @@ describe('design tokens', () => {
     });
   });
 
-  // A symbol drawn as text is the same dark text on every mana colour. The light theme may
-  // override the mana colours, so check against its value where it has one.
-  describe.each(['dark', 'light'] as const)('the %s theme', (theme) => {
-    const valueOrDark = (name: string) => (theme === 'light' && lightBlock.includes(`${name}:`) ? value(name, 'light') : value(name));
-    it.each(Object.keys(COLORS))('mana text is readable on the %s mana colour', (color) => {
-      expect(contrast(valueOrDark('--color-mana-text'), valueOrDark(`--color-mana-${color.toLowerCase()}`))).toBeGreaterThanOrEqual(4.5);
+  // Mana colours fill the collection summary's bars and swatches, which sit on the page:
+  // non-text marks, so 3:1 against it in both themes. White can't be 3:1 against a light page
+  // and still look white, so there it keeps a pale fill and gets an outline that is 3:1.
+  describe.each(['dark', 'light'] as const)('mana colours in the %s theme', (theme) => {
+    const shown = Object.keys(COLORS)
+      .map((c) => c.toLowerCase())
+      .filter((c) => !(theme === 'light' && c === 'w'));
+    it.each(shown)('--color-mana-%s stands out from the page', (c) => {
+      const mana = theme === 'light' && lightBlock.includes(`--color-mana-${c}:`) ? value(`--color-mana-${c}`, 'light') : value(`--color-mana-${c}`);
+      expect(contrast(mana, value('--color-bg', theme))).toBeGreaterThanOrEqual(3);
     });
+  });
+  it('outlines white mana in the light theme, where its fill is pale', () => {
+    const styles = read('../index.css');
+    expect(styles).toMatch(/:root\[data-theme='light'\] \.swatch--w \{\s*box-shadow: inset 0 0 0 1px var\(--color-border-control\);/);
+    expect(contrast(value('--color-border-control', 'light'), value('--color-bg', 'light'))).toBeGreaterThanOrEqual(3);
+  });
+
+  // A mana symbol drawn as text (when Scryfall has no image) is dark text on a pale pill of its
+  // colour, the same in both themes, as on a printed card. Multicolour isn't a symbol.
+  it.each(['w', 'u', 'b', 'r', 'g', 'c'])('mana text is readable on the %s symbol', (c) => {
+    expect(lightBlock).not.toMatch(new RegExp(`--color-mana-symbol-${c}:|--color-mana-text:`));
+    expect(contrast(value('--color-mana-text'), value(`--color-mana-symbol-${c}`))).toBeGreaterThanOrEqual(4.5);
   });
 
   // The quantity badge and a tile's Actions button sit on card art, which can be any colour, so
