@@ -298,6 +298,7 @@ a.button:hover {
 }
 .card-tile__sheen::before {
   content: '';
+  /* Its colours are a light effect over the card art, not interface colour, so they aren't tokens. */
   position: absolute;
   inset: 0 -100%;
   mix-blend-mode: screen;
@@ -389,9 +390,9 @@ a.button:hover {
 /* An owned copy's tile: a count on the image, its copy as chips, its value. */
 .entry-tile__quantity {
   padding: 0.125rem 0.5625rem;
-  background: rgb(10 10 12 / 86%);
-  box-shadow: 0 0 0 1px rgb(255 255 255 / 16%);
-  color: #ffffff;
+  background: var(--color-on-image);
+  box-shadow: 0 0 0 1px var(--color-on-image-ring);
+  color: var(--color-on-image-text);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
@@ -409,8 +410,8 @@ a.button:hover {
   text-decoration: none;
 }
 .entry-tile__copy > .entry-tile__finish {
-  background: linear-gradient(100deg, #3a3550, #24414a);
-  color: #e7e0ff;
+  background: linear-gradient(100deg, var(--color-foil-from), var(--color-foil-to));
+  color: var(--color-foil-text);
 }
 .entry-tile__price {
   display: flex;
@@ -441,8 +442,8 @@ a.button:hover {
   min-height: var(--size-touch);
   padding: 0;
   border-radius: var(--radius-full);
-  background: rgb(10 10 12 / 86%);
-  color: #ffffff;
+  background: var(--color-on-image);
+  color: var(--color-on-image-text);
 }
 @media (hover: hover) and (pointer: fine) {
   .entry-tile .card-tile__actions {
@@ -984,7 +985,7 @@ html:has(.listing-controls) {
 .mana-symbol--text {
   padding: 0 0.15em;
   border-radius: var(--radius-sm);
-  color: #1a1a1a;
+  color: var(--color-mana-text);
 }
 .mana-symbol--text::before {
   content: '{';

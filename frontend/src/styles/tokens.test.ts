@@ -54,6 +54,9 @@ describe('design tokens', () => {
     ['--color-danger-text', '--color-danger', 4.5],
     ['--color-danger-fg', '--color-bg', 4.5],
     ['--color-danger-fg', '--color-surface-raised', 4.5],
+    // The foil chip's text, across its whole gradient.
+    ['--color-foil-text', '--color-foil-from', 4.5],
+    ['--color-foil-text', '--color-foil-to', 4.5],
     // Non-text marks need 3:1: a focus ring, and the outline that shows where a control is.
     ['--color-focus', '--color-bg', 3],
     ['--color-focus', '--color-surface-raised', 3],
@@ -83,6 +86,24 @@ describe('design tokens', () => {
     const styles = read('../index.css');
     expect(styles).toMatch(/:root\[data-theme='light'\] \.swatch--w \{\s*box-shadow: inset 0 0 0 1px var\(--color-border-control\);/);
     expect(contrast(value('--color-border-control', 'light'), value('--color-bg', 'light'))).toBeGreaterThanOrEqual(3);
+  });
+
+  // A mana symbol drawn as text (when Scryfall has no image) is dark text on a pale pill of its
+  // colour, the same in both themes, as on a printed card. Multicolour isn't a symbol.
+  it.each(['w', 'u', 'b', 'r', 'g', 'c'])('mana text is readable on the %s symbol', (c) => {
+    expect(lightBlock).not.toMatch(new RegExp(`--color-mana-symbol-${c}:|--color-mana-text:`));
+    expect(contrast(value('--color-mana-text'), value(`--color-mana-symbol-${c}`))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // The quantity badge and a tile's Actions button sit on card art, which can be any colour, so
+  // they're one value in both themes. Their translucent backing must keep the text readable even
+  // over white art (the worst case for light text).
+  it('keeps text on card art readable over any art', () => {
+    expect(lightBlock).not.toMatch(/--color-on-image/);
+    const [, r, g, b, alpha] = tokens.match(/--color-on-image:\s*rgb\((\d+) (\d+) (\d+) \/ (\d+)%\);/)!.map(Number);
+    const overWhite = [r, g, b].map((c) => Math.round((c * alpha + 255 * (100 - alpha)) / 100));
+    const backing = `#${overWhite.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+    expect(contrast(value('--color-on-image-text'), backing)).toBeGreaterThanOrEqual(4.5);
   });
 
   it('gives the light theme its own value for every colour it needs', () => {
