@@ -75,14 +75,14 @@ describe('CollectionPage, in pounds', () => {
     }
   });
 
-  it('shows every value in pounds when GBP is chosen, a missing price still as a dash', async () => {
+  it('shows every value in pounds when GBP is chosen, a missing price still as "No price"', async () => {
     localStorage.setItem('mtgcollector-currency', 'gbp');
     renderApp('/collection', collection);
     const summary = await main().findByRole('region', { name: 'Collection summary' });
     expect(summary).toHaveTextContent(pounds(stats.value_eur));
     for (const e of all) {
       const tile = (await main().findByRole('heading', { name: e.card.name })).closest('article')!;
-      expect(tile.querySelector('.entry-tile__value')).toHaveTextContent(e.value_eur == null ? '—' : `Value ${pounds(e.value_eur)}`);
+      expect(tile.querySelector('.entry-tile__price')).toHaveTextContent(e.value_eur == null ? /^No price$/ : `Value ${pounds(e.value_eur)}`);
     }
   });
 });
