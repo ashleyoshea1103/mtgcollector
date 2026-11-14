@@ -67,6 +67,24 @@ describe('design tokens', () => {
     });
   });
 
+  // Mana colours fill the collection summary's bars and swatches, which sit on the page:
+  // non-text marks, so 3:1 against it in both themes. White can't be 3:1 against a light page
+  // and still look white, so there it keeps a pale fill and gets an outline that is 3:1.
+  describe.each(['dark', 'light'] as const)('mana colours in the %s theme', (theme) => {
+    const shown = Object.keys(COLORS)
+      .map((c) => c.toLowerCase())
+      .filter((c) => !(theme === 'light' && c === 'w'));
+    it.each(shown)('--color-mana-%s stands out from the page', (c) => {
+      const mana = theme === 'light' && lightBlock.includes(`--color-mana-${c}:`) ? value(`--color-mana-${c}`, 'light') : value(`--color-mana-${c}`);
+      expect(contrast(mana, value('--color-bg', theme))).toBeGreaterThanOrEqual(3);
+    });
+  });
+  it('outlines white mana in the light theme, where its fill is pale', () => {
+    const styles = read('../index.css');
+    expect(styles).toMatch(/:root\[data-theme='light'\] \.swatch--w \{\s*box-shadow: inset 0 0 0 1px var\(--color-border-control\);/);
+    expect(contrast(value('--color-border-control', 'light'), value('--color-bg', 'light'))).toBeGreaterThanOrEqual(3);
+  });
+
   it('gives the light theme its own value for every colour it needs', () => {
     for (const name of new Set(pairs.flat().filter((p): p is string => typeof p === 'string'))) {
       expect(lightBlock, name).toMatch(new RegExp(`${name}:`));
