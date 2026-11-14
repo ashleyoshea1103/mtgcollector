@@ -774,9 +774,18 @@ html:has(.listing-controls) {
 .custom-group-card__previews img:nth-child(4) {
   transform: rotate(9deg);
 }
+/* Fills the space the previews would take, centred. */
 .custom-group-card__empty {
   width: 100%;
+  align-content: center;
   padding: var(--spacing-4);
+}
+/* Muted body text, so the group's name below stays the card's heading. */
+.custom-group-card__empty .empty-state__title {
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-normal);
 }
 .custom-group-card__name {
   margin: 0;
