@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { cards, entries, makeEntry, serverPricedBolts, unpricedCard } from '../fixtures';
-import { eur, getAllByTooltip, getByTooltip, inPounds, pounds, poundsSeen, queryByTooltip, visibleText } from '../test/helpers';
+import { eur, getByTooltip, inPounds, pounds, poundsSeen, queryByTooltip, visibleText } from '../test/helpers';
 import { MoneyContext } from '../lib/money';
 import { corsIconUrl } from '../lib/urls';
 import { CardTile } from './CardTile';
@@ -115,9 +115,9 @@ describe('CollectionEntryTile, the unit price', () => {
     expect(screen.getByRole('article')).not.toHaveTextContent(/each/);
   });
 
-  it('shows an unpriced single copy as one dash', () => {
+  it('shows an unpriced single copy as "No price" too', () => {
     render(<CollectionEntryTile entry={makeEntry(10, unpricedCard, { quantity: 1 })} />);
-    expect(screen.getByRole('article').querySelectorAll('.price--none')).toHaveLength(1);
+    expect(screen.getByRole('article').querySelector('.entry-tile__price')).toHaveTextContent(/^No price$/);
   });
 });
 
@@ -165,9 +165,22 @@ describe('CollectionEntryTile', () => {
     expect(queryByTooltip(document.body, 'English')).not.toBeInTheDocument();
   });
 
-  it('shows dashes for the price and value of an unpriced card', () => {
-    render(<CollectionEntryTile entry={entries.unpricedElves} />);
-    expect(getAllByTooltip(document.body, 'No price available')).toHaveLength(2);
+  it('says "No price" once for an unpriced card, in place of its price and value', () => {
+    const { unpricedElves } = entries;
+    const { rerender } = render(<CollectionEntryTile entry={unpricedElves} />);
+    const price = () => screen.getByRole('article').querySelector('.entry-tile__price')!;
+    // The whole line, as seen and as read out: no dashes, no "each", no "Value".
+    expect(visibleText(price())).toBe('No price');
+    expect(price()).toHaveTextContent(/^No price$/);
+    expect(queryByTooltip(document.body, 'No price available')).not.toBeInTheDocument();
+
+    rerender(
+      <MoneyContext value={inPounds}>
+        <CollectionEntryTile entry={unpricedElves} />
+      </MoneyContext>,
+    );
+    expect(visibleText(price())).toBe('No price');
+    expect(price()).toHaveTextContent(/^No price$/);
   });
 
   it('renders its actions', () => {

@@ -427,6 +427,12 @@ a.button:hover {
   color: var(--color-text-strong);
   font-weight: var(--font-weight-semibold);
 }
+/* In the value's place, when the card has no price. */
+.entry-tile__none {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
 /* The Actions button sits on the image's corner, shown while the tile is pointed at or
    focused (always where the main pointer is a finger, which can't point without pressing). */
 .entry-tile .card-tile__actions {
