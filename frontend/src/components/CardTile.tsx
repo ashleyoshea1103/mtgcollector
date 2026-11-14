@@ -37,6 +37,8 @@ export function CardTile({ card, finish = defaultFinish(card), price, overlay, c
         ) : (
           image
         )}
+        {/* Foil copies catch the light (index.css): a layer of its own, clipping its moving band to the card. */}
+        {finish !== 'nonfoil' && <span className="card-tile__sheen" aria-hidden="true" />}
         {overlay && <div className="card-tile__overlay">{overlay}</div>}
       </div>
       <div className="card-tile__body">

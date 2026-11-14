@@ -284,37 +284,47 @@ a.button:hover {
     box-shadow: var(--shadow-lg);
   }
 }
-/* Foil copies catch the light: a sheen that sweeps across the image. */
-:is(.card-tile--foil, .card-tile--etched) .card-tile__media::after {
-  content: '';
+/* Foil copies catch the light: a sheen sweeps across the image in about 2.2 s, then rests off it
+   for about 1.4 s. Each pass starts and ends with the band just off the card, so the loop never
+   jumps (motion.test.ts works this out from the values here). The band is a layer three cards
+   wide, slid with a transform; its own layer clips it to the card's corners without clipping
+   the image button's focus ring. */
+.card-tile__sheen {
   position: absolute;
   inset: 0;
+  overflow: clip; /* Not hidden: it needn't scroll. */
   border-radius: inherit;
   pointer-events: none;
+}
+.card-tile__sheen::before {
+  content: '';
+  position: absolute;
+  inset: 0 -100%;
   mix-blend-mode: screen;
   background: linear-gradient(
     115deg,
-    transparent 28%,
-    rgb(255 255 255 / 34%) 42%,
-    rgb(150 225 255 / 28%) 48%,
-    rgb(255 170 240 / 24%) 54%,
-    transparent 68%
+    transparent 26.5%,
+    rgb(255 255 255 / 34%) 43%,
+    rgb(150 225 255 / 28%) 50%,
+    rgb(255 170 240 / 24%) 57%,
+    transparent 73.5%
   );
-  background-size: 260% 260%;
+  transform: translateX(-57%);
   animation: foil-sheen 3.6s ease-in-out infinite;
 }
 @keyframes foil-sheen {
   0% {
-    background-position: 110% 0;
+    transform: translateX(-57%);
   }
+  60%,
   100% {
-    background-position: -110% 0;
+    transform: translateX(57%);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  :is(.card-tile--foil, .card-tile--etched) .card-tile__media::after {
+  .card-tile__sheen::before {
     animation: none;
-    background-position: 50% 0;
+    transform: none;
   }
 }
 .card-tile__overlay {
