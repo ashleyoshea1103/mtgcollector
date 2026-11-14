@@ -35,18 +35,25 @@ export function CollectionEntryTile({ entry, actions, onView }: Props) {
           </TooltipText>
         )}
       </Cluster>
-      <p className="entry-tile__price">
-        {/* For one copy the price per copy is the value: shown once. */}
-        {entry.quantity > 1 && (
-          <span className="entry-tile__unit">
-            <Price value={entry.unit_price_eur} each />
+      {entry.value_eur == null ? (
+        // No unit price means no value either: said once, in words, not as two dashes.
+        <p className="entry-tile__price">
+          <span className="entry-tile__none">No price</span>
+        </p>
+      ) : (
+        <p className="entry-tile__price">
+          {/* For one copy the price per copy is the value: shown once. */}
+          {entry.quantity > 1 && (
+            <span className="entry-tile__unit">
+              <Price value={entry.unit_price_eur} each />
+            </span>
+          )}
+          <span className="entry-tile__value">
+            <VisuallyHidden>Value </VisuallyHidden>
+            <Price value={entry.value_eur} />
           </span>
-        )}
-        <span className="entry-tile__value">
-          <VisuallyHidden>Value </VisuallyHidden>
-          <Price value={entry.value_eur} />
-        </span>
-      </p>
+        </p>
+      )}
     </CardTile>
   );
 }
