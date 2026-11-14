@@ -17,6 +17,11 @@ Run the API. It applies database migrations when it starts, then imports Scryfal
 cd backend
 go run ./cmd/server
 ```
+To have something to look at, seed the development database with an account, a collection of 65 entries (every colour, rarity, mana value, type and finish, a few languages and conditions, an unpriced card and a printing Scryfall no longer lists) and four groups. It needs the cards imported first, by the server or `go run ./cmd/sync`. Running it again replaces what it made, and it refuses any database but the development one. Log in as `dev@example.com` with the password `correct horse battery staple`.
+```bash
+cd backend
+go run ./cmd/seed
+```
 Run the frontend in another terminal. It forwards `/api` to the API:
 ```bash
 cd frontend

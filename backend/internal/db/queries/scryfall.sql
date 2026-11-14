@@ -147,3 +147,12 @@ SELECT *
 SELECT count(*)
   FROM scryfall_syncs
  WHERE bulk_updated_at = $1 AND (error IS NOT NULL OR finished_at IS NULL);
+
+-- name: MarkCardGone :execrows
+-- One card as MarkGoneCards marks those missing from an import: gone, its prices cleared.
+-- Only the development seed uses it, to show a printing Scryfall no longer lists; the next
+-- import that finds the card in the bulk file writes it back.
+UPDATE cards
+   SET gone_since = now(), price_eur = NULL, price_eur_foil = NULL, price_usd = NULL,
+       price_usd_foil = NULL, price_usd_etched = NULL, updated_at = now()
+ WHERE id = @id AND gone_since IS NULL;

@@ -127,6 +127,24 @@ func (q *Queries) LastImport(ctx context.Context) (ScryfallSync, error) {
 	return i, err
 }
 
+const markCardGone = `-- name: MarkCardGone :execrows
+UPDATE cards
+   SET gone_since = now(), price_eur = NULL, price_eur_foil = NULL, price_usd = NULL,
+       price_usd_foil = NULL, price_usd_etched = NULL, updated_at = now()
+ WHERE id = $1 AND gone_since IS NULL
+`
+
+// One card as MarkGoneCards marks those missing from an import: gone, its prices cleared.
+// Only the development seed uses it, to show a printing Scryfall no longer lists; the next
+// import that finds the card in the bulk file writes it back.
+func (q *Queries) MarkCardGone(ctx context.Context, id pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, markCardGone, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const markGoneCards = `-- name: MarkGoneCards :execrows
 UPDATE cards c
    SET gone_since = now(), price_eur = NULL, price_eur_foil = NULL, price_usd = NULL,
