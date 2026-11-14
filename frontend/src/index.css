@@ -1086,6 +1086,13 @@ html:has(.listing-controls) {
   margin: 0;
   color: var(--color-text-secondary);
 }
+div.search-page__hint {
+  display: grid;
+  gap: var(--spacing-2);
+}
+div.search-page__hint p {
+  margin: 0;
+}
 .search-page__results {
   display: grid;
   gap: var(--spacing-5);
