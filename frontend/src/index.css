@@ -327,9 +327,11 @@ a.button:hover {
     transform: none;
   }
 }
+/* At the image's foot, over the card's small print (collector number, artist), not its
+   printed name at the top. */
 .card-tile__overlay {
   position: absolute;
-  top: var(--spacing-2);
+  bottom: var(--spacing-2);
   left: var(--spacing-2);
   /* Only shows things (a count): a press on it is a press on the image. */
   pointer-events: none;
@@ -543,8 +545,7 @@ a.button:hover {
 .collection-summary__total dt {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  font-weight: var(--font-weight-medium);
 }
 .collection-summary__total dd {
   margin: 0;
@@ -563,8 +564,6 @@ a.button:hover {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 .breakdown-bar {
   display: flex;
@@ -921,11 +920,9 @@ html:has(.listing-controls) {
 .card-detail__prices > h3,
 .card-detail__owned > h3 {
   margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
 }
 .card-detail__cardmarket {
   justify-self: start;
@@ -996,22 +993,22 @@ html:has(.listing-controls) {
   content: '}';
 }
 .mana-symbol--text.mana-symbol--w {
-  background: var(--color-mana-w);
+  background: var(--color-mana-symbol-w);
 }
 .mana-symbol--text.mana-symbol--u {
-  background: var(--color-mana-u);
+  background: var(--color-mana-symbol-u);
 }
 .mana-symbol--text.mana-symbol--b {
-  background: var(--color-mana-b);
+  background: var(--color-mana-symbol-b);
 }
 .mana-symbol--text.mana-symbol--r {
-  background: var(--color-mana-r);
+  background: var(--color-mana-symbol-r);
 }
 .mana-symbol--text.mana-symbol--g {
-  background: var(--color-mana-g);
+  background: var(--color-mana-symbol-g);
 }
 .mana-symbol--text.mana-symbol--c {
-  background: var(--color-mana-c);
+  background: var(--color-mana-symbol-c);
 }
 
 /* Search */
@@ -1247,11 +1244,9 @@ html:has(.listing-controls) {
 }
 .add-card-dialog__printings h3 {
   margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
 }
 .printing-list {
   display: grid;
@@ -1259,6 +1254,8 @@ html:has(.listing-controls) {
   max-height: 16rem;
   overflow-y: auto;
   padding-right: var(--spacing-1);
+  /* Its rows lay out by the list's width (the dialog's), not the screen's. */
+  container-type: inline-size;
 }
 .printing-option {
   justify-content: flex-start;
@@ -1272,7 +1269,29 @@ html:has(.listing-controls) {
 }
 .printing-option__set {
   flex: 1;
+  min-width: 0;
   color: var(--color-text);
+}
+.printing-option .price {
+  margin-left: auto;
+}
+/* Too narrow for one line (a phone): the set's name on the first, then its number, year and
+   price, the price still at the right. Nothing scrolls sideways or is cut off. */
+@container (max-width: 28rem) {
+  .printing-option {
+    flex-wrap: wrap;
+    row-gap: 0.125rem;
+    padding-block: var(--spacing-2);
+  }
+  /* A full-width break after the set's name, however wide its symbol is. */
+  .printing-option::after {
+    content: '';
+    flex-basis: 100%;
+    order: 1;
+  }
+  .printing-option > :is(.printing-option__number, .printing-option__date, .price, .no-longer-listed) {
+    order: 2;
+  }
 }
 .printing-option__number,
 .printing-option__date {
